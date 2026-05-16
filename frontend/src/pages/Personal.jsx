@@ -8,7 +8,7 @@ import {
   UserMinus, BadgeCheck, Search, ChevronLeft, ChevronRight, MapPin,
   Star, AlertTriangle, Edit2, X, Check,
   TrendingUp, Shield, Award, Clock, Zap, AlertCircle, Users,
-  ShieldAlert, Mail, PlusCircle, HandMetal
+  ShieldAlert, Mail, PlusCircle, HandMetal, Lock, ParkingSquare
 } from 'lucide-react';
 import personalService from '../services/personal.service';
 import api from '../services/api';
@@ -103,8 +103,8 @@ const TacticalKPIs = ({ personal }) => {
 // ─── CONFIGURACIÓN DE TABS POR ROL ───────────────────────────────────────────
 
 const TABS_POR_ROL = {
-  PARQUERO:           ['kpis', 'zona', 'incentivos', 'sanciones', 'editar'],
-  SUPERVISOR_PARQUEROS:['kpis', 'zona', 'incentivos', 'sanciones', 'editar'],
+  PARQUERO:           ['kpis', 'zona', 'permisos', 'incentivos', 'sanciones', 'editar'],
+  SUPERVISOR_PARQUEROS:['kpis', 'zona', 'permisos', 'incentivos', 'sanciones', 'editar'],
   ALCABALA:           ['kpis', 'incentivos', 'sanciones', 'editar'],
   SUPERVISOR:         ['kpis', 'incentivos', 'sanciones', 'editar'],
   ADMIN_BASE:         ['editar'],
@@ -139,6 +139,7 @@ const ModalGestion = ({ miembro, isOpen, onClose, zonas, onUpdate, userActual })
     zona:       { id: 'zona',       label: 'Zona',       icon: MapPin },
     incentivos: { id: 'incentivos', label: 'Incentivos', icon: Star },
     sanciones:  { id: 'sanciones', label: 'Sanciones',  icon: ShieldAlert },
+    permisos:   { id: 'permisos',  label: 'Permisos',   icon: Lock },
     editar:     { id: 'editar',     label: 'Editar',     icon: Edit2 },
   }[id]));
 
@@ -298,7 +299,51 @@ const ModalGestion = ({ miembro, isOpen, onClose, zonas, onUpdate, userActual })
             </div>
           )}
 
-          {/* ── TAB ZONA ── */}
+          {/* ── TAB PERMISOS ── */}
+          {tab === 'permisos' && (
+            <div className="space-y-4">
+              <div className="bg-primary/5 border border-primary/10 p-6 rounded-2xl flex items-center gap-6">
+                <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center text-primary shrink-0 border border-primary/20">
+                  <ParkingSquare size={28} />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xs font-black text-text-main uppercase tracking-widest mb-1">Gestión de Pases Temporales</h3>
+                  <p className="text-[10px] text-text-muted font-bold leading-tight uppercase opacity-70">
+                    Permite al parquero generar accesos para visitantes y validar la capacidad de la zona en tiempo real.
+                  </p>
+                </div>
+                <div className="flex flex-col items-center gap-2">
+                  <span className={cn('text-[8px] font-black uppercase tracking-tighter', formEdit.puede_crear_pases ? 'text-primary' : 'text-text-muted')}>
+                    {formEdit.puede_crear_pases ? 'AUTORIZADO' : 'DENEGADO'}
+                  </span>
+                  <input 
+                    type="checkbox" 
+                    className="w-8 h-8 accent-primary cursor-pointer shadow-lg"
+                    checked={formEdit.puede_crear_pases}
+                    onChange={e => {
+                      const val = e.target.checked;
+                      setFormEdit(prev => ({ ...prev, puede_crear_pases: val }));
+                      // Auto-guardar para mejor UX en esta pestaña
+                      personalService.actualizar(miembro.id, { puede_crear_pases: val })
+                        .then(updated => {
+                           onUpdate(updated);
+                           toast.success(val ? 'Permiso otorgado' : 'Permiso revocado');
+                        })
+                        .catch(() => toast.error('Error al actualizar permiso'));
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="p-4 bg-white/5 rounded-xl border border-white/5">
+                 <p className="text-[8px] font-black text-text-muted uppercase tracking-[0.2em] mb-2 flex items-center gap-2">
+                    <Shield size={10} className="text-primary" /> Nota de Seguridad
+                 </p>
+                 <p className="text-[9px] text-text-muted/60 font-bold uppercase italic leading-normal">
+                    Este permiso delega la autoridad de ingreso al parquero. El sistema registrará todas las creaciones bajo su nombre para fines de auditoría.
+                 </p>
+              </div>
+            </div>
+          )}
           {tab === 'zona' && (
             <div className="flex flex-col sm:flex-row items-center gap-4 bg-white/5 border border-white/5 p-4 rounded-2xl">
               <div className="flex items-center gap-3 shrink-0">
@@ -437,20 +482,6 @@ const ModalGestion = ({ miembro, isOpen, onClose, zonas, onUpdate, userActual })
                 <input className="w-full h-10 bg-bg-card border border-white/10 rounded-xl px-3 text-xs font-bold text-text-main outline-none focus:ring-1 focus:ring-primary"
                   value={formEdit.telefono} onChange={e => setFormEdit({ ...formEdit, telefono: e.target.value })} />
               </div>
-              {miembro.rol === 'PARQUERO' && (
-                <div className="space-y-1 flex items-center gap-3 bg-primary/5 border border-primary/10 p-2 rounded-xl">
-                   <div className="flex-1">
-                      <p className="text-[8px] font-black text-primary uppercase tracking-widest">Permisos Especiales</p>
-                      <p className="text-[9px] font-bold text-text-main/80 leading-none">Autorizar creación de pases temporales</p>
-                   </div>
-                   <input 
-                    type="checkbox" 
-                    className="w-5 h-5 accent-primary cursor-pointer"
-                    checked={formEdit.puede_crear_pases}
-                    onChange={e => setFormEdit({ ...formEdit, puede_crear_pases: e.target.checked })}
-                   />
-                </div>
-              )}
               <div className="flex items-end sm:pt-4">
                 <Boton type="submit" isLoading={guardandoAction} className="h-10 w-full text-[10px] font-black uppercase tracking-widest">Guardar Cambios</Boton>
               </div>
