@@ -35,6 +35,7 @@ class Usuario(Base):
     password_hash = Column(Text, nullable=False)
     debe_cambiar_password = Column(Boolean, default=False, nullable=False)
     expira_at = Column(DateTime(timezone=True), nullable=True) # Para guardias temporales de 24h
+    puede_crear_pases = Column(Boolean, default=False, nullable=False)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

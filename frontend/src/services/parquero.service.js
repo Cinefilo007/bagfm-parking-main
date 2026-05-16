@@ -166,6 +166,15 @@ export const parqueroService = {
     async consultarResultadoPlaca(jobId) {
         const { data } = await api.get(`/ia/resultado-placa/${jobId}`);
         return data;
+    },
+
+    /**
+     * Crea un pase de visitante (temporal) y registra el ingreso.
+     * @param {object} datos { placa, nombre, cedula, telefono, marca, modelo, color, fecha_expiracion, confirmar_ingreso, zona_id }
+     */
+    async crearPaseVisitante(datos) {
+        const { data } = await api.post('/parqueros/crear-pase-visitante', datos);
+        return data;
     }
 };
 

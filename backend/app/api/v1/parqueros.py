@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 from typing import List, Dict, Any, Optional
+from datetime import datetime
 
 from app.core.database import obtener_db
 from app.core.dependencias import obtener_usuario_actual, require_rol
@@ -222,3 +223,39 @@ async def obtener_vehiculos_perdidos(
     pero no han llegado en el tiempo reglamentario.
     """
     return await parquero_service.get_vehiculos_perdidos(db, current_user.id)
+
+
+@router.post("/crear-pase-visitante")
+async def crear_pase_visitante(
+    placa: str = Body(..., embed=True),
+    nombre: str = Body(..., embed=True),
+    cedula: Optional[str] = Body(None, embed=True),
+    telefono: Optional[str] = Body(None, embed=True),
+    marca: Optional[str] = Body(None, embed=True),
+    modelo: Optional[str] = Body(None, embed=True),
+    color: Optional[str] = Body(None, embed=True),
+    fecha_expiracion: Optional[datetime] = Body(None, embed=True),
+    confirmar_ingreso: bool = Body(True, embed=True),
+    zona_id: Optional[UUID] = Body(None, embed=True),
+    db: AsyncSession = Depends(obtener_db),
+    current_user: Usuario = Depends(require_rol(["SUPERVISOR_PARQUEROS", "PARQUERO", "ADMIN_BASE", "COMANDANTE"]))
+):
+    """
+    Crea un pase de visitante (temporal) validando permisos y capacidad.
+    Si zona_id no se envía, usa la zona asignada del parquero.
+    """
+    try:
+        # Usar zona del parquero si no se especifica
+        target_zona_id = zona_id or current_user.zona_asignada_id
+        if not target_zona_id:
+            raise HTTPException(status_code=400, detail="El parquero no tiene una zona asignada.")
+
+        return await parquero_service.crear_pase_visitante(
+            db, current_user.id, target_zona_id,
+            placa=placa, nombre=nombre, cedula=cedula,
+            telefono=telefono, marca=marca, modelo=modelo,
+            color=color, fecha_expiracion=fecha_expiracion,
+            confirmar_ingreso=confirmar_ingreso
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

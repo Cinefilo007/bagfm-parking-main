@@ -130,7 +130,7 @@ const ModalGestion = ({ miembro, isOpen, onClose, zonas, onUpdate, userActual })
   const [details, setDetails] = useState({ kpis: null, incentivos: [], sanciones: [] });
   const [zonaSeleccionada, setZonaSeleccionada] = useState(miembro?.zona_asignada_id || '');
   const [guardandoAction, setGuardandoAction] = useState(false);
-  const [formEdit, setFormEdit] = useState({ nombre: miembro?.nombre || '', apellido: miembro?.apellido || '', email: miembro?.email || '', telefono: miembro?.telefono || '' });
+  const [formEdit, setFormEdit] = useState({ nombre: miembro?.nombre || '', apellido: miembro?.apellido || '', email: miembro?.email || '', telefono: miembro?.telefono || '', puede_crear_pases: miembro?.puede_crear_pases || false });
   const [formInc, setFormInc] = useState({ tipo: '', descripcion: '' });
   const [formSanc, setFormSanc] = useState({ tipo: '', motivo: '', ejecutar_inmediato: false });
 
@@ -145,7 +145,7 @@ const ModalGestion = ({ miembro, isOpen, onClose, zonas, onUpdate, userActual })
   useEffect(() => {
     if (!isOpen || !miembro) return;
     setTab(tabsDisponibles[0]?.id || 'editar');
-    setFormEdit({ nombre: miembro.nombre, apellido: miembro.apellido, email: miembro.email || '', telefono: miembro.telefono || '' });
+    setFormEdit({ nombre: miembro.nombre, apellido: miembro.apellido, email: miembro.email || '', telefono: miembro.telefono || '', puede_crear_pases: miembro.puede_crear_pases || false });
     setZonaSeleccionada(miembro.zona_asignada_id || '');
     setLoadingDetails(true);
     Promise.all([
@@ -437,6 +437,20 @@ const ModalGestion = ({ miembro, isOpen, onClose, zonas, onUpdate, userActual })
                 <input className="w-full h-10 bg-bg-card border border-white/10 rounded-xl px-3 text-xs font-bold text-text-main outline-none focus:ring-1 focus:ring-primary"
                   value={formEdit.telefono} onChange={e => setFormEdit({ ...formEdit, telefono: e.target.value })} />
               </div>
+              {miembro.rol === 'PARQUERO' && (
+                <div className="space-y-1 flex items-center gap-3 bg-primary/5 border border-primary/10 p-2 rounded-xl">
+                   <div className="flex-1">
+                      <p className="text-[8px] font-black text-primary uppercase tracking-widest">Permisos Especiales</p>
+                      <p className="text-[9px] font-bold text-text-main/80 leading-none">Autorizar creación de pases temporales</p>
+                   </div>
+                   <input 
+                    type="checkbox" 
+                    className="w-5 h-5 accent-primary cursor-pointer"
+                    checked={formEdit.puede_crear_pases}
+                    onChange={e => setFormEdit({ ...formEdit, puede_crear_pases: e.target.checked })}
+                   />
+                </div>
+              )}
               <div className="flex items-end sm:pt-4">
                 <Boton type="submit" isLoading={guardandoAction} className="h-10 w-full text-[10px] font-black uppercase tracking-widest">Guardar Cambios</Boton>
               </div>

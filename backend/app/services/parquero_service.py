@@ -106,6 +106,7 @@ class ParqueroService:
             "nombre": zona.nombre,
             "capacidad_total": total,
             "usa_puestos_identificados": zona.usa_puestos_identificados,
+            "puede_crear_pases": usuario.puede_crear_pases,
             "kpis": {
                 "libres": max(0, total - ocupados_totales), 
                 "ocupados": ocupados_totales,
@@ -1254,6 +1255,89 @@ class ParqueroService:
         await self._actualizar_ocupacion_zona(db, zona_id, 1)
         await db.commit()
         return {"status": "ok", "mensaje": "Ingreso confirmado correctamente."}
+
+    async def crear_pase_visitante(
+        self, db: AsyncSession, parquero_id: UUID, zona_id: UUID,
+        placa: str, nombre: str, cedula: str | None = None,
+        telefono: str | None = None, marca: str | None = None,
+        modelo: str | None = None, color: str | None = None,
+        fecha_expiracion: datetime | None = None,
+        confirmar_ingreso: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Crea un pase temporal para un visitante y registra su ingreso si se solicita.
+        Valida permisos del parquero y capacidad real de la zona.
+        """
+        # 1. Verificar Permiso del Parquero
+        res_u = await db.execute(select(Usuario).where(Usuario.id == parquero_id))
+        parquero = res_u.scalars().first()
+        if not parquero or not parquero.puede_crear_pases:
+            raise ValueError("No tienes permisos para crear pases de visitantes.")
+
+        # 2. Validar Capacidad de la Zona
+        # Usamos la lógica de get_mi_zona para saber cuántos libres reales hay
+        zona_kpis = await self.get_mi_zona(db, parquero_id)
+        if not zona_kpis or zona_kpis["kpis"]["libres"] <= 0:
+            raise ValueError("CAPACIDAD AGOTADA. No hay puestos libres disponibles en esta zona.")
+
+        # 3. Crear CodigoQR
+        import string, secrets
+        from app.models.enums import QRTipo
+        token_qr = "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(12))
+        
+        placa_norm = placa.strip().upper()
+        
+        nuevo_qr = CodigoQR(
+            token=token_qr,
+            tipo=QRTipo.temporal,
+            activo=True,
+            vehiculo_placa=placa_norm,
+            vehiculo_marca=marca.strip().upper() if marca else None,
+            vehiculo_modelo=modelo.strip().upper() if modelo else None,
+            vehiculo_color=color.strip().upper() if color else None,
+            nombre_portador=nombre.strip().upper(),
+            cedula_portador=cedula.strip().upper() if cedula else None,
+            telefono_portador=telefono.strip() if telefono else None,
+            zona_asignada_id=zona_id,
+            created_by=parquero_id,
+            datos_completos=True,
+            fecha_expiracion=fecha_expiracion,
+            max_accesos=None # Ilimitado por defecto según requerimiento
+        )
+        db.add(nuevo_qr)
+        await db.flush()
+
+        # 4. Registrar Ingreso (si se confirma)
+        res_data = {
+            "qr_id": str(nuevo_qr.id),
+            "placa": placa_norm,
+            "token": token_qr,
+            "tipo_pase": "VISITANTE",
+            "tipo_pase_color": "#fbbf24" # Amber
+        }
+
+        if confirmar_ingreso:
+            nuevo_vp = VehiculoPase(
+                qr_id=nuevo_qr.id,
+                placa=placa_norm,
+                marca=nuevo_qr.vehiculo_marca,
+                modelo=nuevo_qr.vehiculo_modelo,
+                color=nuevo_qr.vehiculo_color,
+                zona_asignada_id=zona_id,
+                ingresado=True,
+                hora_ingreso=datetime.now(timezone.utc)
+            )
+            db.add(nuevo_vp)
+            await self._actualizar_ocupacion_zona(db, zona_id, 1)
+            await db.commit()
+            await db.refresh(nuevo_vp)
+            res_data["vehiculo_pase_id"] = str(nuevo_vp.id)
+            res_data["mensaje"] = f"Pase creado e ingreso registrado para {placa_norm}"
+        else:
+            await db.commit()
+            res_data["mensaje"] = f"Pase de visitante creado para {placa_norm}"
+
+        return res_data
 
 parquero_service = ParqueroService()
 

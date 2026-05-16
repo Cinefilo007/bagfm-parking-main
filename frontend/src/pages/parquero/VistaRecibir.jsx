@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
     ArrowLeft, Scan, Keyboard, LogIn, CheckCircle2,
     RefreshCw, Car, XCircle, Camera, User, UserCheck,
-    ParkingSquare, AlertTriangle, Power
+    ParkingSquare, AlertTriangle, Power, PlusCircle
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { toast } from 'react-hot-toast';
@@ -90,7 +90,7 @@ const FichaVehiculo = ({ datos, onConfirmar, cargando, onReset }) => (
 // El guardado siempre va a `codigos_qr` si hay qrId (NO a `usuarios`).
 // Si no hay qrId (sin QR), el VehiculoPase ya fue creado; solo se confirma.
 // ══════════════════════════════════════════════════════════════════════════════
-const ModalRegistroDatos = ({ resultadoSinDatos, zonaId, onRegistrado, onCerrar }) => {
+const ModalRegistroDatos = ({ resultadoSinDatos, zonaId, zonaData, onRegistrado, onCerrar }) => {
     const scannerIARef = useRef(null);
 
     const soloPersona    = resultadoSinDatos?.solo_persona === true;
@@ -109,6 +109,10 @@ const ModalRegistroDatos = ({ resultadoSinDatos, zonaId, onRegistrado, onCerrar 
     const [modoIA,   setModoIA]   = useState(null); // 'cedula' | 'vehiculo'
     const [iaLoad,   setIaLoad]   = useState(false);
     const [cargando, setCargando] = useState(false);
+    
+    // Configuración para Creación de Pase (Visitantes)
+    const [crearPase, setCrearPase] = useState(false);
+    const [fechaExp,  setFechaExp]  = useState(''); // Formato YYYY-MM-DD
 
     // ── Captura IA ──────────────────────────────────────────────────────────
     const handleCapturarIA = async () => {
@@ -146,8 +150,30 @@ const ModalRegistroDatos = ({ resultadoSinDatos, zonaId, onRegistrado, onCerrar 
 
     // ── Confirmar ───────────────────────────────────────────────────────────
     const handleConfirmar = async () => {
+        if (!placa.trim()) { toast.error('La placa es obligatoria'); return; }
+        if (!nombre.trim()) { toast.error('El nombre es obligatorio'); return; }
+
         setCargando(true);
         try {
+            if (crearPase) {
+                // FLUJO NUEVO: Creación de pase temporal con validación de capacidad
+                const res = await parqueroService.crearPaseVisitante({
+                    placa: placa.trim().toUpperCase(),
+                    nombre: nombre.trim().toUpperCase(),
+                    cedula: cedula.trim().toUpperCase() || null,
+                    telefono: telefono ? (telefono.startsWith('+58') ? telefono : `+58${telefono}`) : null,
+                    marca: marca.trim().toUpperCase() || null,
+                    modelo: modelo.trim().toUpperCase() || null,
+                    color: color.trim().toUpperCase() || null,
+                    fecha_expiracion: fechaExp ? `${fechaExp}T23:59:59` : null,
+                    confirmar_ingreso: true,
+                    zona_id: zonaId
+                });
+                toast.success(res.mensaje);
+                onRegistrado?.(res);
+                return;
+            }
+
             if (qrId && vehiculoPaseId) {
                 // CASO 1: Vehículo ya identificado por QR — guardar datos (portador y/o vehículo) en codigos_qr e ingresar
                 if (!soloPersona && !placa.trim()) { toast.error('La placa es obligatoria'); return; }
@@ -164,8 +190,7 @@ const ModalRegistroDatos = ({ resultadoSinDatos, zonaId, onRegistrado, onCerrar 
                 toast.success(`Datos registrados ✔ ${placa}`);
                 onRegistrado?.({ placa, vehiculoPaseId });
             } else {
-                // CASO 2: Sin QR — vehículo completamente desconocido
-                if (!placa.trim()) { toast.error('La placa es obligatoria'); return; }
+                // CASO 2: Sin QR — vehículo completamente desconocido (Ingreso Directo sin pase formal)
                 const res = await parqueroService.registrarLlegadaPlaca(placa.trim().toUpperCase(), zonaId, {
                     nombre: nombre || null,
                     cedula: cedula || null,
@@ -331,21 +356,63 @@ const ModalRegistroDatos = ({ resultadoSinDatos, zonaId, onRegistrado, onCerrar 
 
                 </div>
 
-                <div className="p-4 border-t border-white/5 space-y-2">
-                    <button
-                        onClick={handleConfirmar}
-                        disabled={cargando}
-                        className="w-full h-12 rounded-xl bg-success text-bg-app text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                        {cargando ? <RefreshCw size={15} className="animate-spin" /> : <UserCheck size={15} />}
-                        {soloPersona ? 'Confirmar Portador e Ingresar' : 'Registrar e Ingresar'}
-                    </button>
-                    <button
-                        onClick={onCerrar}
-                        className="w-full h-9 rounded-lg bg-white/5 border border-white/10 text-[9px] font-black uppercase tracking-widest text-text-muted"
-                    >
-                        Cancelar
-                    </button>
+                </div>
+                
+                <div className="p-4 border-t border-white/5 space-y-4">
+                    {/* ── SECCIÓN PASE TEMPORAL (Solo si tiene permiso) ── */}
+                    {zonaData?.puede_crear_pases && !qrId && (
+                        <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl space-y-3">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <ParkingSquare size={14} className="text-primary" />
+                                    <span className="text-[9px] font-black text-primary uppercase tracking-widest">Crear Pase Visitante</span>
+                                </div>
+                                <input 
+                                    type="checkbox" 
+                                    className="w-5 h-5 accent-primary cursor-pointer" 
+                                    checked={crearPase} 
+                                    onChange={e => setCrearPase(e.target.checked)} 
+                                />
+                            </div>
+                            
+                            {crearPase && (
+                                <div className="space-y-2 animate-in slide-in-from-top-1 duration-200">
+                                    <p className="text-[8px] text-text-muted uppercase font-bold italic">Se validará el cupo en {zonaData?.nombre || 'la zona'} antes de proceder.</p>
+                                    <div className="space-y-1">
+                                        <label className="text-[8px] font-black text-text-muted uppercase tracking-widest px-1">Fecha de Expiración</label>
+                                        <input 
+                                            type="date" 
+                                            className="w-full h-10 bg-bg-low border border-white/10 rounded-lg px-3 text-xs font-black text-text-main outline-none focus:border-primary/50"
+                                            value={fechaExp}
+                                            onChange={e => setFechaExp(e.target.value)}
+                                            min={new Date().toISOString().split('T')[0]}
+                                        />
+                                        <p className="text-[7px] text-text-muted/60 mt-1 uppercase font-bold px-1">Dejar vacío para "Sin límites"</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="space-y-2">
+                        <button
+                            onClick={handleConfirmar}
+                            disabled={cargando}
+                            className={cn(
+                                "w-full h-12 rounded-xl text-bg-app text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50",
+                                crearPase ? "bg-primary shadow-lg shadow-primary/20" : "bg-success"
+                            )}
+                        >
+                            {cargando ? <RefreshCw size={16} className="animate-spin" /> : (crearPase ? <PlusCircle size={16} /> : <LogIn size={16} />)}
+                            {crearPase ? 'Crear Pase e Ingresar' : (soloPersona ? 'Confirmar Portador e Ingresar' : 'Registrar e Ingresar')}
+                        </button>
+                        <button
+                            onClick={onCerrar}
+                            className="w-full h-9 rounded-lg bg-white/5 border border-white/10 text-[9px] font-black uppercase tracking-widest text-text-muted"
+                        >
+                            Cancelar
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -805,6 +872,7 @@ const VistaRecibir = () => {
                 <ModalRegistroDatos
                     resultadoSinDatos={sinDatos}
                     zonaId={zonaId}
+                    zonaData={zonaData}
                     onRegistrado={() => { toast.success('Vehículo registrado correctamente'); resetear(); }}
                     onCerrar={resetear}
                 />

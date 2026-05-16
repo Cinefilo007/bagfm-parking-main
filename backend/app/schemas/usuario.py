@@ -15,6 +15,7 @@ class UsuarioBase(BaseModel):
     entidad_nombre: Optional[str] = None
     activo: bool = True
     foto_url: Optional[str] = None
+    puede_crear_pases: bool = False
 
 class UsuarioCrear(UsuarioBase):
     password: str
@@ -44,3 +45,4 @@ class UsuarioActualizar(BaseModel):
     rol: Optional[RolTipo] = None
     entidad_id: Optional[UUID] = None
     zona_asignada_id: Optional[UUID] = None
+    puede_crear_pases: Optional[bool] = None
