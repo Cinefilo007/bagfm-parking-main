@@ -625,6 +625,7 @@ const VistaRecibir = () => {
         try {
             const res = await parqueroService.registrarLlegadaQR(qrToken, zonaId, false);
             if (res.sin_datos) {
+                // Siempre permitimos completar datos si el QR es válido
                 setSinDatos(res);
             } else {
                 setResultado(res);
