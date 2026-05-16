@@ -1295,12 +1295,12 @@ class ParqueroService:
             vehiculo_marca=marca.strip().upper() if marca else None,
             vehiculo_modelo=modelo.strip().upper() if modelo else None,
             vehiculo_color=color.strip().upper() if color else None,
-            nombre_portador=nombre.strip().upper(),
+            nombre_portador=nombre.strip().upper() if nombre else None,
             cedula_portador=cedula.strip().upper() if cedula else None,
             telefono_portador=telefono.strip() if telefono else None,
             zona_asignada_id=zona_id,
             created_by=parquero_id,
-            datos_completos=True,
+            datos_completos=True if (nombre and placa_norm) else False,
             fecha_expiracion=fecha_expiracion,
             max_accesos=None # Ilimitado por defecto según requerimiento
         )

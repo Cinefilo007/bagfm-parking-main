@@ -151,7 +151,6 @@ const ModalRegistroDatos = ({ resultadoSinDatos, zonaId, zonaData, onRegistrado,
     // ── Confirmar ───────────────────────────────────────────────────────────
     const handleConfirmar = async () => {
         if (!placa.trim()) { toast.error('La placa es obligatoria'); return; }
-        if (!nombre.trim()) { toast.error('El nombre es obligatorio'); return; }
 
         setCargando(true);
         try {
