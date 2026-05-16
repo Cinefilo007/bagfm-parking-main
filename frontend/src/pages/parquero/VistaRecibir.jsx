@@ -355,8 +355,6 @@ const ModalRegistroDatos = ({ resultadoSinDatos, zonaId, zonaData, onRegistrado,
                     )}
 
                 </div>
-
-                </div>
                 
                 <div className="p-4 border-t border-white/5 space-y-4">
                     {/* ── SECCIÓN PASE TEMPORAL (Solo si tiene permiso) ── */}
