@@ -67,11 +67,11 @@ const TarjetaPuesto = ({ puesto, vehiculosEnZona = [], onClick }) => {
             className={cn(
                 'relative flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all active:scale-95 hover:brightness-125 hover:shadow-lg',
                 config.border, config.bg,
-                esOcupado && 'border-red-500/40 bg-red-500/10 shadow-[0_0_20px_rgba(239,68,68,0.15)]'
+                esOcupado && 'border-red-500/40 bg-red-500/10 shadow-lg shadow-red-500/10'
             )}
         >
             <div className={cn('w-2.5 h-2.5 rounded-full mb-1.5 shadow-sm', dotColor, esOcupado && 'animate-pulse')} />
-            <ParkingSquare size={20} className={cn(iconColor, esOcupado && 'animate-pulse drop-shadow-[0_0_8px_rgba(239,68,68,0.6)]')} />
+            <ParkingSquare size={20} className={cn(iconColor, esOcupado && 'animate-pulse')} />
             
             {/* Si está ocupado y tenemos placa, mostramos la placa como texto principal */}
             {esOcupado && vehiculo?.placa ? (
@@ -346,7 +346,7 @@ const DashboardParquero = () => {
             <ReporteRapido zonaId={zonaInfo?.id} />
 
             {/* ── Header ── */}
-            <header className="sticky top-0 z-40 bg-bg-card/90 backdrop-blur-md border-b border-white/5 px-4 py-3">
+            <header className="sticky top-0 z-40 bg-bg-card border-b border-white/5 px-4 py-3">
                 <div className="flex items-center justify-between max-w-2xl mx-auto">
                     <div className="flex items-center gap-3">
                         <div className="w-9 h-9 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20">

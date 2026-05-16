@@ -154,9 +154,7 @@
   }
 
   .glass-card {
-    background: color-mix(in srgb, var(--bg-card), transparent 20%);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: color-mix(in srgb, var(--bg-card), transparent 10%);
     border: 1px solid color-mix(in srgb, var(--text-main), transparent 90%);
   }
 

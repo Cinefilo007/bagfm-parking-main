@@ -24,7 +24,7 @@ export const Modal = ({ isOpen, onClose, title, children, className, balanced = 
     <div className={cn("fixed inset-0 z-[9999] flex transition-all duration-300", balanced && "lg:left-72")}>
       {/* Backdrop: Cubre toda la pantalla */}
       <div 
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300" 
+        className="absolute inset-0 bg-black/85 animate-in fade-in duration-300" 
         onClick={onClose}
       />
       
