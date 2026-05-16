@@ -764,8 +764,8 @@ const VistaRecibir = () => {
                                                 ) : job.status === 'completado' ? (
                                                     <div>
                                                         <p className="text-sm font-black text-success uppercase">{job.resultado?.placa || '???'}</p>
-                                                        <p className="text-[9px] text-text-muted truncate">
-                                                            {job.resultado?.sin_datos ? 'Vehículo no registrado' : (job.resultado?.marca || 'Vehículo encontrado')}
+                                                        <p className="text-[9px] text-text-muted truncate" title={job.resultado?.mensaje}>
+                                                            {job.resultado?.mensaje || (job.resultado?.sin_datos ? 'Vehículo no registrado' : 'Vehículo encontrado')}
                                                         </p>
                                                     </div>
                                                 ) : (

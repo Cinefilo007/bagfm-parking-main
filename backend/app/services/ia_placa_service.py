@@ -177,6 +177,7 @@ class IAPlacaService:
         if vp_activo:
             return {
                 "encontrado": True,
+                "sin_datos": False,
                 "ya_ingresado": True,
                 "pase_valido": True,
                 "tipo_pase": "REINGRESO",
@@ -216,6 +217,7 @@ class IAPlacaService:
                     estado_msg = membresia.estado.value.upper() if membresia else "SIN MEMBRESÍA"
                     return {
                         "encontrado": True,
+                        "sin_datos": False,
                         "ya_ingresado": False,
                         "pase_valido": False,
                         "tipo_pase": "SOCIO",
@@ -228,6 +230,7 @@ class IAPlacaService:
 
                 return {
                     "encontrado": True,
+                    "sin_datos": False,
                     "ya_ingresado": False,
                     "pase_valido": True,
                     "tipo_pase": "SOCIO PERMANENTE",
@@ -252,6 +255,7 @@ class IAPlacaService:
             if qr.fecha_expiracion and qr.fecha_expiracion < ahora:
                 return {
                     "encontrado": True,
+                    "sin_datos": False,
                     "ya_ingresado": False,
                     "pase_valido": False,
                     "tipo_pase": qr.tipo.value.upper() if qr.tipo else "PASE",
@@ -266,6 +270,7 @@ class IAPlacaService:
             if qr.max_accesos and qr.accesos_usados >= qr.max_accesos:
                 return {
                     "encontrado": True,
+                    "sin_datos": False,
                     "ya_ingresado": False,
                     "pase_valido": False,
                     "tipo_pase": "PASE AGOTADO",
@@ -290,6 +295,7 @@ class IAPlacaService:
 
             return {
                 "encontrado": True,
+                "sin_datos": False,
                 "ya_ingresado": False,
                 "pase_valido": True,
                 "tipo_pase": tipo_label,
@@ -304,13 +310,14 @@ class IAPlacaService:
         # ── 4. No encontrado ────────────────────────────────────────────────
         return {
             "encontrado": False,
+            "sin_datos": True,
             "ya_ingresado": False,
             "pase_valido": False,
             "tipo_pase": None,
             "tipo_pase_color": "#94a3b8",
             "nombre_portador": None,
             "vehiculo_pase_id": None,
-            "mensaje": f"❌ {placa} no registrado en el sistema",
+            "mensaje": f"❌ {placa} NO REGISTRADO. Pedir Pase QR.",
             "alerta": "error",
         }
 
@@ -335,6 +342,7 @@ class IAPlacaService:
                     "placa": "",
                     "confianza": deteccion["confianza"],
                     "encontrado": False,
+                    "sin_datos": True,
                     "pase_valido": False,
                     "mensaje": "⚠️ No se pudo leer la placa. Intente con otra foto.",
                     "alerta": "warning",
@@ -365,6 +373,7 @@ class IAPlacaService:
                 "mensaje": f"Error interno del sistema IA: {str(e)}",
                 "alerta": "error",
                 "encontrado": False,
+                "sin_datos": True,
                 "pase_valido": False,
                 "tipo_pase": None,
                 "tipo_pase_color": "#94a3b8",
