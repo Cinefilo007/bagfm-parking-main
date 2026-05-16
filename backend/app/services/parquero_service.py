@@ -651,6 +651,7 @@ class ParqueroService:
                 registrado_por = parquero_id,
                 es_manual = True,
                 vehiculo_placa = vehiculo_pase.placa,
+                zona_id = vehiculo_pase.zona_asignada_id,
                 observaciones = "Salida automática sincronizada con parquero."
             )
             # Intentar rellenar usuario_id si el QR lo tiene
@@ -744,7 +745,7 @@ class ParqueroService:
             select(Acceso)
             .where(
                 Acceso.zona_id == zona_id,
-                Acceso.tipo == AccesoTipo.entrada
+                Acceso.tipo.in_([AccesoTipo.entrada, AccesoTipo.salida])
             )
             .order_by(Acceso.timestamp.desc())
             .limit(fetch_limit)
@@ -810,11 +811,12 @@ class ParqueroService:
                 "telefono_portador": telefono_portador,
                 "tipo_pase": info_pase["nombre"],
                 "tipo_pase_color": info_pase["color"],
-                "descripcion": f"Entrada por alcabala: {acceso.punto_acceso}",
+                "descripcion": f"{'Entrada' if acceso.tipo == AccesoTipo.entrada else 'Salida'} por alcabala: {acceso.punto_acceso}",
                 "timestamp": acceso.timestamp.isoformat() if acceso.timestamp else None,
                 "punto": acceso.punto_acceso,
                 "es_manual": acceso.es_manual,
                 "falta_datos": falta_datos,
+                "acceso_tipo": acceso.tipo.value if acceso.tipo else "entrada",
             })
 
         # --- VehiculoPase — ingreso a zona ---

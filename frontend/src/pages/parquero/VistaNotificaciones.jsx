@@ -59,6 +59,14 @@ const CONFIG_TIPO = {
         dot: 'bg-indigo-400',
         label: 'ENTRADA POR ALCABALA',
     },
+    salida_base: {
+        Icon: LogOut,
+        color: 'text-warning',
+        bg: 'bg-warning/10',
+        border: 'border-warning/20',
+        dot: 'bg-warning',
+        label: 'SALIDA DE BASE',
+    },
     ingreso_zona: {
         Icon: LogIn,
         color: 'text-success',
@@ -81,7 +89,13 @@ const CONFIG_TIPO = {
 const TarjetaEvento = ({ evento, onEntrada, onCompletar }) => {
     const navigate = useNavigate();
     const [cargando, setCargando] = useState(false);
-    const cfg = CONFIG_TIPO[evento.tipo] || CONFIG_TIPO.alcabala;
+    
+    // Determinar config dinámicamente para alcabala
+    let cfg = CONFIG_TIPO[evento.tipo] || CONFIG_TIPO.alcabala;
+    if (evento.tipo === 'alcabala' && evento.acceso_tipo === 'salida') {
+        cfg = CONFIG_TIPO.salida_base;
+    }
+    
     const { Icon } = cfg;
 
     const handleEntrada = async (e) => {

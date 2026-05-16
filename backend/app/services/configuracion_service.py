@@ -18,7 +18,7 @@ class ConfiguracionService:
 
     async def get_config_salidas(self, db: AsyncSession) -> Dict[str, Any]:
         """Obtiene el bloque de configuración para salidas de base."""
-        sync_parquero = await self.get_valor(db, "BASE_EXIT_SYNC_PARKING", "false")
+        sync_parquero = await self.get_valor(db, "BASE_EXIT_SYNC_PARKING", "true")
         mass_time = await self.get_valor(db, "BASE_EXIT_MASS_TIME", "")
         
         return {
