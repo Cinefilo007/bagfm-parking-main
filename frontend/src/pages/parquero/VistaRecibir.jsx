@@ -514,8 +514,15 @@ const VistaRecibir = () => {
         try {
             const res = await parqueroService.registrarLlegadaPlaca(placa, zonaId, {}, false);
             if (res.sin_datos) {
-                // La placa no existe en ninguna fuente; mostrar modal de registro
-                setSinDatos(res);
+                // La placa no existe en ninguna fuente
+                if (zonaData?.puede_crear_pases) {
+                    setSinDatos(res);
+                } else {
+                    toast.error(`Vehículo ${placa} no registrado en el sistema`, { 
+                        icon: '⚠️',
+                        duration: 4000 
+                    });
+                }
             } else {
                 // Vehículo encontrado: mostrar ficha para confirmar
                 setResultado(res);
@@ -590,7 +597,12 @@ const VistaRecibir = () => {
             // Placa leída pero no existe
             setPlacaInput(res.placa || '');
             setTab('placa'); // Volver a la pestaña de placa normal
-            setSinDatos(res); // Abrir modal
+            
+            if (zonaData?.puede_crear_pases) {
+                setSinDatos(res); // Abrir modal
+            } else {
+                toast.error(`Vehículo ${res.placa} no registrado`, { icon: '⚠️' });
+            }
         } else {
             // Encontrado: confirmar de una vez (fast-track)
             // Se asume que el backend IA ya nos trajo la estructura de FichaVehiculo
