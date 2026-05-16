@@ -8,7 +8,6 @@ import {
 import { cn } from '../../lib/utils';
 import { toast } from 'react-hot-toast';
 import { QRScanner } from '../../components/alcabala/QRScanner';
-import { QRScanner } from '../../components/alcabala/QRScanner';
 import { parqueroService } from '../../services/parquero.service';
 
 // ── Variables Globales Polling ──────────────────────────────────────────────
