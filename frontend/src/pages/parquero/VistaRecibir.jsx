@@ -112,7 +112,7 @@ const ModalRegistroDatos = ({ resultadoSinDatos, zonaId, zonaData, onRegistrado,
     
     // Configuración para Creación de Pase (Visitantes)
     const [crearPase, setCrearPase] = useState(false);
-    const [fechaExp,  setFechaExp]  = useState(''); // Formato YYYY-MM-DD
+    const [fechaExp,  setFechaExp]  = useState(new Date().toISOString().split('T')[0]); // Default hoy
 
     // ── Captura IA ──────────────────────────────────────────────────────────
     const handleCapturarIA = async () => {
@@ -385,7 +385,6 @@ const ModalRegistroDatos = ({ resultadoSinDatos, zonaId, zonaData, onRegistrado,
                                             onChange={e => setFechaExp(e.target.value)}
                                             min={new Date().toISOString().split('T')[0]}
                                         />
-                                        <p className="text-[7px] text-text-muted/60 mt-1 uppercase font-bold px-1">Dejar vacío para "Sin límites"</p>
                                     </div>
                                 </div>
                             )}
