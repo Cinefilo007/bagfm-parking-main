@@ -1,0 +1,30 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "services": {
+    "backend": {
+      "source": {
+        "directory": "backend"
+      },
+      "build": {
+        "builder": "DOCKERFILE"
+      },
+      "deploy": {
+        "healthcheckPath": "/api/health",
+        "numReplicas": 1,
+        "restartPolicyType": "ON_FAILURE"
+      }
+    },
+    "frontend": {
+      "source": {
+        "directory": "frontend"
+      },
+      "build": {
+        "builder": "DOCKERFILE"
+      },
+      "deploy": {
+        "numReplicas": 1,
+        "restartPolicyType": "ON_FAILURE"
+      }
+    }
+  }
+}

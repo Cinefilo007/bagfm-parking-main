@@ -1,0 +1,12 @@
+node_modules/
+dist/
+dist-ssr/
+.git/
+.gitignore
+.env
+.env.local
+.vscode/
+.idea/
+README.md
+*.log
+npm-debug.log*
