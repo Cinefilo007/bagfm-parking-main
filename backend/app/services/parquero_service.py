@@ -210,7 +210,7 @@ class ParqueroService:
         self, db: AsyncSession, placa: str, zona_id: UUID, parquero_id: UUID,
         nombre: str = None, cedula: str = None, telefono: str = None,
         marca: str = None, modelo: str = None, color: str = None,
-        confirmar: bool = True
+        confirmar: bool = True, pago_cobrado: bool = False
     ) -> Dict[str, Any]:
         """
         Busca un vehículo por placa siguiendo esta cadena de búsqueda:
@@ -363,7 +363,8 @@ class ParqueroService:
                 color=vehiculo_db.color,
                 zona_asignada_id=zona_id,
                 ingresado=confirmar,
-                hora_ingreso=datetime.now(timezone.utc) if confirmar else None
+                hora_ingreso=datetime.now(timezone.utc) if confirmar else None,
+                pago_cobrado=pago_cobrado
             )
             db.add(nuevo_vp)
             
@@ -434,7 +435,8 @@ class ParqueroService:
                 color=qr_encontrado.vehiculo_color,
                 zona_asignada_id=zona_id,
                 ingresado=confirmar,
-                hora_ingreso=datetime.now(timezone.utc) if confirmar else None
+                hora_ingreso=datetime.now(timezone.utc) if confirmar else None,
+                pago_cobrado=pago_cobrado
             )
             db.add(nuevo_vp)
             await db.commit()
@@ -531,7 +533,8 @@ class ParqueroService:
                 color=color,
                 zona_asignada_id=zona_id,
                 ingresado=confirmar,
-                hora_ingreso=datetime.now(timezone.utc) if confirmar else None
+                hora_ingreso=datetime.now(timezone.utc) if confirmar else None,
+                pago_cobrado=pago_cobrado
             )
             db.add(nuevo_vp)
             if confirmar:
@@ -564,7 +567,8 @@ class ParqueroService:
         nombre: str | None, cedula: str | None, telefono: str | None,
         zona_id: UUID | None = None,
         placa: str | None = None, marca: str | None = None,
-        modelo: str | None = None, color: str | None = None
+        modelo: str | None = None, color: str | None = None,
+        pago_cobrado: bool = False
     ) -> Dict[str, Any]:
         """Completa los datos y activa el ingreso (ocupación)."""
         res_qr = await db.execute(select(CodigoQR).where(CodigoQR.id == qr_id))
@@ -621,6 +625,7 @@ class ParqueroService:
             
             vp.ingresado = True
             vp.hora_ingreso = datetime.now(timezone.utc)
+            vp.pago_cobrado = pago_cobrado
             
             # Incrementar ocupación al finalizar registro de datos
             target_zona = zona_id or vp.zona_asignada_id
@@ -1236,7 +1241,8 @@ class ParqueroService:
 
 
     async def confirmar_ingreso_zona(
-        self, db: AsyncSession, vehiculo_pase_id: UUID, zona_id: UUID
+        self, db: AsyncSession, vehiculo_pase_id: UUID, zona_id: UUID,
+        pago_cobrado: bool = False
     ) -> Dict[str, Any]:
         """
         Confirma la recepción de un vehículo en la zona, marcándolo como ingresado y aumentando la ocupación.
@@ -1253,6 +1259,7 @@ class ParqueroService:
         vp.hora_ingreso = datetime.now(timezone.utc)
         vp.zona_asignada_id = zona_id
         vp.hora_salida = None
+        vp.pago_cobrado = pago_cobrado
         
         await self._actualizar_ocupacion_zona(db, zona_id, 1)
         await db.commit()
@@ -1264,7 +1271,7 @@ class ParqueroService:
         telefono: str | None = None, marca: str | None = None,
         modelo: str | None = None, color: str | None = None,
         fecha_expiracion: datetime | None = None,
-        confirmar_ingreso: bool = True
+        confirmar_ingreso: bool = True, pago_cobrado: bool = False
     ) -> Dict[str, Any]:
         """
         Crea un pase temporal para un visitante y registra su ingreso si se solicita.
@@ -1327,7 +1334,8 @@ class ParqueroService:
                 color=nuevo_qr.vehiculo_color,
                 zona_asignada_id=zona_id,
                 ingresado=True,
-                hora_ingreso=datetime.now(timezone.utc)
+                hora_ingreso=datetime.now(timezone.utc),
+                pago_cobrado=pago_cobrado
             )
             db.add(nuevo_vp)
             await self._actualizar_ocupacion_zona(db, zona_id, 1)

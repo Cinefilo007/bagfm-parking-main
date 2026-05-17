@@ -7,7 +7,8 @@ import {
   TrendingUp, Activity, UserCog, Clock,
   LogIn, LogOut, Navigation, RefreshCw,
   ChevronRight, Phone, Gauge, CheckCircle2,
-  XCircle, Wifi, WifiOff, TriangleAlert
+  XCircle, Wifi, WifiOff, TriangleAlert,
+  CircleDollarSign, BanknoteIcon
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import api from '../../services/api';
@@ -273,7 +274,78 @@ export default function DashboardEntidad() {
           ))}
         </div>
 
-        {/* ── FILA 3: Historial de Flujo + Capacidad por Zona ── */}
+        {/* ── FILA 3: Contabilidad del Día — Cobros del Parquero ── */}
+        {(kpis.total_ingresos_hoy ?? 0) > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 px-1">
+              <CircleDollarSign size={14} className="text-emerald-400" />
+              <h3 className="text-xs font-black text-text-main uppercase tracking-[0.2em] opacity-60 italic">
+                Contabilidad del Día — Cobros del Parquero
+              </h3>
+              <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-[8px] font-black uppercase tracking-widest">
+                HOY
+              </span>
+            </div>
+
+            <div className="bg-bg-low/40 border border-white/5 rounded-2xl p-4 space-y-4">
+              {/* KPI Cards */}
+              <div className="grid grid-cols-3 gap-3">
+                {/* Pagados */}
+                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 text-center">
+                  <div className="text-3xl font-black font-display text-emerald-400 leading-none mb-1">
+                    {kpis.pases_cobrados_hoy ?? 0}
+                  </div>
+                  <div className="text-[8px] font-black uppercase tracking-widest text-emerald-400/70">
+                    Cobrados
+                  </div>
+                </div>
+                {/* No cobrados */}
+                <div className="bg-danger/10 border border-danger/20 rounded-xl p-4 text-center">
+                  <div className="text-3xl font-black font-display text-danger leading-none mb-1">
+                    {kpis.pases_no_cobrados_hoy ?? 0}
+                  </div>
+                  <div className="text-[8px] font-black uppercase tracking-widest text-danger/70">
+                    Sin Cobro
+                  </div>
+                </div>
+                {/* Total */}
+                <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
+                  <div className="text-3xl font-black font-display text-text-main leading-none mb-1">
+                    {kpis.total_ingresos_hoy ?? 0}
+                  </div>
+                  <div className="text-[8px] font-black uppercase tracking-widest text-text-muted">
+                    Total Hoy
+                  </div>
+                </div>
+              </div>
+
+              {/* Barra proporcional */}
+              {(kpis.total_ingresos_hoy ?? 0) > 0 && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-widest">
+                    <span className="text-emerald-400 flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                      {Math.round(((kpis.pases_cobrados_hoy ?? 0) / (kpis.total_ingresos_hoy ?? 1)) * 100)}% cobrado
+                    </span>
+                    <span className="text-danger flex items-center gap-1">
+                      {Math.round(((kpis.pases_no_cobrados_hoy ?? 0) / (kpis.total_ingresos_hoy ?? 1)) * 100)}% pendiente
+                      <span className="w-2 h-2 rounded-full bg-danger inline-block" />
+                    </span>
+                  </div>
+                  <div className="h-2 w-full bg-black/30 rounded-full overflow-hidden flex">
+                    <div
+                      className="h-full bg-emerald-500 rounded-l-full transition-all duration-700"
+                      style={{ width: `${Math.round(((kpis.pases_cobrados_hoy ?? 0) / (kpis.total_ingresos_hoy ?? 1)) * 100)}%` }}
+                    />
+                    <div className="h-full flex-1 bg-danger/60" />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── FILA 4: Historial de Flujo + Capacidad por Zona ── */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
           {/* Historial de Flujo Vehicular */}

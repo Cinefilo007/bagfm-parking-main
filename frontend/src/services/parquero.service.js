@@ -47,10 +47,14 @@ export const parqueroService = {
      * @param {string} placa Placa del vehículo.
      * @param {string} zonaId UUID de la zona del parquero.
      * @param {object} extras Datos adicionales opcionales (nombre, cedula, telefono, marca, modelo, color)
+     * @param {boolean} confirmar Si se confirma el ingreso inmediatamente.
+     * @param {boolean} pagoCobrado Si el parquero cobró el puesto al visitante.
      * @returns {{ sin_datos: boolean, placa, vehiculo_pase_id?, marca?, modelo?, color? }}
      */
-    async registrarLlegadaPlaca(placa, zonaId, extras = {}, confirmar = true) {
-        const { data } = await api.post('/parqueros/llegada-placa', { placa, zona_id: zonaId, confirmar, ...extras });
+    async registrarLlegadaPlaca(placa, zonaId, extras = {}, confirmar = true, pagoCobrado = false) {
+        const { data } = await api.post('/parqueros/llegada-placa', {
+            placa, zona_id: zonaId, confirmar, pago_cobrado: pagoCobrado, ...extras
+        });
         return data;
     },
     
@@ -58,9 +62,12 @@ export const parqueroService = {
      * Confirma el ingreso de un vehículo previamente consultado.
      * @param {string} vehiculoPaseId UUID del VehiculoPase
      * @param {string} zonaId UUID de la zona
+     * @param {boolean} pagoCobrado Si el parquero cobró el puesto al visitante.
      */
-    async confirmarIngreso(vehiculoPaseId, zonaId) {
-        const { data } = await api.post('/parqueros/confirmar-ingreso', { vehiculo_pase_id: vehiculoPaseId, zona_id: zonaId });
+    async confirmarIngreso(vehiculoPaseId, zonaId, pagoCobrado = false) {
+        const { data } = await api.post('/parqueros/confirmar-ingreso', {
+            vehiculo_pase_id: vehiculoPaseId, zona_id: zonaId, pago_cobrado: pagoCobrado
+        });
         return data;
     },
 
@@ -112,8 +119,9 @@ export const parqueroService = {
      * @param {string} qrId UUID del CodigoQR a actualizar.
      * @param {string} vehiculoPaseId UUID del VehiculoPase ya creado.
      * @param {object} datos Datos del portador y del vehículo.
+     * @param {boolean} pagoCobrado Si el parquero cobró el puesto al visitante.
      */
-    async completarDatosPortador(qrId, vehiculoPaseId, datos) {
+    async completarDatosPortador(qrId, vehiculoPaseId, datos, pagoCobrado = false) {
         const { data } = await api.post('/parqueros/completar-datos-portador', {
             qr_id: qrId,
             vehiculo_pase_id: vehiculoPaseId,
@@ -125,6 +133,7 @@ export const parqueroService = {
             marca: datos.marca || null,
             modelo: datos.modelo || null,
             color: datos.color || null,
+            pago_cobrado: pagoCobrado,
         });
         return data;
     },
@@ -170,10 +179,13 @@ export const parqueroService = {
 
     /**
      * Crea un pase de visitante (temporal) y registra el ingreso.
-     * @param {object} datos { placa, nombre, cedula, telefono, marca, modelo, color, fecha_expiracion, confirmar_ingreso, zona_id }
+     * @param {object} datos { placa, nombre, cedula, telefono, marca, modelo, color, fecha_expiracion, confirmar_ingreso, zona_id, pago_cobrado }
      */
     async crearPaseVisitante(datos) {
-        const { data } = await api.post('/parqueros/crear-pase-visitante', datos);
+        const { data } = await api.post('/parqueros/crear-pase-visitante', {
+            ...datos,
+            pago_cobrado: datos.pago_cobrado ?? false,
+        });
         return data;
     }
 };

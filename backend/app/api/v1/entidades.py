@@ -477,6 +477,33 @@ async def dashboard_entidad(
 
     # ── 6. Rendimiento de Parqueros ──
     parqueros_rendimiento = []
+    # ── 7. Contabilidad de Cobros del Día ──
+    pases_cobrados_hoy = 0
+    pases_no_cobrados_hoy = 0
+    if zona_ids:
+        ahora_utc = datetime.now(timezone.utc)
+        ahora_local = ahora_utc - timedelta(hours=4)
+        hoy_inicio_local = ahora_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        hoy_inicio_utc = hoy_inicio_local + timedelta(hours=4)
+
+        rs_cobrados = await db.execute(
+            select(func.count(VehiculoPase.id)).where(
+                VehiculoPase.zona_asignada_id.in_(zona_ids),
+                VehiculoPase.hora_ingreso >= hoy_inicio_utc,
+                VehiculoPase.pago_cobrado == True
+            )
+        )
+        pases_cobrados_hoy = rs_cobrados.scalar() or 0
+
+        rs_no_cobrados = await db.execute(
+            select(func.count(VehiculoPase.id)).where(
+                VehiculoPase.zona_asignada_id.in_(zona_ids),
+                VehiculoPase.hora_ingreso >= hoy_inicio_utc,
+                VehiculoPase.pago_cobrado == False
+            )
+        )
+        pases_no_cobrados_hoy = rs_no_cobrados.scalar() or 0
+
     if zona_ids:
         rs_parqueros = await db.execute(
             select(Usuario)
@@ -526,6 +553,10 @@ async def dashboard_entidad(
             "total_perdidos": len(vehiculos_perdidos),
             "total_en_camino": len(vehiculos_en_camino),
             "total_parqueros": len(parqueros_rendimiento),
+            # Contabilidad de cobros del día
+            "pases_cobrados_hoy": pases_cobrados_hoy,
+            "pases_no_cobrados_hoy": pases_no_cobrados_hoy,
+            "total_ingresos_hoy": pases_cobrados_hoy + pases_no_cobrados_hoy,
         },
         "zonas": zonas_resumen,
         "historial": historial,

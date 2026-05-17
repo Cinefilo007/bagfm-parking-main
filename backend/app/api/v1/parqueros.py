@@ -98,6 +98,7 @@ async def registrar_llegada_por_placa(
     modelo: Optional[str] = Body(None, embed=True),
     color: Optional[str] = Body(None, embed=True),
     confirmar: bool = Body(True, embed=True),
+    pago_cobrado: bool = Body(False, embed=True),
     db: AsyncSession = Depends(obtener_db),
     current_user: Usuario = Depends(require_rol(["SUPERVISOR_PARQUEROS", "PARQUERO", "ADMIN_BASE", "COMANDANTE"]))
 ):
@@ -112,7 +113,7 @@ async def registrar_llegada_por_placa(
             db, placa, zona_id, current_user.id,
             nombre=nombre, cedula=cedula, telefono=telefono,
             marca=marca, modelo=modelo, color=color,
-            confirmar=confirmar
+            confirmar=confirmar, pago_cobrado=pago_cobrado
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -121,6 +122,7 @@ async def registrar_llegada_por_placa(
 async def confirmar_ingreso_zona(
     vehiculo_pase_id: UUID = Body(..., embed=True),
     zona_id: UUID = Body(..., embed=True),
+    pago_cobrado: bool = Body(False, embed=True),
     db: AsyncSession = Depends(obtener_db),
     current_user: Usuario = Depends(require_rol(["SUPERVISOR_PARQUEROS", "PARQUERO", "ADMIN_BASE", "COMANDANTE"]))
 ):
@@ -128,7 +130,7 @@ async def confirmar_ingreso_zona(
     Confirma físicamente el ingreso de un vehículo que fue consultado previamente.
     """
     try:
-        return await parquero_service.confirmar_ingreso_zona(db, vehiculo_pase_id, zona_id)
+        return await parquero_service.confirmar_ingreso_zona(db, vehiculo_pase_id, zona_id, pago_cobrado=pago_cobrado)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -180,6 +182,7 @@ async def completar_datos_portador(
     marca: Optional[str] = Body(None, embed=True),
     modelo: Optional[str] = Body(None, embed=True),
     color: Optional[str] = Body(None, embed=True),
+    pago_cobrado: bool = Body(False, embed=True),
     db: AsyncSession = Depends(obtener_db),
     current_user: Usuario = Depends(require_rol(["SUPERVISOR_PARQUEROS", "PARQUERO", "ADMIN_BASE", "COMANDANTE"]))
 ):
@@ -191,7 +194,8 @@ async def completar_datos_portador(
     try:
         return await parquero_service.completar_datos_portador(
             db, qr_id, vehiculo_pase_id, nombre, cedula, telefono, zona_id,
-            placa=placa, marca=marca, modelo=modelo, color=color
+            placa=placa, marca=marca, modelo=modelo, color=color,
+            pago_cobrado=pago_cobrado
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -237,6 +241,7 @@ async def crear_pase_visitante(
     fecha_expiracion: Optional[datetime] = Body(None, embed=True),
     confirmar_ingreso: bool = Body(True, embed=True),
     zona_id: Optional[UUID] = Body(None, embed=True),
+    pago_cobrado: bool = Body(False, embed=True),
     db: AsyncSession = Depends(obtener_db),
     current_user: Usuario = Depends(require_rol(["SUPERVISOR_PARQUEROS", "PARQUERO", "ADMIN_BASE", "COMANDANTE"]))
 ):
@@ -255,7 +260,7 @@ async def crear_pase_visitante(
             placa=placa, nombre=nombre, cedula=cedula,
             telefono=telefono, marca=marca, modelo=modelo,
             color=color, fecha_expiracion=fecha_expiracion,
-            confirmar_ingreso=confirmar_ingreso
+            confirmar_ingreso=confirmar_ingreso, pago_cobrado=pago_cobrado
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

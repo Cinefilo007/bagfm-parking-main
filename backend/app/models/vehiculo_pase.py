@@ -28,6 +28,9 @@ class VehiculoPase(Base):
     hora_ingreso = Column(DateTime(timezone=True), nullable=True)
     hora_salida = Column(DateTime(timezone=True), nullable=True)
     
+    # Cobro del parquero — opcional, no interrumpe el flujo de registro
+    pago_cobrado = Column(Boolean, default=False, nullable=False)
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     # Relaciones

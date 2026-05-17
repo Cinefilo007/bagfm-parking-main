@@ -40,7 +40,10 @@ Proveer al **Admin de Entidad** un panel de control táctico operativo en tiempo
     "uso_pct": 45,
     "total_socios": 120,
     "total_perdidos": 2,
-    "total_parqueros": 4
+    "total_parqueros": 4,
+    "pases_cobrados_hoy": 38,
+    "pases_no_cobrados_hoy": 7,
+    "total_ingresos_hoy": 45
   },
   "zonas": [
     {
@@ -180,3 +183,4 @@ El dashboard sigue el Design System Aegis Tactical idéntico al Dashboard del Co
 | Versión | Fecha | Cambio |
 |---------|-------|--------|
 | v2.5 | 2026-05-11 | Dashboard Entidad: implementación completa con endpoint consolidado, historial de flujo, vehículos perdidos y rendimiento de parqueros |
+| v2.6 | 2026-05-17 | KPI de Cobros del Día: `pases_cobrados_hoy`, `pases_no_cobrados_hoy`, `total_ingresos_hoy` calculados con base en `vehiculos_pase.pago_cobrado` y `hora_ingreso >= hoy (UTC-4)` |

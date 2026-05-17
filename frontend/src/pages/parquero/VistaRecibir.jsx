@@ -3,7 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
     ArrowLeft, Scan, Keyboard, LogIn, CheckCircle2,
     RefreshCw, Car, XCircle, Camera, User, UserCheck,
-    ParkingSquare, AlertTriangle, Power, PlusCircle
+    ParkingSquare, AlertTriangle, Power, PlusCircle,
+    BadgeDollarSign, CircleDollarSign
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { toast } from 'react-hot-toast';
@@ -28,8 +29,8 @@ const InputField = ({ label, value, onChange, placeholder, prefix }) => (
     </div>
 );
 
-// ── Ficha de vehículo encontrado (flujo exitoso sin modal) ───────────────
-const FichaVehiculo = ({ datos, onConfirmar, cargando, onReset }) => (
+// ── Ficha de vehículo encontrado (flujo exitoso sin modal) ──────────────────
+const FichaVehiculo = ({ datos, onConfirmar, cargando, onReset, pagoCobrado, onTogglePago }) => (
     <div className="space-y-3 animate-in fade-in duration-300">
         <div className="bg-bg-card rounded-2xl border border-white/5 overflow-hidden">
             <div className="flex items-center gap-3 p-4 border-b border-white/5">
@@ -63,6 +64,30 @@ const FichaVehiculo = ({ datos, onConfirmar, cargando, onReset }) => (
                 </div>
             </div>
         </div>
+
+        {/* Toggle de cobro — opcional */}
+        <button
+            onClick={onTogglePago}
+            className={cn(
+                "w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all",
+                pagoCobrado
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                    : "bg-white/[0.03] border-white/10 text-text-muted"
+            )}
+        >
+            <div className="flex items-center gap-2">
+                <CircleDollarSign size={15} className={pagoCobrado ? "text-emerald-400" : "text-text-muted"} />
+                <span className="text-[10px] font-black uppercase tracking-widest">
+                    {pagoCobrado ? "Cobro Registrado ✓" : "Marcar Cobro (opcional)"}
+                </span>
+            </div>
+            <div className={cn(
+                "w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all",
+                pagoCobrado ? "bg-emerald-500 border-emerald-500" : "border-white/20"
+            )}>
+                {pagoCobrado && <CheckCircle2 size={12} className="text-bg-app" />}
+            </div>
+        </button>
 
         <button
             onClick={onConfirmar}
@@ -111,8 +136,10 @@ const ModalRegistroDatos = ({ resultadoSinDatos, zonaId, zonaData, onRegistrado,
     const [cargando, setCargando] = useState(false);
     
     // Configuración para Creación de Pase (Visitantes)
-    const [crearPase, setCrearPase] = useState(false);
-    const [fechaExp,  setFechaExp]  = useState(new Date().toISOString().split('T')[0]); // Default hoy
+    const [crearPase,   setCrearPase]   = useState(false);
+    const [fechaExp,    setFechaExp]    = useState(new Date().toISOString().split('T')[0]); // Default hoy
+    // Control de cobro — opcional, default false
+    const [pagoCobrado, setPagoCobrado] = useState(false);
 
     // ── Captura IA ──────────────────────────────────────────────────────────
     const handleCapturarIA = async () => {
@@ -166,7 +193,8 @@ const ModalRegistroDatos = ({ resultadoSinDatos, zonaId, zonaData, onRegistrado,
                     color: color.trim().toUpperCase() || null,
                     fecha_expiracion: fechaExp ? `${fechaExp}T23:59:59` : null,
                     confirmar_ingreso: true,
-                    zona_id: zonaId
+                    zona_id: zonaId,
+                    pago_cobrado: pagoCobrado,
                 });
                 toast.success(res.mensaje);
                 onRegistrado?.(res);
@@ -185,7 +213,7 @@ const ModalRegistroDatos = ({ resultadoSinDatos, zonaId, zonaData, onRegistrado,
                     marca:    marca || null,
                     modelo:   modelo || null,
                     color:    color || null
-                });
+                }, pagoCobrado);
                 toast.success(`Datos registrados ✔ ${placa}`);
                 onRegistrado?.({ placa, vehiculoPaseId });
             } else {
@@ -197,7 +225,7 @@ const ModalRegistroDatos = ({ resultadoSinDatos, zonaId, zonaData, onRegistrado,
                     marca: marca || null,
                     modelo: modelo || null,
                     color: color || null
-                });
+                }, true, pagoCobrado);
                 toast.success(`${placa} registrado en zona`);
                 onRegistrado?.(res);
             }
@@ -356,6 +384,30 @@ const ModalRegistroDatos = ({ resultadoSinDatos, zonaId, zonaData, onRegistrado,
                 </div>
                 
                 <div className="p-4 border-t border-white/5 space-y-4">
+                    {/* ── COBRO — Siempre visible, completamente opcional ── */}
+                    <button
+                        onClick={() => setPagoCobrado(p => !p)}
+                        className={cn(
+                            "w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all",
+                            pagoCobrado
+                                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                                : "bg-white/[0.03] border-white/10 text-text-muted"
+                        )}
+                    >
+                        <div className="flex items-center gap-2">
+                            <CircleDollarSign size={14} className={pagoCobrado ? "text-emerald-400" : "text-text-muted"} />
+                            <span className="text-[9px] font-black uppercase tracking-widest">
+                                {pagoCobrado ? "Cobro Registrado ✓" : "Cobro Realizado (opcional)"}
+                            </span>
+                        </div>
+                        <div className={cn(
+                            "w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all",
+                            pagoCobrado ? "bg-emerald-500 border-emerald-500" : "border-white/20"
+                        )}>
+                            {pagoCobrado && <CheckCircle2 size={11} className="text-bg-app" />}
+                        </div>
+                    </button>
+
                     {/* ── SECCIÓN PASE TEMPORAL (Solo si tiene permiso) ── */}
                     {zonaData?.puede_crear_pases && !qrId && (
                         <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl space-y-3">
@@ -433,6 +485,8 @@ const VistaRecibir = () => {
     const [resultado,  setResultado]  = useState(null);       // VehiculoPase con sin_datos=false
     const [sinDatos,   setSinDatos]   = useState(null);       // objeto sin_datos=true del backend
     const [confirmando, setConfirmando] = useState(false);
+    // Cobro para el flujo de FichaVehiculo (directo, sin modal)
+    const [pagoCobradoFicha, setPagoCobradoFicha] = useState(false);
 
     // ── ESTADOS DE IA (Procesamiento en Background) ──
     const [aiJobs, setAiJobs] = useState([]); // Lista de trabajos IA { jobId, status, error, resultado... }
@@ -502,6 +556,7 @@ const VistaRecibir = () => {
         setResultado(null);
         setSinDatos(null);
         setPlacaInput('');
+        setPagoCobradoFicha(false);
     };
 
     // ── Buscar por placa ────────────────────────────────────────────────────
@@ -641,7 +696,7 @@ const VistaRecibir = () => {
         if (!resultado?.vehiculo_pase_id) return;
         setConfirmando(true);
         try {
-            await parqueroService.confirmarIngreso(resultado.vehiculo_pase_id, zonaId);
+            await parqueroService.confirmarIngreso(resultado.vehiculo_pase_id, zonaId, pagoCobradoFicha);
             toast.success(`${resultado.placa} ingresó a la zona`);
             resetear();
         } catch (e) {
@@ -754,6 +809,8 @@ const VistaRecibir = () => {
                         cargando={confirmando}
                         onConfirmar={handleConfirmarIngreso}
                         onReset={resetear}
+                        pagoCobrado={pagoCobradoFicha}
+                        onTogglePago={() => setPagoCobradoFicha(p => !p)}
                     />
                 )}
 

@@ -66,3 +66,17 @@ Establecer las reglas de visualización táctica para el mapa de puestos de esta
 
 ---
 *Ultima actualización: 2026-05-12 (Validación zona incorrecta en búsqueda por placa — paridad con flujo QR)*
+
+## 10. CONTROL DE COBROS DEL PARQUERO (v2.6)
+
+- **Campo**: `pago_cobrado` (boolean, default `false`) en `vehiculos_pase`.
+- **Flujos que lo soportan**: `registrar_llegada_placa`, `completar_datos_portador`, `confirmar_ingreso_zona`, `crear_pase_visitante`.
+- **UI — `VistaRecibir.jsx`**:
+  - **Modal (`ModalRegistroDatos`)**: Botón-checkbox verde "Cobro Realizado (opcional)" visible siempre, antes de la sección de pase temporal.
+  - **Ficha directa (`FichaVehiculo`)**: Toggle "Marcar Cobro (opcional)" visible antes del botón "Confirmar Ingreso".
+  - Ambos controles son **completamente opcionales** y tienen `default = false`. No interrumpen el flujo si el parquero no los toca.
+  - Estado JS: `pagoCobrado` (modal) y `pagoCobradoFicha` (ficha directa), ambos reseteados al llamar `resetear()`.
+- **Dashboard Admin Entidad**: Sección "Contabilidad del Día" visible solo si `total_ingresos_hoy > 0`, muestra 3 KPIs (Cobrados, Sin Cobro, Total) y barra proporcional verde/rojo.
+- **Migración**: `scripts/migrate_pago_cobrado.sql` — `ADD COLUMN IF NOT EXISTS pago_cobrado BOOLEAN NOT NULL DEFAULT FALSE;`
+
+*Ultima actualización: 2026-05-17 (Sistema de control de cobros del parquero — campo pago_cobrado en vehiculos_pase)*
