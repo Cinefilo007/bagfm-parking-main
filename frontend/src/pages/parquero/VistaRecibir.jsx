@@ -71,21 +71,21 @@ const FichaVehiculo = ({ datos, onConfirmar, cargando, onReset, pagoCobrado, onT
             className={cn(
                 "w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all",
                 pagoCobrado
-                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-                    : "bg-white/[0.03] border-white/10 text-text-muted"
+                    ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
+                    : "bg-gray-100 dark:bg-white/[0.04] border-gray-300 dark:border-white/15 text-gray-600 dark:text-text-muted"
             )}
         >
             <div className="flex items-center gap-2">
-                <CircleDollarSign size={15} className={pagoCobrado ? "text-emerald-400" : "text-text-muted"} />
+                <CircleDollarSign size={15} className={pagoCobrado ? "text-emerald-500 dark:text-emerald-400" : "text-gray-500 dark:text-text-muted"} />
                 <span className="text-[10px] font-black uppercase tracking-widest">
                     {pagoCobrado ? "Cobro Registrado ✓" : "Marcar Cobro (opcional)"}
                 </span>
             </div>
             <div className={cn(
                 "w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all",
-                pagoCobrado ? "bg-emerald-500 border-emerald-500" : "border-white/20"
+                pagoCobrado ? "bg-emerald-500 border-emerald-500" : "border-gray-300 dark:border-white/25"
             )}>
-                {pagoCobrado && <CheckCircle2 size={12} className="text-bg-app" />}
+                {pagoCobrado && <CheckCircle2 size={12} className="text-white" />}
             </div>
         </button>
 
@@ -390,21 +390,21 @@ const ModalRegistroDatos = ({ resultadoSinDatos, zonaId, zonaData, onRegistrado,
                         className={cn(
                             "w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all",
                             pagoCobrado
-                                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-                                : "bg-white/[0.03] border-white/10 text-text-muted"
+                                ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
+                                : "bg-gray-100 dark:bg-white/[0.04] border-gray-300 dark:border-white/15 text-gray-600 dark:text-text-muted"
                         )}
                     >
                         <div className="flex items-center gap-2">
-                            <CircleDollarSign size={14} className={pagoCobrado ? "text-emerald-400" : "text-text-muted"} />
+                            <CircleDollarSign size={14} className={pagoCobrado ? "text-emerald-500 dark:text-emerald-400" : "text-gray-500 dark:text-text-muted"} />
                             <span className="text-[9px] font-black uppercase tracking-widest">
                                 {pagoCobrado ? "Cobro Registrado ✓" : "Cobro Realizado (opcional)"}
                             </span>
                         </div>
                         <div className={cn(
                             "w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all",
-                            pagoCobrado ? "bg-emerald-500 border-emerald-500" : "border-white/20"
+                            pagoCobrado ? "bg-emerald-500 border-emerald-500" : "border-gray-300 dark:border-white/25"
                         )}>
-                            {pagoCobrado && <CheckCircle2 size={11} className="text-bg-app" />}
+                            {pagoCobrado && <CheckCircle2 size={11} className="text-white" />}
                         </div>
                     </button>
 
