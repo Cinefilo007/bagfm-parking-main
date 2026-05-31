@@ -196,12 +196,12 @@ export default function ParqueAutomotor() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0E1322] text-text-main p-4 space-y-4 font-sans">
+    <div className="min-h-screen dark bg-bg-app text-text-main p-4 space-y-4 font-sans">
       {/* HEADER TÁCTICO */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-[#1A1F2F] border border-white/5 rounded-xl p-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-bg-card border border-bg-high/50 rounded-xl p-4">
         <div>
           <div className="flex items-center gap-2">
-            <div className="w-2 h-5 rounded-full bg-success" />
+            <div className="w-2 h-5 rounded-full bg-success animate-pulse" />
             <h1 className="text-sm font-black uppercase tracking-widest text-text-main font-mono">Aegis Fuel: Parque Automotor</h1>
           </div>
           <p className="text-[10px] text-text-muted uppercase tracking-wider mt-0.5">Control táctico de la flota y asignación de combustible de la base</p>
@@ -209,14 +209,14 @@ export default function ParqueAutomotor() {
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <button 
             onClick={() => setModalImportar(true)}
-            className="flex-1 sm:flex-initial h-10 px-4 rounded-xl bg-success text-bg-app font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-success/90 transition-all cursor-pointer active:scale-95"
+            className="flex-1 sm:flex-initial h-10 px-4 rounded-xl bg-success text-on-primary font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-success/90 transition-all cursor-pointer active:scale-95 shadow-tactica"
           >
             <Upload size={14} />
             Carga Masiva Excel
           </button>
           <button 
             onClick={() => { cargarEntidades(); cargarVehiculos(); }}
-            className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-text-muted hover:text-text-main transition-all"
+            className="w-10 h-10 rounded-xl bg-white/5 border border-bg-high/30 flex items-center justify-center text-text-muted hover:text-text-main transition-all"
             title="Refrescar datos"
           >
             <RefreshCw size={15} />
@@ -227,7 +227,7 @@ export default function ParqueAutomotor() {
       {/* FILTROS Y CONTROLES */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* BUSCADOR */}
-        <div className="md:col-span-2 bg-[#1A1F2F] border border-white/5 rounded-xl p-4">
+        <div className="md:col-span-2 bg-bg-card border border-bg-high/50 rounded-xl p-4">
           <h3 className="text-[10px] font-black uppercase tracking-widest text-text-muted mb-3 flex items-center gap-1.5">
             <Search size={12} /> Búsqueda y Segmentación
           </h3>
@@ -238,7 +238,7 @@ export default function ParqueAutomotor() {
                 placeholder="BUSCAR POR PLACA..."
                 value={placaBusqueda}
                 onChange={(e) => setPlacaBusqueda(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl pl-4 pr-10 h-11 text-xs text-text-main font-mono focus:outline-none focus:border-success transition-all uppercase"
+                className="w-full bg-bg-low border border-bg-high/30 rounded-xl pl-4 pr-10 h-11 text-xs text-text-main font-display font-black tracking-wider focus:outline-none focus:border-success transition-all uppercase"
               />
               <button type="submit" className="absolute right-3 top-3.5 text-text-muted hover:text-text-main">
                 <Search size={14} />
@@ -248,7 +248,7 @@ export default function ParqueAutomotor() {
             <select
               value={filtroEntidad}
               onChange={(e) => setFiltroEntidad(e.target.value)}
-              className="bg-white/5 border border-white/10 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all"
+              className="bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-bold"
             >
               <option value="">TODAS LAS ENTIDADES</option>
               {entidades.map(ent => (
@@ -258,7 +258,7 @@ export default function ParqueAutomotor() {
 
             <button
               type="submit"
-              className="h-11 px-5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] font-black uppercase tracking-widest transition-all"
+              className="h-11 px-5 rounded-xl bg-white/5 hover:bg-white/10 border border-bg-high/30 text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer"
             >
               Filtrar
             </button>
@@ -266,7 +266,7 @@ export default function ParqueAutomotor() {
         </div>
 
         {/* AJUSTES DE CUOTA GLOBAL DE LA ENTIDAD SELECCIONADA */}
-        <div className="bg-[#1A1F2F] border border-white/5 rounded-xl p-4">
+        <div className="bg-bg-card border border-bg-high/50 rounded-xl p-4">
           <h3 className="text-[10px] font-black uppercase tracking-widest text-text-muted mb-3 flex items-center gap-1.5">
             <Settings size={12} /> Límite Semanal Entidad
           </h3>
@@ -284,21 +284,21 @@ export default function ParqueAutomotor() {
                     placeholder="Cuota en Litros"
                     value={nuevoLimiteEntidad}
                     onChange={(e) => setNuevoLimiteEntidad(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 h-11 text-xs text-text-main font-mono focus:outline-none focus:border-success transition-all"
+                    className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-4 h-11 text-xs text-text-main font-display font-black focus:outline-none focus:border-success transition-all"
                   />
                   <span className="absolute right-3 top-3.5 text-[10px] font-black text-text-muted uppercase">Ltrs</span>
                 </div>
                 <button
                   type="submit"
                   disabled={guardandoLimiteEntidad}
-                  className="px-4 rounded-xl bg-success text-bg-app font-black text-[10px] uppercase tracking-widest hover:bg-success/90 transition-all flex items-center justify-center"
+                  className="px-4 rounded-xl bg-success text-on-primary font-black text-[10px] uppercase tracking-widest hover:bg-success/90 transition-all flex items-center justify-center cursor-pointer shadow-tactica"
                 >
                   {guardandoLimiteEntidad ? <RefreshCw size={13} className="animate-spin" /> : "Guardar"}
                 </button>
               </div>
             </form>
           ) : (
-            <div className="h-[76px] flex items-center justify-center bg-white/5 border border-dashed border-white/10 rounded-xl">
+            <div className="h-[76px] flex items-center justify-center bg-white/5 border border-dashed border-bg-high/30 rounded-xl">
               <p className="text-[10px] text-text-muted uppercase tracking-wider text-center px-4">Seleccione una entidad para gestionar su límite semanal de litros</p>
             </div>
           )}
@@ -306,7 +306,7 @@ export default function ParqueAutomotor() {
       </div>
 
       {/* LISTADO DE VEHÍCULOS (PARQUE AUTOMOTOR) */}
-      <div className="bg-[#1A1F2F] border border-white/5 rounded-xl p-4 overflow-hidden">
+      <div className="bg-bg-card border border-bg-high/50 rounded-xl p-4 overflow-hidden">
         <h2 className="text-[10px] font-black uppercase tracking-widest text-text-muted mb-4 flex items-center gap-1.5">
           <Database size={13} /> Flota Registrada ({vehiculos.length} Vehículos)
         </h2>
@@ -317,7 +317,7 @@ export default function ParqueAutomotor() {
             <p className="text-[10px] text-text-muted uppercase tracking-widest">Cargando parque automotor...</p>
           </div>
         ) : vehiculos.length === 0 ? (
-          <div className="py-12 flex flex-col items-center justify-center gap-2 bg-white/5 border border-dashed border-white/10 rounded-xl">
+          <div className="py-12 flex flex-col items-center justify-center gap-2 bg-white/5 border border-dashed border-bg-high/30 rounded-xl">
             <Car size={36} className="text-text-muted" />
             <p className="text-xs text-text-muted italic">No se encontraron vehículos registrados con los criterios seleccionados.</p>
           </div>
@@ -325,7 +325,7 @@ export default function ParqueAutomotor() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-white/5 text-[8px] font-black uppercase tracking-widest text-text-muted">
+                <tr className="border-b border-bg-high/20 text-[8px] font-black uppercase tracking-widest text-text-muted">
                   <th className="py-2.5 px-3">Placa</th>
                   <th className="py-2.5 px-3">Vehículo</th>
                   <th className="py-2.5 px-3">Entidad</th>
@@ -337,38 +337,38 @@ export default function ParqueAutomotor() {
                   <th className="py-2.5 px-3 text-right">Ajustes</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5 text-[11px] font-sans">
+              <tbody className="divide-y divide-bg-high/20 text-[11px] font-sans">
                 {vehiculos.map(v => (
-                  <tr key={v.id} className="hover:bg-white/20 transition-all">
-                    <td className="py-3 px-3 font-mono font-bold text-text-main tracking-wider">{v.placa}</td>
+                  <tr key={v.id} className="hover:bg-bg-low/30 transition-all">
+                    <td className="py-3 px-3 font-display font-black text-text-main tracking-wider">{v.placa}</td>
                     <td className="py-3 px-3 text-text-sec">
                       <div className="font-bold text-text-main">{v.marca}</div>
                       <div className="text-[9px] text-text-muted">{v.modelo} · {v.color}</div>
                     </td>
                     <td className="py-3 px-3">
-                      <span className="text-[10px] font-medium text-text-sec uppercase truncate max-w-[150px] inline-block">
-                        {v.entidad_nombre || <span className="text-text-muted italic">Sin Entidad</span>}
+                      <span className="text-[10px] font-bold text-text-sec uppercase truncate max-w-[150px] inline-block">
+                        {v.entidad_nombre || <span className="text-text-muted italic lowercase">Sin Entidad</span>}
                       </span>
                     </td>
                     <td className="py-3 px-3">{renderUsoBadge(v.uso_vehiculo)}</td>
-                    <td className="py-3 px-3 uppercase font-mono text-[9px] text-text-sec">
+                    <td className="py-3 px-3 uppercase font-display text-[9px] text-text-sec">
                       {v.tipo_combustible === 'diesel' ? (
                         <span className="px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400 font-bold">DIESEL</span>
                       ) : (
                         <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold">GASOLINA</span>
                       )}
                     </td>
-                    <td className="py-3 px-3 font-mono">
-                      <span className="font-bold">{v.asignacion_combustible_semanal} L</span>
-                      <span className="text-[8px] text-text-muted block">Tanque: {v.capacidad_tanque}L</span>
+                    <td className="py-3 px-3 font-display">
+                      <span className="font-black text-text-main">{v.asignacion_combustible_semanal} L</span>
+                      <span className="text-[8px] text-text-muted block font-sans">Tanque: {v.capacidad_tanque}L</span>
                     </td>
-                    <td className="py-3 px-3 font-mono text-text-sec">{v.ultimo_kilometraje} km</td>
+                    <td className="py-3 px-3 font-display font-bold text-text-sec">{v.ultimo_kilometraje} km</td>
                     <td className="py-3 px-3">
                       <div className="flex justify-center">
                         <button
                           onClick={() => handleToggleAutorizar(v)}
                           className={cn(
-                            "flex items-center gap-1 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border transition-all cursor-pointer",
+                            "flex items-center gap-1 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border transition-all cursor-pointer shadow-sm",
                             v.autorizado_combustible 
                               ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/20" 
                               : "bg-red-500/10 border-red-500/40 text-red-400 hover:bg-red-500/20"
@@ -381,7 +381,7 @@ export default function ParqueAutomotor() {
                     <td className="py-3 px-3 text-right">
                       <button
                         onClick={() => handleAbrirEditarVehiculo(v)}
-                        className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all flex items-center justify-center ml-auto text-text-muted hover:text-text-main"
+                        className="w-8 h-8 rounded-lg bg-white/5 border border-bg-high/30 hover:bg-white/10 transition-all flex items-center justify-center ml-auto text-text-muted hover:text-text-main cursor-pointer"
                         title="Editar parámetros"
                       >
                         <Edit3 size={12} />
@@ -398,15 +398,15 @@ export default function ParqueAutomotor() {
       {/* MODAL EDICIÓN PARÁMETROS VEHÍCULO */}
       {modalVehiculo && (
         <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-sm bg-[#1A1F2F] rounded-2xl border border-white/10 shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-[#0E1322]">
+          <div className="w-full max-w-sm bg-bg-card rounded-2xl border border-bg-high/50 shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-bg-high/30 bg-bg-app">
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-4 rounded-full bg-success" />
                 <p className="text-[10px] font-black uppercase tracking-widest text-text-main font-mono">Ajustes Combustible: {modalVehiculo.placa}</p>
               </div>
               <button 
                 onClick={() => setModalVehiculo(null)}
-                className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-text-muted hover:text-text-main"
+                className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-text-muted hover:text-text-main cursor-pointer"
               >
                 <XCircle size={15} />
               </button>
@@ -414,7 +414,7 @@ export default function ParqueAutomotor() {
 
             <form onSubmit={handleGuardarVehiculo} className="p-4 space-y-4">
               {/* Autorización rápida */}
-              <div className="flex justify-between items-center bg-white/5 border border-white/10 rounded-xl p-3">
+              <div className="flex justify-between items-center bg-white/5 border border-bg-high/30 rounded-xl p-3">
                 <div>
                   <span className="text-[10px] font-black uppercase tracking-widest text-text-main block">Autorizado para Surtir</span>
                   <span className="text-[8px] text-text-muted uppercase">Permitir despacho directo en bomba</span>
@@ -422,7 +422,7 @@ export default function ParqueAutomotor() {
                 <button
                   type="button"
                   onClick={() => setFormVehiculo(prev => ({ ...prev, autorizado_combustible: !prev.autorizado_combustible }))}
-                  className="text-text-main focus:outline-none"
+                  className="text-text-main focus:outline-none cursor-pointer"
                 >
                   {formVehiculo.autorizado_combustible ? (
                     <ToggleRight className="text-success" size={32} />
@@ -438,7 +438,7 @@ export default function ParqueAutomotor() {
                 <select
                   value={formVehiculo.uso_vehiculo}
                   onChange={(e) => setFormVehiculo(prev => ({ ...prev, uso_vehiculo: e.target.value }))}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all"
+                  className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-bold"
                 >
                   <option value="particular">PARTICULAR</option>
                   <option value="protocolar">PROTOCOLAR</option>
@@ -452,7 +452,7 @@ export default function ParqueAutomotor() {
                 <select
                   value={formVehiculo.tipo_combustible}
                   onChange={(e) => setFormVehiculo(prev => ({ ...prev, tipo_combustible: e.target.value }))}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all"
+                  className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-bold"
                 >
                   <option value="gasolina">GASOLINA</option>
                   <option value="diesel">DIESEL</option>
@@ -468,10 +468,10 @@ export default function ParqueAutomotor() {
                       type="number"
                       value={formVehiculo.capacidad_tanque}
                       onChange={(e) => setFormVehiculo(prev => ({ ...prev, capacidad_tanque: e.target.value }))}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 h-11 text-xs text-text-main font-mono focus:outline-none focus:border-success transition-all"
+                      className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main font-display font-black focus:outline-none focus:border-success transition-all"
                       placeholder="Ej: 50"
                     />
-                    <span className="absolute right-3 top-3.5 text-[8px] font-black text-text-muted">L</span>
+                    <span className="absolute right-3 top-3.5 text-[8px] font-black text-text-muted font-sans">L</span>
                   </div>
                 </div>
 
@@ -482,10 +482,10 @@ export default function ParqueAutomotor() {
                       type="number"
                       value={formVehiculo.asignacion_combustible_semanal}
                       onChange={(e) => setFormVehiculo(prev => ({ ...prev, asignacion_combustible_semanal: e.target.value }))}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 h-11 text-xs text-text-main font-mono focus:outline-none focus:border-success transition-all"
+                      className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main font-display font-black focus:outline-none focus:border-success transition-all"
                       placeholder="Ej: 30"
                     />
-                    <span className="absolute right-3 top-3.5 text-[8px] font-black text-text-muted">L</span>
+                    <span className="absolute right-3 top-3.5 text-[8px] font-black text-text-muted font-sans">L</span>
                   </div>
                 </div>
               </div>
@@ -495,14 +495,14 @@ export default function ParqueAutomotor() {
                 <button
                   type="button"
                   onClick={() => setModalVehiculo(null)}
-                  className="w-1/3 h-11 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-text-muted"
+                  className="w-1/3 h-11 rounded-xl bg-white/5 border border-bg-high/30 text-[10px] font-black uppercase tracking-widest text-text-muted cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={guardandoVehiculo}
-                  className="flex-1 h-11 rounded-xl bg-success text-bg-app font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5"
+                  className="flex-1 h-11 rounded-xl bg-success text-on-primary font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5 cursor-pointer shadow-tactica"
                 >
                   {guardandoVehiculo ? <RefreshCw size={13} className="animate-spin" /> : "Guardar Cambios"}
                 </button>
@@ -515,15 +515,15 @@ export default function ParqueAutomotor() {
       {/* MODAL CARGA MASIVA DE EXCEL */}
       {modalImportar && (
         <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-[#1A1F2F] rounded-2xl border border-white/10 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-[#0E1322]">
+          <div className="w-full max-w-md bg-bg-card rounded-2xl border border-bg-high/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-bg-high/30 bg-bg-app">
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-4 rounded-full bg-success" />
                 <p className="text-[10px] font-black uppercase tracking-widest text-text-main font-mono">Carga Masiva: Flota Automotriz</p>
               </div>
               <button 
                 onClick={() => { setModalImportar(false); setArchivoExcel(null); setResumenImportacion(null); }}
-                className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-text-muted hover:text-text-main"
+                className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-text-muted hover:text-text-main cursor-pointer"
               >
                 <XCircle size={15} />
               </button>
@@ -532,20 +532,20 @@ export default function ParqueAutomotor() {
             <div className="p-4 space-y-4 overflow-y-auto flex-1 scrollbar-tactical">
               {/* Formulario de carga */}
               <form onSubmit={handleSubirExcel} className="space-y-4">
-                <div className="border-2 border-dashed border-white/10 rounded-xl p-6 bg-white/5 flex flex-col items-center justify-center text-center gap-2">
+                <div className="border-2 border-dashed border-bg-high/30 rounded-xl p-6 bg-white/5 flex flex-col items-center justify-center text-center gap-2">
                   <FileSpreadsheet className="text-success mb-1" size={32} />
                   <div>
                     <span className="text-xs font-bold text-text-main block">Seleccionar plantilla Excel (.xlsx)</span>
-                    <span className="text-[9px] text-text-muted uppercase mt-1 block">El archivo debe contener placa, marca, modelo, capacidad de tanque, etc.</span>
+                    <span className="text-[9px] text-text-muted uppercase mt-1 block font-sans">El archivo debe contener placa, marca, modelo, capacidad de tanque, etc.</span>
                   </div>
                   <input
                     type="file"
                     accept=".xlsx, .xls"
                     onChange={(e) => setArchivoExcel(e.target.files[0])}
-                    className="w-full text-xs text-text-muted mt-2 cursor-pointer bg-white/5 border border-white/10 rounded px-2 py-1 file:hidden"
+                    className="w-full text-xs text-text-muted mt-2 cursor-pointer bg-white/5 border border-bg-high/30 rounded px-2 py-1 file:hidden"
                   />
                   {archivoExcel && (
-                    <span className="text-[10px] text-success font-black uppercase tracking-wider mt-1">
+                    <span className="text-[10px] text-success font-black uppercase tracking-wider mt-1 font-display">
                       Archivo listo: {archivoExcel.name}
                     </span>
                   )}
@@ -555,14 +555,14 @@ export default function ParqueAutomotor() {
                   <button
                     type="button"
                     onClick={() => { setModalImportar(false); setArchivoExcel(null); setResumenImportacion(null); }}
-                    className="w-1/3 h-11 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-text-muted"
+                    className="w-1/3 h-11 rounded-xl bg-white/5 border border-bg-high/30 text-[10px] font-black uppercase tracking-widest text-text-muted cursor-pointer"
                   >
                     Cerrar
                   </button>
                   <button
                     type="submit"
                     disabled={importandoExcel || !archivoExcel}
-                    className="flex-1 h-11 rounded-xl bg-success text-bg-app font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    className="flex-1 h-11 rounded-xl bg-success text-on-primary font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-tactica"
                   >
                     {importandoExcel ? <RefreshCw size={13} className="animate-spin" /> : <Upload size={13} />}
                     Procesar Plantilla
@@ -572,28 +572,26 @@ export default function ParqueAutomotor() {
 
               {/* Resumen de importación si fue exitosa */}
               {resumenImportacion && (
-                <div className="bg-[#0E1322] border border-white/5 rounded-xl p-3 space-y-2">
+                <div className="bg-bg-app border border-bg-high/50 rounded-xl p-3 space-y-2">
                   <p className="text-[10px] font-black uppercase tracking-widest text-success flex items-center gap-1">
                     <CheckCircle size={12} /> Carga Procesada Exitosamente
                   </p>
                   
                   <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono font-bold mt-1">
-                    <div className="bg-white/5 border border-white/10 rounded p-2">
+                    <div className="bg-white/5 border border-bg-high/30 rounded p-2">
                       <span className="text-text-muted text-[8px] uppercase block tracking-wider mb-1">Leídos</span>
                       <span className="text-text-main text-sm">{resumenImportacion.leidos || 0}</span>
                     </div>
                     <div className="bg-emerald-500/5 border border-emerald-500/10 rounded p-2">
-                      <span className="text-emerald-400 text-[8px] uppercase block tracking-wider mb-1">Creados</span>
                       <span className="text-emerald-400 text-sm">{resumenImportacion.creados || 0}</span>
                     </div>
                     <div className="bg-blue-500/5 border border-blue-500/10 rounded p-2">
-                      <span className="text-blue-400 text-[8px] uppercase block tracking-wider mb-1">Actualizados</span>
                       <span className="text-blue-400 text-sm">{resumenImportacion.actualizados || 0}</span>
                     </div>
                   </div>
 
                   {resumenImportacion.errores && resumenImportacion.errores.length > 0 && (
-                    <div className="pt-2 border-t border-white/5">
+                    <div className="pt-2 border-t border-bg-high/20">
                       <p className="text-[9px] font-black uppercase tracking-widest text-danger flex items-center gap-1 mb-1.5">
                         <AlertTriangle size={11} /> Advertencias y Errores ({resumenImportacion.errores.length})
                       </p>

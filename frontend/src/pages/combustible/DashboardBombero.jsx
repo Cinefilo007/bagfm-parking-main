@@ -317,7 +317,7 @@ export default function DashboardBombero() {
   // Pantalla de Declaración Inicial de Inventario obligatoria
   if (!tieneLecturaSemana && !cargandoTanques) {
     return (
-      <div className="min-h-screen bg-bg-app flex items-center justify-center p-4">
+      <div className="min-h-screen dark bg-bg-app flex items-center justify-center p-4">
         <div className="w-full max-w-md bg-bg-card rounded-2xl border border-warning/30 shadow-tactica overflow-hidden">
           <div className="bg-warning/10 border-b border-warning/20 px-6 py-4 flex items-center gap-3">
             <AlertTriangle className="text-warning animate-pulse-slow" size={24} />
@@ -362,7 +362,7 @@ export default function DashboardBombero() {
   }
 
   return (
-    <div className="min-h-screen bg-bg-app flex flex-col pb-20">
+    <div className="min-h-screen dark bg-bg-app flex flex-col pb-20">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-bg-card/90 backdrop-blur-md border-b border-white/5 px-4 py-3">
         <div className="flex items-center justify-between max-w-lg mx-auto w-full">

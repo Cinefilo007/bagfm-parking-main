@@ -83,19 +83,19 @@ export default function ReporteCombustible() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0E1322] text-text-main p-4 space-y-4 font-sans">
+    <div className="min-h-screen dark bg-bg-app text-text-main p-4 space-y-4 font-sans">
       {/* HEADER TÁCTICO */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-[#1A1F2F] border border-white/5 rounded-xl p-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-bg-card border border-bg-high/50 rounded-xl p-4">
         <div>
           <div className="flex items-center gap-2">
-            <div className="w-2 h-5 rounded-full bg-success" />
+            <div className="w-2 h-5 rounded-full bg-success animate-pulse" />
             <h1 className="text-sm font-black uppercase tracking-widest text-text-main font-mono">Panel Analítico de Consumo</h1>
           </div>
           <p className="text-[10px] text-text-muted uppercase tracking-wider mt-0.5">Auditoría de combustible y control de inventario de la bomba</p>
         </div>
         <button 
           onClick={() => cargarReporte()}
-          className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-text-muted hover:text-text-main transition-all cursor-pointer self-end sm:self-auto"
+          className="w-10 h-10 rounded-xl bg-white/5 border border-bg-high/30 flex items-center justify-center text-text-muted hover:text-text-main transition-all cursor-pointer self-end sm:self-auto"
           title="Actualizar reporte"
         >
           {cargandoReporte ? (
@@ -107,7 +107,7 @@ export default function ReporteCombustible() {
       </div>
 
       {/* FILTROS TÁCTICOS */}
-      <div className="bg-[#1A1F2F] border border-white/5 rounded-xl p-4">
+      <div className="bg-bg-card border border-bg-high/50 rounded-xl p-4">
         <form onSubmit={handleFiltrar} className="flex flex-col md:flex-row gap-4 items-end">
           <div className="grid grid-cols-2 gap-3 flex-1 w-full">
             <div className="space-y-1">
@@ -118,7 +118,7 @@ export default function ReporteCombustible() {
                 type="date"
                 value={fechaInicio}
                 onChange={(e) => setFechaInicio(e.target.value)}
-                className="w-full bg-[#0E1322] border border-white/10 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all"
+                className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-bold"
               />
             </div>
 
@@ -130,7 +130,7 @@ export default function ReporteCombustible() {
                 type="date"
                 value={fechaFin}
                 onChange={(e) => setFechaFin(e.target.value)}
-                className="w-full bg-[#0E1322] border border-white/10 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all"
+                className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-bold"
               />
             </div>
           </div>
@@ -143,7 +143,7 @@ export default function ReporteCombustible() {
               <select
                 value={filtroEntidad}
                 onChange={(e) => setFiltroEntidad(e.target.value)}
-                className="w-full bg-[#0E1322] border border-white/10 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all"
+                className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-bold"
               >
                 <option value="">TODAS LAS ENTIDADES</option>
                 {entidades.map(ent => (
@@ -155,7 +155,7 @@ export default function ReporteCombustible() {
 
           <button
             type="submit"
-            className="w-full md:w-auto h-11 px-6 rounded-xl bg-success text-bg-app font-black text-[10px] uppercase tracking-widest hover:bg-success/90 transition-all cursor-pointer"
+            className="w-full md:w-auto h-11 px-6 rounded-xl bg-success text-on-primary font-black text-[10px] uppercase tracking-widest hover:bg-success/90 transition-all cursor-pointer shadow-tactica"
           >
             Generar Reporte
           </button>
@@ -163,7 +163,7 @@ export default function ReporteCombustible() {
       </div>
 
       {cargandoReporte ? (
-        <div className="py-24 flex flex-col items-center justify-center gap-3 bg-[#1A1F2F] border border-white/5 rounded-xl">
+        <div className="py-24 flex flex-col items-center justify-center gap-3 bg-bg-card border border-bg-high/50 rounded-xl">
           <RefreshCw size={36} className="animate-spin text-success" />
           <p className="text-[10px] text-text-muted uppercase tracking-widest font-mono">Consolidando registros de auditoría...</p>
         </div>
@@ -172,48 +172,48 @@ export default function ReporteCombustible() {
           {/* TARJETAS DE KPIS PRINCIPALES */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* KPI 1: LITROS */}
-            <div className="bg-[#1A1F2F] border border-white/5 rounded-xl p-4 flex justify-between items-center">
+            <div className="bg-bg-card border border-bg-high/50 rounded-xl p-4 flex justify-between items-center">
               <div className="space-y-1">
                 <span className="text-[8px] font-black text-text-muted uppercase tracking-widest block">Litros Surtidos</span>
-                <span className="text-3xl font-black font-mono text-success tracking-wide">
+                <span className="text-3xl font-black font-display text-success tracking-wide">
                   {reporte.total_litros.toLocaleString('es-ES', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                 </span>
                 <span className="text-[8px] text-text-muted block uppercase">Medida de volumen real</span>
               </div>
-              <div className="w-12 h-12 rounded-xl bg-success/5 border border-success/15 flex items-center justify-center text-success">
+              <div className="w-12 h-12 rounded-xl bg-success/5 border border-success/15 flex items-center justify-center text-success animate-pulse-slow">
                 <Droplet size={20} />
               </div>
             </div>
 
             {/* KPI 2: CARGAS */}
-            <div className="bg-[#1A1F2F] border border-white/5 rounded-xl p-4 flex justify-between items-center">
+            <div className="bg-bg-card border border-bg-high/50 rounded-xl p-4 flex justify-between items-center">
               <div className="space-y-1">
                 <span className="text-[8px] font-black text-text-muted uppercase tracking-widest block">Transacciones</span>
-                <span className="text-3xl font-black font-mono text-text-main tracking-wide">
+                <span className="text-3xl font-black font-display text-text-main tracking-wide">
                   {reporte.total_cargas}
                 </span>
                 <span className="text-[8px] text-text-muted block uppercase">Abastecimientos completados</span>
               </div>
-              <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-text-muted">
+              <div className="w-12 h-12 rounded-xl bg-white/5 border border-bg-high/30 flex items-center justify-center text-text-muted">
                 <Database size={20} />
               </div>
             </div>
 
             {/* KPI 3: GASOLINA */}
-            <div className="bg-[#1A1F2F] border border-white/5 rounded-xl p-4">
+            <div className="bg-bg-card border border-bg-high/50 rounded-xl p-4">
               <div className="flex justify-between items-start mb-2">
                 <div>
                   <span className="text-[8px] font-black text-text-muted uppercase tracking-widest block">Gasolina Surtida</span>
-                  <span className="text-xl font-bold font-mono text-text-main block">
+                  <span className="text-xl font-bold font-display text-text-main block">
                     {(reporte.consumo_por_combustible?.gasolina || 0).toLocaleString('es-ES', { maximumFractionDigits: 1 })} L
                   </span>
                 </div>
-                <span className="text-[9px] font-black font-mono text-emerald-400">
+                <span className="text-[9px] font-black font-display text-emerald-400">
                   {calcularPorcentajeConsumo(reporte.consumo_por_combustible?.gasolina, reporte.total_litros)}%
                 </span>
               </div>
               {/* Barra de progreso */}
-              <div className="w-full bg-[#0E1322] h-2 rounded-full overflow-hidden border border-white/5">
+              <div className="w-full bg-bg-app h-2 rounded-full overflow-hidden border border-bg-high/50">
                 <div 
                   className="bg-emerald-500 h-full rounded-full" 
                   style={{ width: `${calcularPorcentajeConsumo(reporte.consumo_por_combustible?.gasolina, reporte.total_litros)}%` }}
@@ -222,20 +222,20 @@ export default function ReporteCombustible() {
             </div>
 
             {/* KPI 4: DIESEL */}
-            <div className="bg-[#1A1F2F] border border-white/5 rounded-xl p-4">
+            <div className="bg-bg-card border border-bg-high/50 rounded-xl p-4">
               <div className="flex justify-between items-start mb-2">
                 <div>
                   <span className="text-[8px] font-black text-text-muted uppercase tracking-widest block">Diésel Surtido</span>
-                  <span className="text-xl font-bold font-mono text-text-main block">
+                  <span className="text-xl font-bold font-display text-text-main block">
                     {(reporte.consumo_por_combustible?.diesel || 0).toLocaleString('es-ES', { maximumFractionDigits: 1 })} L
                   </span>
                 </div>
-                <span className="text-[9px] font-black font-mono text-blue-400">
+                <span className="text-[9px] font-black font-display text-blue-400">
                   {calcularPorcentajeConsumo(reporte.consumo_por_combustible?.diesel, reporte.total_litros)}%
                 </span>
               </div>
               {/* Barra de progreso */}
-              <div className="w-full bg-[#0E1322] h-2 rounded-full overflow-hidden border border-white/5">
+              <div className="w-full bg-bg-app h-2 rounded-full overflow-hidden border border-bg-high/50">
                 <div 
                   className="bg-blue-500 h-full rounded-full" 
                   style={{ width: `${calcularPorcentajeConsumo(reporte.consumo_por_combustible?.diesel, reporte.total_litros)}%` }}
@@ -248,10 +248,10 @@ export default function ReporteCombustible() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* SECCIÓN 1: CONSUMO POR ENTIDAD (2 tercios en pantalla grande si es Comandante) */}
             <div className={cn(
-              "bg-[#1A1F2F] border border-white/5 rounded-xl p-4",
+              "bg-bg-card border border-bg-high/50 rounded-xl p-4",
               esAdminEntidad ? "lg:col-span-3" : "lg:col-span-2"
             )}>
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-text-muted mb-4 flex items-center gap-1.5 border-b border-white/5 pb-2.5">
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-text-muted mb-4 flex items-center gap-1.5 border-b border-bg-high/20 pb-2.5">
                 <Award size={13} /> Consumo por Entidad
               </h3>
               
@@ -265,12 +265,12 @@ export default function ReporteCombustible() {
                       <div key={idx} className="space-y-1">
                         <div className="flex justify-between items-center text-xs">
                           <span className="font-bold text-text-main uppercase truncate max-w-[280px]">{row.entidad}</span>
-                          <span className="font-mono text-text-sec">
+                          <span className="font-display text-text-sec">
                             <span className="font-black text-text-main">{row.litros.toFixed(1)} L</span> ({row.cargas} cargas)
                           </span>
                         </div>
                         <div className="flex items-center gap-3">
-                          <div className="flex-1 bg-[#0E1322] h-2.5 rounded-full overflow-hidden border border-white/5">
+                          <div className="flex-1 bg-bg-app h-2.5 rounded-full overflow-hidden border border-bg-high/50">
                             <div 
                               className="bg-success h-full rounded-full" 
                               style={{ width: `${pct}%` }}
@@ -287,18 +287,18 @@ export default function ReporteCombustible() {
 
             {/* SECCIÓN 2: AUDITORÍA DE FRAUDE Y ALERTAS (1 tercio, u horizontal completo para admin de entidad) */}
             <div className={cn(
-              "bg-[#1A1F2F] border border-white/5 rounded-xl p-4",
+              "bg-bg-card border border-bg-high/50 rounded-xl p-4",
               esAdminEntidad ? "lg:col-span-3" : "lg:col-span-1"
             )}>
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-danger mb-4 flex items-center gap-1.5 border-b border-white/5 pb-2.5">
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-danger mb-4 flex items-center gap-1.5 border-b border-bg-high/20 pb-2.5">
                 <ShieldAlert size={14} /> Alertas de Auditoría e IA
               </h3>
 
               {reporte.alertas_sospechosas && reporte.alertas_sospechosas.length === 0 ? (
-                <div className="py-12 flex flex-col items-center justify-center gap-1.5 text-center bg-white/5 border border-dashed border-white/10 rounded-xl">
+                <div className="py-12 flex flex-col items-center justify-center gap-1.5 text-center bg-white/5 border border-dashed border-bg-high/30 rounded-xl">
                   <CheckCircle size={28} className="text-emerald-500" />
                   <p className="text-xs text-text-muted italic">Auditoría Limpia</p>
-                  <p className="text-[9px] text-text-muted uppercase">No se detectaron discrepancias en kilometraje</p>
+                  <p className="text-[9px] text-text-muted uppercase font-sans">No se detectaron discrepancias en kilometraje</p>
                 </div>
               ) : (
                 <div className="space-y-3 max-h-[350px] overflow-y-auto scrollbar-tactical pr-1.5">
@@ -311,7 +311,7 @@ export default function ReporteCombustible() {
                       
                       <div className="flex justify-between items-start">
                         <div className="space-y-0.5">
-                          <span className="text-xs font-black font-mono tracking-wider text-text-main">{al.placa}</span>
+                          <span className="text-xs font-black font-display tracking-wider text-text-main">{al.placa}</span>
                           <span className="text-[8px] text-text-muted block uppercase">Bombero: {al.bombero}</span>
                         </div>
                         <span className="text-[8px] font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider">
@@ -319,17 +319,17 @@ export default function ReporteCombustible() {
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2 text-center font-mono text-[9px] py-1 bg-black/30 border border-white/5 rounded">
+                      <div className="grid grid-cols-3 gap-2 text-center font-display text-[9px] py-1 bg-black/30 border border-bg-high/30 rounded">
                         <div>
-                          <span className="text-text-muted text-[7px] uppercase block">Odóm. Prev</span>
+                          <span className="text-text-muted text-[7px] uppercase block font-sans">Odóm. Prev</span>
                           <span className="text-text-main font-bold">{al.km_anterior} km</span>
                         </div>
                         <div>
-                          <span className="text-text-muted text-[7px] uppercase block">Odóm. Act</span>
+                          <span className="text-text-muted text-[7px] uppercase block font-sans">Odóm. Act</span>
                           <span className="text-text-main font-bold">{al.km_actual} km</span>
                         </div>
                         <div>
-                          <span className="text-text-muted text-[7px] uppercase block">Litros</span>
+                          <span className="text-text-muted text-[7px] uppercase block font-sans">Litros</span>
                           <span className="text-text-main font-bold text-danger">{al.litros} L</span>
                         </div>
                       </div>

@@ -115,19 +115,19 @@ export default function ColaAprobacionesCombustible() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0E1322] text-text-main p-4 space-y-4 font-sans">
+    <div className="min-h-screen dark bg-bg-app text-text-main p-4 space-y-4 font-sans">
       {/* HEADER TÁCTICO */}
-      <div className="flex flex-row justify-between items-center bg-[#1A1F2F] border border-white/5 rounded-xl p-4">
+      <div className="flex flex-row justify-between items-center bg-bg-card border border-bg-high/50 rounded-xl p-4">
         <div>
           <div className="flex items-center gap-2">
-            <div className="w-2 h-5 rounded-full bg-danger" />
+            <div className="w-2 h-5 rounded-full bg-danger animate-pulse" />
             <h1 className="text-sm font-black uppercase tracking-widest text-text-main font-mono">Buzón de Aprobación Remota</h1>
           </div>
           <p className="text-[10px] text-text-muted uppercase tracking-wider mt-0.5">Autorizaciones en tiempo real para suministro especial de combustible</p>
         </div>
         <button 
           onClick={() => cargarSolicitudes()}
-          className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-text-muted hover:text-text-main transition-all cursor-pointer"
+          className="w-10 h-10 rounded-xl bg-white/5 border border-bg-high/30 flex items-center justify-center text-text-muted hover:text-text-main transition-all cursor-pointer"
           title="Actualizar cola"
         >
           {cargandoSolicitudes ? (
@@ -145,8 +145,8 @@ export default function ColaAprobacionesCombustible() {
           <p className="text-[10px] text-text-muted uppercase tracking-widest font-mono">Monitoreando canal de emergencia...</p>
         </div>
       ) : solicitudes.length === 0 ? (
-        <div className="py-24 flex flex-col items-center justify-center gap-3 bg-[#1A1F2F] border border-dashed border-white/10 rounded-2xl">
-          <Clock size={48} className="text-text-muted animate-pulse" />
+        <div className="py-24 flex flex-col items-center justify-center gap-3 bg-bg-card border border-dashed border-bg-high/30 rounded-2xl">
+          <Clock size={48} className="text-text-muted animate-pulse-slow" />
           <div className="text-center space-y-1">
             <p className="text-sm font-bold text-text-muted">Buzón de Emergencia Despejado</p>
             <p className="text-[10px] text-text-muted uppercase tracking-wide">No hay solicitudes de combustible pendientes de resolución</p>
@@ -160,30 +160,30 @@ export default function ColaAprobacionesCombustible() {
             return (
               <div 
                 key={sol.id} 
-                className="bg-[#1A1F2F] border border-white/5 hover:border-white/10 rounded-xl p-4 flex flex-col justify-between gap-4 transition-all"
+                className="bg-bg-card border border-bg-high/50 hover:border-bg-high/80 rounded-xl p-4 flex flex-col justify-between gap-4 transition-all"
               >
                 {/* CABECERA TARJETA */}
                 <div className="flex justify-between items-start">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-base font-black font-mono tracking-wider text-text-main">{sol.placa}</span>
+                      <span className="text-base font-black font-display tracking-wider text-text-main">{sol.placa}</span>
                       {renderTipoBadge(sol.tipo_solicitud)}
                     </div>
-                    <p className="text-[10px] font-black uppercase text-success tracking-widest font-mono">
+                    <p className="text-[10px] font-black uppercase text-success tracking-widest font-display">
                       Cantidad Solicitada: {sol.cantidad_solicitada} Litros
                     </p>
                   </div>
-                  <div className="flex items-center gap-1 bg-white/5 border border-white/10 px-2 py-1 rounded text-[9px] font-mono text-text-muted">
+                  <div className="flex items-center gap-1 bg-bg-low border border-bg-high/30 px-2 py-1 rounded text-[9px] font-mono text-text-muted">
                     <Clock size={10} />
                     Hace {formatTiempoTranscurrido(sol.fecha)}
                   </div>
                 </div>
 
                 {/* DETALLES DE VEHÍCULO / CONDUCTOR */}
-                <div className="bg-[#0E1322] border border-white/5 rounded-lg p-3 space-y-2 text-[10px] font-sans">
+                <div className="bg-bg-app border border-bg-high/50 rounded-lg p-3 space-y-2 text-[10px] font-sans">
                   {/* Conductor */}
                   {sol.conductor && (
-                    <div className="flex items-center gap-2 border-b border-white/5 pb-1.5">
+                    <div className="flex items-center gap-2 border-b border-bg-high/20 pb-1.5">
                       <User size={13} className="text-text-muted" />
                       <div>
                         <span className="text-text-muted uppercase text-[8px] block">Conductor</span>
@@ -194,7 +194,7 @@ export default function ColaAprobacionesCombustible() {
 
                   {/* Detalles Físicos */}
                   {esNoRegistrado ? (
-                    <div className="flex items-center gap-2 border-b border-white/5 pb-1.5">
+                    <div className="flex items-center gap-2 border-b border-bg-high/20 pb-1.5">
                       <Car size={13} className="text-text-muted" />
                       <div>
                         <span className="text-text-muted uppercase text-[8px] block">Detalles del Vehículo</span>
@@ -224,7 +224,7 @@ export default function ColaAprobacionesCombustible() {
                     <select
                       value={entidadesSeleccionadas[sol.id] || ''}
                       onChange={(e) => handleSeleccionarEntidad(sol.id, e.target.value)}
-                      className="w-full bg-[#0E1322] border border-white/10 rounded-xl px-3 h-10 text-[10px] text-text-main focus:outline-none focus:border-success transition-all"
+                      className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-10 text-[10px] text-text-main focus:outline-none focus:border-success transition-all font-bold"
                     >
                       <option value="">-- TRÁNSITO / EXTERNO (POR DEFECTO) --</option>
                       {entidades.map(ent => (
@@ -247,7 +247,7 @@ export default function ColaAprobacionesCombustible() {
                   <button
                     onClick={() => handleResolver(sol.id, 'aprobada', sol.placa)}
                     disabled={procesandoId !== null}
-                    className="flex-[2] h-10 rounded-xl bg-success text-bg-app font-black text-[9px] uppercase tracking-widest flex items-center justify-center gap-1 cursor-pointer transition-all hover:bg-success/90 active:scale-95 disabled:opacity-50"
+                    className="flex-[2] h-10 rounded-xl bg-success text-on-primary font-black text-[9px] uppercase tracking-widest flex items-center justify-center gap-1 cursor-pointer transition-all hover:bg-success/90 active:scale-95 disabled:opacity-50 shadow-tactica"
                   >
                     <Check size={12} />
                     Aprobar Suministro
