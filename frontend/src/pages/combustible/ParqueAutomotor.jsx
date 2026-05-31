@@ -38,6 +38,7 @@ export default function ParqueAutomotor() {
   // Modal Carga Masiva Excel
   const [modalImportar, setModalImportar] = useState(false);
   const [archivoExcel, setArchivoExcel] = useState(null);
+  const [entidadImportacion, setEntidadImportacion] = useState('');
   const [importandoExcel, setImportandoExcel] = useState(false);
   const [resumenImportacion, setResumenImportacion] = useState(null);
 
@@ -163,14 +164,14 @@ export default function ParqueAutomotor() {
 
   const handleSubirExcel = async (e) => {
     e.preventDefault();
-    if (!archivoExcel) return;
+    if (!archivoExcel || !entidadImportacion) return;
     setImportandoExcel(true);
     setResumenImportacion(null);
     try {
       const formData = new FormData();
       formData.append('file', archivoExcel);
       
-      const res = await combustibleService.importarExcelParque(formData);
+      const res = await combustibleService.importarExcelParque(formData, entidadImportacion);
       toast.success("Carga masiva procesada exitosamente");
       setResumenImportacion(res.data);
       cargarVehiculos();
@@ -538,16 +539,32 @@ export default function ParqueAutomotor() {
                 <p className="text-[10px] font-black uppercase tracking-widest text-text-main font-mono">Carga Masiva: Flota Automotriz</p>
               </div>
               <button 
-                onClick={() => { setModalImportar(false); setArchivoExcel(null); setResumenImportacion(null); }}
+                onClick={() => { setModalImportar(false); setArchivoExcel(null); setEntidadImportacion(''); setResumenImportacion(null); }}
                 className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-text-muted hover:text-text-main cursor-pointer"
               >
                 <XCircle size={15} />
               </button>
             </div>
-
+ 
             <div className="p-4 space-y-4 overflow-y-auto flex-1 scrollbar-tactical">
               {/* Formulario de carga */}
               <form onSubmit={handleSubirExcel} className="space-y-4">
+                {/* Selector de Entidad */}
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Entidad de Asignación (Obligatorio)</label>
+                  <select
+                    value={entidadImportacion}
+                    onChange={(e) => setEntidadImportacion(e.target.value)}
+                    className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-bold uppercase"
+                    required
+                  >
+                    <option value="">-- SELECCIONE LA ENTIDAD --</option>
+                    {entidades.map(ent => (
+                      <option key={ent.id} value={ent.id}>{ent.nombre.toUpperCase()}</option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="border-2 border-dashed border-bg-high/30 rounded-xl p-6 bg-white/5 flex flex-col items-center justify-center text-center gap-2">
                   <FileSpreadsheet className="text-success mb-1" size={32} />
                   <div>
@@ -574,19 +591,19 @@ export default function ParqueAutomotor() {
                     <Download size={12} /> Descargar Plantilla Oficial
                   </button>
                 </div>
-
+ 
                 <div className="flex gap-3">
                   <button
                     type="button"
-                    onClick={() => { setModalImportar(false); setArchivoExcel(null); setResumenImportacion(null); }}
+                    onClick={() => { setModalImportar(false); setArchivoExcel(null); setEntidadImportacion(''); setResumenImportacion(null); }}
                     className="w-1/3 h-11 rounded-xl bg-white/5 border border-bg-high/30 text-[10px] font-black uppercase tracking-widest text-text-muted cursor-pointer"
                   >
                     Cerrar
                   </button>
                   <button
                     type="submit"
-                    disabled={importandoExcel || !archivoExcel}
-                    className="flex-1 h-11 rounded-xl bg-success text-on-primary font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-tactica"
+                    disabled={importandoExcel || !archivoExcel || !entidadImportacion}
+                    className="flex-1 h-11 rounded-xl bg-success text-on-primary font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-tactica"
                   >
                     {importandoExcel ? <RefreshCw size={13} className="animate-spin" /> : <Upload size={13} />}
                     Procesar Plantilla

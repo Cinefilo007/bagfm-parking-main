@@ -117,7 +117,7 @@ class TemplateService:
         # Encabezados
         headers = [
             "PLACA", "MARCA", "MODELO", "COLOR", "TIPO", 
-            "ENTIDAD", "USO", "AUTORIZADO_COMBUSTIBLE", 
+            "USO", "AUTORIZADO_COMBUSTIBLE", 
             "TIPO_COMBUSTIBLE", "CAPACIDAD_TANQUE", "ASIGNACION_SEMANAL"
         ]
         
@@ -131,7 +131,7 @@ class TemplateService:
             cell = ws.cell(row=1, column=col_num, value=header)
             cell.font = header_font
             cell.alignment = center_align
-            if col_num in [1, 6]: # PLACA y ENTIDAD son críticos
+            if col_num in [1]: # PLACA es crítico
                 cell.fill = header_fill
             else:
                 cell.fill = v_fill
@@ -141,7 +141,7 @@ class TemplateService:
         # Ejemplo táctico
         ejemplo = [
             "ABC123D", "TOYOTA", "HILUX", "VERDE", "camioneta",
-            "FERIA GANADERA", "servicio", "SI", "diesel", 75.0, 50.0
+            "servicio", "SI", "diesel", 75.0, 50.0
         ]
         for col_num, value in enumerate(ejemplo, 1):
             ws.cell(row=2, column=col_num, value=value)

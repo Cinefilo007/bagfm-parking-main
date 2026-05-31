@@ -23,24 +23,31 @@ class ImportCombustibleService:
         self,
         db: AsyncSession,
         file_content: bytes,
-        usuario_creador_id: uuid.UUID
+        usuario_creador_id: uuid.UUID,
+        entidad_id: uuid.UUID
     ) -> Dict[str, Any]:
         """
-        Procesa el archivo Excel del parque automotor de las entidades.
+        Procesa el archivo Excel del parque automotor de las entidades asignando todo a la entidad provista.
         Columnas:
           A (0): PLACA (Obligatorio)
           B (1): MARCA (Opcional, default "S/M")
           C (2): MODELO (Opcional, default "S/M")
           D (3): COLOR (Opcional, default "S/C")
           E (4): TIPO (Opcional, ej: sedan, camion, suv)
-          F (5): ENTIDAD (Obligatorio - nombre de la entidad en el sistema)
-          G (6): USO (particular | protocolar | servicio)
-          H (7): AUTORIZADO_COMBUSTIBLE (SI | NO)
-          I (8): TIPO_COMBUSTIBLE (gasolina | diesel)
-          J (9): CAPACIDAD_TANQUE (Litros - numérico)
-          K (10): ASIGNACION_SEMANAL (Litros - numérico)
+          F (5): USO (particular | protocolar | servicio)
+          G (6): AUTORIZADO_COMBUSTIBLE (SI | NO)
+          H (7): TIPO_COMBUSTIBLE (gasolina | diesel)
+          I (8): CAPACIDAD_TANQUE (Litros - numérico)
+          J (9): ASIGNACION_SEMANAL (Litros - numérico)
         """
         try:
+            # 0. Validar que la entidad existe
+            query_ent = select(EntidadCivil).where(EntidadCivil.id == entidad_id)
+            res_ent = await db.execute(query_ent)
+            entidad = res_ent.scalar_one_or_none()
+            if not entidad:
+                raise ValueError("La entidad seleccionada no está registrada en el sistema.")
+
             wb = openpyxl.load_workbook(BytesIO(file_content), data_only=True)
             sheet = wb.active
             
@@ -54,12 +61,9 @@ class ImportCombustibleService:
             rows = list(sheet.iter_rows(min_row=2, values_only=True))
             resumen["total"] = len(rows)
             
-            # Cache de entidades por nombre (para evitar queries repetidas por cada fila)
-            entidades_cache = {}
-            
             for index, row in enumerate(rows, start=2):
                 if not any(row) or not row[0]: # Fila vacía o sin placa
-                    continue
+                     continue
                 
                 try:
                     placa = str(row[0]).strip().upper()
@@ -67,33 +71,21 @@ class ImportCombustibleService:
                     modelo = str(row[2]).strip().upper() if row[2] else "S/M"
                     color = str(row[3]).strip().upper() if row[3] else "S/C"
                     tipo_vehic = str(row[4]).strip().lower() if row[4] else "sedan"
-                    entidad_nombre = str(row[5]).strip() if row[5] else None
-                    uso_str = str(row[6]).strip().lower() if row[6] else "particular"
-                    aut_comb_str = str(row[7]).strip().upper() if row[7] else "NO"
-                    comb_str = str(row[8]).strip().lower() if row[8] else "gasolina"
-                    capacidad = float(row[9]) if row[9] is not None else 0.0
-                    asignacion = float(row[10]) if row[10] is not None else 0.0
+                    uso_str = str(row[5]).strip().lower() if row[5] else "particular"
+                    aut_comb_str = str(row[6]).strip().upper() if row[6] else "NO"
+                    comb_str = str(row[7]).strip().lower() if row[7] else "gasolina"
                     
-                    # 1. Validar campos críticos
-                    if not entidad_nombre:
-                        raise ValueError(f"Fila {index}: El nombre de la entidad es obligatorio.")
+                    try:
+                        capacidad = float(row[8]) if row[8] is not None else 0.0
+                    except (ValueError, TypeError):
+                        capacidad = 0.0
                         
-                    # 2. Buscar entidad en cache/BD
-                    entidad = entidades_cache.get(entidad_nombre)
-                    if not entidad:
-                        # Buscar de forma insensible a mayúsculas
-                        query_ent = select(EntidadCivil).where(
-                            func.lower(EntidadCivil.nombre) == entidad_nombre.lower()
-                        )
-                        res_ent = await db.execute(query_ent)
-                        entidad = res_ent.scalar_one_or_none()
+                    try:
+                        asignacion = float(row[9]) if row[9] is not None else 0.0
+                    except (ValueError, TypeError):
+                        asignacion = 0.0
                         
-                        if not entidad:
-                            raise ValueError(f"La entidad '{entidad_nombre}' no está registrada en el sistema. Regístrela primero.")
-                        
-                        entidades_cache[entidad_nombre] = entidad
-                        
-                    # 3. Parsear Enums
+                    # 1. Parsear Enums
                     try:
                         uso_vehiculo = UsoVehiculo(uso_str)
                     except ValueError:
@@ -106,7 +98,7 @@ class ImportCombustibleService:
                         
                     autorizado_combustible = True if aut_comb_str in ["SI", "S", "YES", "TRUE", "1"] else False
                     
-                    # 4. Buscar si el vehículo ya existe
+                    # 2. Buscar si el vehículo ya existe
                     query_v = select(Vehiculo).where(Vehiculo.placa == placa)
                     res_v = await db.execute(query_v)
                     vehiculo = res_v.scalar_one_or_none()
@@ -145,7 +137,7 @@ class ImportCombustibleService:
                         db.add(vehiculo)
                         resumen["exitosos"] += 1
                         
-                    # 5. Flush periódico para detectar errores SQL rápido sin abortar todo
+                    # 3. Flush periódico para detectar errores SQL rápido sin abortar todo
                     await db.flush()
                     
                     # Broadcast progreso en el canal global de la base

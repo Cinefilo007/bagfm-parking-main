@@ -82,8 +82,8 @@ export const combustibleService = {
   /**
    * Sube la plantilla de Excel para importar el parque automotor.
    */
-  async importarExcelParque(formData) {
-    const { data } = await api.post('/combustible/importar-excel', formData, {
+  async importarExcelParque(formData, entidadId) {
+    const { data } = await api.post(`/combustible/importar-excel?entidad_id=${entidadId}`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }

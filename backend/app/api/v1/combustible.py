@@ -332,6 +332,7 @@ async def descargar_plantilla_parque(
 
 @router.post("/importar-excel")
 async def importar_excel_parque(
+    entidad_id: UUID = Query(...),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(obtener_db),
     usuario: Usuario = Depends(obtener_usuario_actual)
@@ -345,7 +346,7 @@ async def importar_excel_parque(
     try:
         contenido = await file.read()
         resumen = await import_combustible_service.procesar_excel_parque_automotor(
-            db, contenido, usuario.id
+            db, contenido, usuario.id, entidad_id
         )
         await db.commit()
         return {"status": "success", "data": resumen}
