@@ -34,6 +34,13 @@ import DashboardSupervisorBase from '../pages/supervisor-base/Dashboard';
 import CensoVehicularSupervisor from '../pages/supervisor-base/CensoVehicular';
 import CensoPersonasSupervisor from '../pages/supervisor-base/CensoPersonas';
 import PaseTemporalSupervisor from '../pages/supervisor-base/PaseTemporal';
+
+// Módulo Combustible Aegis Fuel
+import DashboardBombero from '../pages/combustible/DashboardBombero';
+import ReporteCombustible from '../pages/combustible/ReporteCombustible';
+import ParqueAutomotor from '../pages/combustible/ParqueAutomotor';
+import ColaAprobacionesCombustible from '../pages/combustible/ColaAprobacionesCombustible';
+
 import { useAuthStore } from '../store/auth.store';
 
 const TemporaryPlaceholder = ({ name }) => (
@@ -47,6 +54,7 @@ const HomeRedirect = () => {
   if (!user) return <Navigate to="/login" replace />;
   if (user.rol === 'COMANDANTE' || user.rol === 'ADMIN_BASE') return <Navigate to="/comando/dashboard" replace />;
   if (user.rol === 'SUPERVISOR') return <Navigate to="/supervisor-base/dashboard" replace />;
+  if (user.rol === 'BOMBERO') return <Navigate to="/combustible/dashboard" replace />;
   if (user.rol === 'ADMIN_ENTIDAD') return <Navigate to="/entidad/dashboard" replace />;
   if (user.rol === 'ALCABALA') return <Navigate to="/alcabala/dashboard" replace />;
   if (user.rol === 'SUPERVISOR_PARQUEROS') return <Navigate to="/supervisor/dashboard" replace />;
@@ -150,6 +158,25 @@ export const router = createBrowserRouter([
               { path: 'portal',       element: <PortalSocio /> },
               { path: 'infracciones', element: <InfraccionesSocio /> },
               { path: 'accesos',      element: <HistorialAccesos /> }
+            ]
+          },
+          // COMBUSTIBLE (AEGIS FUEL)
+          {
+            path: 'combustible',
+            element: <RutaProtegida rolesPermitidos={['BOMBERO', 'ADMIN_BASE', 'COMANDANTE', 'SUPERVISOR']} />,
+            children: [
+              { path: '', element: <DashboardBombero /> },
+              { path: 'dashboard', element: <DashboardBombero /> },
+              { path: 'reportes', element: <ReporteCombustible /> },
+              { path: 'aprobaciones', element: <ColaAprobacionesCombustible /> }
+            ]
+          },
+          // PARQUE AUTOMOTOR
+          {
+            path: 'parque-automotor',
+            element: <RutaProtegida rolesPermitidos={['COMANDANTE', 'ADMIN_BASE', 'ADMIN_ENTIDAD', 'SUPERVISOR']} />,
+            children: [
+              { path: '', element: <ParqueAutomotor /> }
             ]
           },
           // AJUSTES

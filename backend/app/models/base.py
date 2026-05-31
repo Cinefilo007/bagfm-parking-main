@@ -30,3 +30,9 @@ from app.models.credencial_biometrica import CredencialBiometrica
 from app.models.challenge_biometrico import ChallengeBiometrico
 from app.models.push_subscription import PushSubscription
 from app.models.configuracion_correo import ConfiguracionCorreo
+
+# Modelos Combustible Aegis Fuel v8.0
+from app.models.tanque_combustible import TanqueCombustible
+from app.models.lectura_tanque import LecturaTanque
+from app.models.solicitud_combustible import SolicitudCombustible
+from app.models.abastecimiento import Abastecimiento

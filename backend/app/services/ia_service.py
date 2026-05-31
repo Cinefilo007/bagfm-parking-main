@@ -63,6 +63,16 @@ class IAService:
                     "{'marca': string, 'modelo': string, 'placa': string, 'color': string}. "
                     "Si no logras leer algún campo, deja el string vacío."
                 )
+            elif tipo == 'odometro':
+                prompt = (
+                    "Eres un sistema OCR de seguridad táctica para la bomba de combustible de BAGFM. "
+                    "Analiza esta imagen del tablero/odómetro de un vehículo. "
+                    "Extrae el valor numérico exacto del kilometraje actual que se observa en la pantalla del odómetro. "
+                    "Devuelve estrictamente un objeto JSON con esta clave: "
+                    "{'kilometraje': integer}. "
+                    "No incluyas texto adicional ni símbolos, solo el valor numérico entero. "
+                    "Si no logras leer el odómetro o la imagen no es legible, devuelve el valor como 0."
+                )
             else:
                 raise ValueError("Tipo de documento no soportado")
 
@@ -89,6 +99,8 @@ class IAService:
             # Retornar estructura vacía para prevenir caídas de UI
             if tipo == 'cedula':
                 return {"nombre": "", "apellido": "", "cedula": ""}
+            elif tipo == 'odometro':
+                return {"kilometraje": 0}
             return {"marca": "", "modelo": "", "placa": "", "color": ""}
 
 ia_service = IAService()

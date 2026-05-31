@@ -13,6 +13,22 @@ export const entidadService = {
     },
 
     /**
+     * Lista todas las entidades.
+     */
+    async listarEntidades(params = {}) {
+        const { data } = await api.get('/entidades', { params });
+        return data;
+    },
+
+    /**
+     * Actualiza los datos de una entidad.
+     */
+    async actualizarEntidad(id, datos) {
+        const { data } = await api.put(`/entidades/${id}`, datos);
+        return data;
+    },
+
+    /**
      * Actualiza la configuración de marca (branding) de una entidad.
      * @param {string} id - UUID de la entidad
      * @param {Object} branding - Objeto JSON con la configuración de presets (general, staff, etc.)

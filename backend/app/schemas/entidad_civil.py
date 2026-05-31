@@ -12,6 +12,7 @@ class EntidadCivilBase(BaseModel):
     latitud: Optional[float] = None
     longitud: Optional[float] = None
     activo: bool = True
+    limite_combustible_semanal: float = 0.0
 
 class EntidadCivilCrear(EntidadCivilBase):
     # Datos del Administrador de la Entidad
@@ -31,6 +32,7 @@ class EntidadCivilActualizar(BaseModel):
     admin_apellido: Optional[str] = None
     admin_email: Optional[str] = None
     admin_password: Optional[str] = None
+    limite_combustible_semanal: Optional[float] = None
 
 class EntidadCivilSalida(EntidadCivilBase):
     id: UUID

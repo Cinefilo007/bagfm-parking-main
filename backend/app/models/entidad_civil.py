@@ -3,7 +3,7 @@ Modelo EntidadCivil.
 Las organizaciones civiles que operan dentro de la base (Club de Pádel, Parque Miranda, etc).
 """
 import uuid
-from sqlalchemy import Column, String, Integer, Boolean, Text, DateTime, ForeignKey, Numeric
+from sqlalchemy import Column, String, Integer, Boolean, Text, DateTime, ForeignKey, Numeric, Float
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -24,6 +24,7 @@ class EntidadCivil(Base):
     latitud = Column(Numeric(10, 8), nullable=True)
     longitud = Column(Numeric(11, 8), nullable=True)
     config_branding = Column(Text, nullable=True) # Almacenamos JSON como texto por simplicidad o usar JSONB
+    limite_combustible_semanal = Column(Float, default=0.0, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_by = Column(UUID(as_uuid=True), ForeignKey("usuarios.id", ondelete="RESTRICT"), nullable=True)
 

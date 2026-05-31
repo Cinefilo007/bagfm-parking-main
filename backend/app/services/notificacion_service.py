@@ -324,4 +324,154 @@ class NotificacionService:
                 if "410 Gone" in str(e) or "404 Not Found" in str(e):
                     sub.activo = False
 
+    async def notificar_discrepancia_combustible(self, db: AsyncSession, datos: dict):
+        """
+        Alerta Táctica: Notifica discrepancias de odómetro o consumo sospechoso al Comandante.
+        """
+        query_destinatarios = select(Usuario).where(
+            Usuario.activo == True,
+            Usuario.rol.in_([RolTipo.COMANDANTE, RolTipo.ADMIN_BASE])
+        )
+        result = await db.execute(query_destinatarios)
+        usuarios = result.scalars().all()
+        ids_usuarios = [u.id for u in usuarios]
+        
+        if not ids_usuarios: return
+
+        query_subs = select(PushSubscription).where(
+            PushSubscription.usuario_id.in_(ids_usuarios),
+            PushSubscription.activo == True
+        )
+        result_subs = await db.execute(query_subs)
+        suscripciones = result_subs.scalars().all()
+
+        payload = {
+            "title": "⚠️ SOSPECHA DE FRAUDE: Combustible",
+            "body": f"Vehículo {datos['placa']} - {datos['motivo']}",
+            "data": {
+                "url": "/combustible/reportes",
+                "tipo": "alerta_combustible_discrepancia"
+            },
+            "icon": "/icons/shield-alert.png"
+        }
+
+        for sub in suscripciones:
+            try:
+                sub_info = {"endpoint": sub.endpoint, "keys": {"p256dh": sub.p256dh, "auth": sub.auth}}
+                webpush_service.send_notification(sub_info, payload)
+            except Exception as e:
+                if "410 Gone" in str(e) or "404 Not Found" in str(e):
+                    sub.activo = False
+
+    async def notificar_solicitud_combustible_pendiente(self, db: AsyncSession, solicitud):
+        """
+        Alerta Táctica: Notifica una solicitud de abastecimiento de emergencia pendiente de aprobación.
+        """
+        query_destinatarios = select(Usuario).where(
+            Usuario.activo == True,
+            Usuario.rol.in_([RolTipo.COMANDANTE, RolTipo.ADMIN_BASE])
+        )
+        result = await db.execute(query_destinatarios)
+        usuarios = result.scalars().all()
+        ids_usuarios = [u.id for u in usuarios]
+        
+        if not ids_usuarios: return
+
+        query_subs = select(PushSubscription).where(
+            PushSubscription.usuario_id.in_(ids_usuarios),
+            PushSubscription.activo == True
+        )
+        result_subs = await db.execute(query_subs)
+        suscripciones = result_subs.scalars().all()
+
+        payload = {
+            "title": "⛽ Nueva Solicitud de Combustible",
+            "body": f"Vehículo {solicitud.placa} ({solicitud.cantidad_solicitada} L) - Pendiente por aprobación",
+            "data": {
+                "url": "/combustible/aprobaciones",
+                "tipo": "solicitud_combustible_pendiente",
+                "solicitud_id": str(solicitud.id)
+            },
+            "icon": "/icons/icon-192x192.png"
+        }
+
+        for sub in suscripciones:
+            try:
+                sub_info = {"endpoint": sub.endpoint, "keys": {"p256dh": sub.p256dh, "auth": sub.auth}}
+                webpush_service.send_notification(sub_info, payload)
+            except Exception as e:
+                if "410 Gone" in str(e) or "404 Not Found" in str(e):
+                    sub.activo = False
+
+    async def notificar_solicitud_combustible_resuelta(self, db: AsyncSession, bombero_id: uuid.UUID, estado: str, placa: str):
+        """
+        Notifica al bombero cuando su solicitud de abastecimiento es aprobada o rechazada.
+        """
+        query_subs = select(PushSubscription).where(
+            PushSubscription.usuario_id == bombero_id,
+            PushSubscription.activo == True
+        )
+        result_subs = await db.execute(query_subs)
+        suscripciones = result_subs.scalars().all()
+
+        if not suscripciones: return
+
+        emoji = "✅" if estado == "aprobada" else "❌"
+        payload = {
+            "title": f"{emoji} Solicitud Resuelta",
+            "body": f"Tu solicitud de suministro para la placa {placa} ha sido {estado.upper()}.",
+            "data": {
+                "url": "/combustible/dashboard",
+                "tipo": "solicitud_combustible_resuelta"
+            },
+            "icon": "/icons/icon-192x192.png"
+        }
+
+        for sub in suscripciones:
+            try:
+                sub_info = {"endpoint": sub.endpoint, "keys": {"p256dh": sub.p256dh, "auth": sub.auth}}
+                webpush_service.send_notification(sub_info, payload)
+            except Exception as e:
+                if "410 Gone" in str(e) or "404 Not Found" in str(e):
+                    sub.activo = False
+
+    async def notificar_limite_combustible_entidad(self, db: AsyncSession, entidad_nombre: str, consumo: float, limite: float):
+        """
+        Alerta Táctica: Notifica que una entidad ha agotado o superado su cupo semanal de combustible.
+        """
+        query_destinatarios = select(Usuario).where(
+            Usuario.activo == True,
+            Usuario.rol.in_([RolTipo.COMANDANTE, RolTipo.ADMIN_BASE])
+        )
+        result = await db.execute(query_destinatarios)
+        usuarios = result.scalars().all()
+        ids_usuarios = [u.id for u in usuarios]
+        
+        if not ids_usuarios: return
+
+        query_subs = select(PushSubscription).where(
+            PushSubscription.usuario_id.in_(ids_usuarios),
+            PushSubscription.activo == True
+        )
+        result_subs = await db.execute(query_subs)
+        suscripciones = result_subs.scalars().all()
+
+        payload = {
+            "title": "🔴 CUPO DE COMBUSTIBLE EXCEDIDO",
+            "body": f"La entidad '{entidad_nombre}' alcanzó su límite semanal de {limite} L (Consumo: {consumo:.1f} L).",
+            "data": {
+                "url": "/combustible/reportes",
+                "tipo": "alerta_cupo_entidad_excedido"
+            },
+            "icon": "/icons/shield-alert.png"
+        }
+
+        for sub in suscripciones:
+            try:
+                sub_info = {"endpoint": sub.endpoint, "keys": {"p256dh": sub.p256dh, "auth": sub.auth}}
+                webpush_service.send_notification(sub_info, payload)
+            except Exception as e:
+                if "410 Gone" in str(e) or "404 Not Found" in str(e):
+                    sub.activo = False
+
 notificacion_service = NotificacionService()

@@ -13,6 +13,7 @@ class RolTipo(str, enum.Enum):
     SUPERVISOR_PARQUEROS = "SUPERVISOR_PARQUEROS"
     PARQUERO = "PARQUERO"
     SOCIO = "SOCIO"
+    BOMBERO = "BOMBERO"
 
 class MembresiaEstado(str, enum.Enum):
     activa = "activa"
@@ -109,3 +110,28 @@ class TipoCarnet(str, enum.Enum):
     cartera = "cartera"
     ticket = "ticket"
     credencial = "credencial"
+
+class TipoCombustible(str, enum.Enum):
+    gasolina = "gasolina"
+    diesel = "diesel"
+
+class UsoVehiculo(str, enum.Enum):
+    particular = "particular"
+    protocolar = "protocolar"
+    servicio = "servicio"
+
+class TipoLecturaTanque(str, enum.Enum):
+    inicial_semana = "inicial_semana"
+    recarga_externa = "recarga_externa"
+    ajuste_auditoria = "ajuste_auditoria"
+
+class EstadoSolicitudCombustible(str, enum.Enum):
+    pendiente = "pendiente"
+    aprobada = "aprobada"
+    rechazada = "rechazada"
+    consumida = "consumida"
+
+class TipoSolicitudCombustible(str, enum.Enum):
+    limite_entidad_excedido = "limite_entidad_excedido"
+    vehiculo_no_autorizado = "vehiculo_no_autorizado"
+    vehiculo_no_registrado = "vehiculo_no_registrado"
