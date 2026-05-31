@@ -73,7 +73,7 @@ Para evitar inconsistencias a lo largo del programa, todas las pantallas del mó
 - **Gestión de Flotas:** Visualización de todos los vehículos activos agrupados/filtrados por entidad con paginación y búsqueda por placa.
 - **Asignación de Combustible:** Toggle interactivo para habilitar/inhabilitar el suministro en bomba a vehículos particulares registrados, y campos para configurar límites y capacidades del tanque en litros.
 - **Límite Semanal de Entidad:** Panel integrado para ajustar el límite total de litros permitidos semanalmente por entidad civil/militar.
-- **Importación Masiva:** Procesamiento de flotas a través de plantillas Excel (`.xlsx`) con un resumen táctico de leídos, creados, actualizados y panel de logs de errores.
+- **Importación Masiva:** Procesamiento de flotas a través de plantillas Excel (`.xlsx`) con un resumen de filas procesadas y bitácora de errores en tiempo real. Incluye un botón para descargar la plantilla oficial que contiene la columna `ENTIDAD`, permitiendo asociar cada vehículo a su respectiva dependencia.
 
 ### 4.2 Cola de Aprobaciones (`ColaAprobacionesCombustible.jsx`)
 - **Resolución Remota Asíncrona:** Panel que refresca automáticamente cada 15 segundos y lista las solicitudes de emergencia pendientes.
@@ -99,5 +99,5 @@ Para evitar inconsistencias a lo largo del programa, todas las pantallas del mó
 
 ---
 
-*Última actualización: 2026-05-31 (Establecimiento de directivas de combustible, habilitación de rol Bombero y accesos al Parque Automotor Aegis Fuel V8.1)*
+*Última actualización: 2026-05-31 (Habilitación de descarga de plantilla con columna de entidades en importación masiva Aegis Fuel V8.2)*
 *Aprobado por: Comandante de Base & Antigravity Aegis Command*

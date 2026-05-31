@@ -106,4 +106,48 @@ class TemplateService:
         wb.save(output)
         return output.getvalue()
 
+    def generar_excel_parque_template(self) -> bytes:
+        """
+        Genera un archivo Excel con los encabezados necesarios para importar la flota vehicular del parque automotor (combustible).
+        """
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "PARQUE_AUTOMOTOR"
+
+        # Encabezados
+        headers = [
+            "PLACA", "MARCA", "MODELO", "COLOR", "TIPO", 
+            "ENTIDAD", "USO", "AUTORIZADO_COMBUSTIBLE", 
+            "TIPO_COMBUSTIBLE", "CAPACIDAD_TANQUE", "ASIGNACION_SEMANAL"
+        ]
+        
+        # Estilos tácticos
+        header_fill = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid") # Slate oscuro
+        v_fill = PatternFill(start_color="334155", end_color="334155", fill_type="solid") # Slate
+        header_font = Font(bold=True, color="FFFFFF")
+        center_align = Alignment(horizontal="center")
+
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col_num, value=header)
+            cell.font = header_font
+            cell.alignment = center_align
+            if col_num in [1, 6]: # PLACA y ENTIDAD son críticos
+                cell.fill = header_fill
+            else:
+                cell.fill = v_fill
+            
+            ws.column_dimensions[openpyxl.utils.get_column_letter(col_num)].width = 22
+
+        # Ejemplo táctico
+        ejemplo = [
+            "ABC123D", "TOYOTA", "HILUX", "VERDE", "camioneta",
+            "FERIA GANADERA", "servicio", "SI", "diesel", 75.0, 50.0
+        ]
+        for col_num, value in enumerate(ejemplo, 1):
+            ws.cell(row=2, column=col_num, value=value)
+
+        output = BytesIO()
+        wb.save(output)
+        return output.getvalue()
+
 template_service = TemplateService()

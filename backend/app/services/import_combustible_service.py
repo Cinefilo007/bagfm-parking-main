@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional
 import uuid
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.models.vehiculo import Vehiculo
 from app.models.entidad_civil import EntidadCivil

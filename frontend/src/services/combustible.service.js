@@ -113,5 +113,15 @@ export const combustibleService = {
   async actualizarVehiculoCombustible(id, datos) {
     const { data } = await api.patch(`/combustible/vehiculos/${id}`, datos);
     return data;
+  },
+
+  /**
+   * Descarga la plantilla de Excel para importar la flota vehicular.
+   */
+  async descargarPlantilla() {
+    const { data } = await api.get('/combustible/template', {
+      responseType: 'blob'
+    });
+    return data;
   }
 };

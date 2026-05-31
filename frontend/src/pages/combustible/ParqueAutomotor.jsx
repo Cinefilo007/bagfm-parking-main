@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Car, RefreshCw, Upload, Edit3, Settings, ShieldAlert,
   CheckCircle, AlertTriangle, XCircle, Search, ToggleLeft, ToggleRight,
-  Database, Flame, FileSpreadsheet, PlusCircle
+  Database, Flame, FileSpreadsheet, PlusCircle, Download
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { toast } from 'react-hot-toast';
@@ -178,6 +178,22 @@ export default function ParqueAutomotor() {
       toast.error(err.response?.data?.detail || "Error al procesar la plantilla Excel.");
     } finally {
       setImportandoExcel(false);
+    }
+  };
+
+  const handleDescargarPlantilla = async () => {
+    try {
+      const data = await combustibleService.descargarPlantilla();
+      const url = window.URL.createObjectURL(new Blob([data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'TEMPLATE_PARQUE_AUTOMOTOR_BAGFM.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success("Plantilla descargada con éxito.");
+    } catch (e) {
+      toast.error("No se pudo descargar la plantilla de importación.");
     }
   };
 
@@ -549,6 +565,14 @@ export default function ParqueAutomotor() {
                       Archivo listo: {archivoExcel.name}
                     </span>
                   )}
+                  
+                  <button
+                    type="button"
+                    onClick={handleDescargarPlantilla}
+                    className="mt-3 text-[9px] text-success font-black uppercase tracking-widest hover:bg-success/20 flex items-center justify-center gap-1.5 cursor-pointer bg-success/10 border border-success/30 px-4 py-2 rounded-lg active:scale-95 transition-all"
+                  >
+                    <Download size={12} /> Descargar Plantilla Oficial
+                  </button>
                 </div>
 
                 <div className="flex gap-3">

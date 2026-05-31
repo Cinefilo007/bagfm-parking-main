@@ -2,7 +2,7 @@
 Enrutador de Combustible (Aegis Fuel API).
 Controlador de rutas para el módulo de control de combustible y parque automotor.
 """
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Query
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Query, Response
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from uuid import UUID
@@ -17,6 +17,7 @@ from app.models.enums import RolTipo, EstadoSolicitudCombustible
 from app.models.tanque_combustible import TanqueCombustible
 from app.services.abastecimiento_service import abastecimiento_service
 from app.services.import_combustible_service import import_combustible_service
+from app.services.template_service import template_service
 
 router = APIRouter()
 
@@ -309,6 +310,25 @@ async def registrar_lectura_inicial(
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/template")
+async def descargar_plantilla_parque(
+    usuario: Usuario = Depends(obtener_usuario_actual)
+):
+    """
+    Descarga la plantilla Excel (.xlsx) para importación de la flota del parque automotor.
+    """
+    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE]:
+        raise HTTPException(status_code=403, detail="Permisos insuficientes. Rol de mando requerido.")
+        
+    excel_data = template_service.generar_excel_parque_template()
+    return Response(
+        content=excel_data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": "attachment; filename=TEMPLATE_PARQUE_AUTOMOTOR_BAGFM.xlsx"
+        }
+    )
 
 @router.post("/importar-excel")
 async def importar_excel_parque(
