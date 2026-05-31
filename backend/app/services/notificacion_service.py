@@ -403,7 +403,7 @@ class NotificacionService:
                 if "410 Gone" in str(e) or "404 Not Found" in str(e):
                     sub.activo = False
 
-    async def notificar_solicitud_combustible_resuelta(self, db: AsyncSession, bombero_id: uuid.UUID, estado: str, placa: str):
+    async def notificar_solicitud_combustible_resuelta(self, db: AsyncSession, bombero_id: UUID, estado: str, placa: str):
         """
         Notifica al bombero cuando su solicitud de abastecimiento es aprobada o rechazada.
         """
