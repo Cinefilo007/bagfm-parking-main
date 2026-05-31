@@ -61,6 +61,7 @@ const getRolStyles = (rol) => {
     case 'ALCABALA':           return { badge: 'text-sky-400 bg-sky-400/10 border-sky-400/20',       avatar: 'text-sky-400 bg-sky-400/10 border-sky-400/20',       bar: 'bg-sky-400' };
     case 'ADMIN_ENTIDAD':      return { badge: 'text-purple-400 bg-purple-400/10 border-purple-400/20', avatar: 'text-purple-400 bg-purple-400/10 border-purple-400/20', bar: 'bg-purple-400' };
     case 'SUPERVISOR_PARQUEROS': return { badge: 'text-amber-500 bg-amber-500/10 border-amber-500/20', avatar: 'text-amber-500 bg-amber-500/10 border-amber-500/20', bar: 'bg-amber-500' };
+    case 'BOMBERO':            return { badge: 'text-orange-400 bg-orange-400/10 border-orange-400/20', avatar: 'text-orange-400 bg-orange-400/10 border-orange-400/20', bar: 'bg-orange-400' };
     default:                   return { badge: 'text-text-muted bg-white/5 border-white/5',           avatar: 'text-text-muted bg-white/5 border-white/5',           bar: 'bg-text-muted' };
   }
 };
@@ -110,6 +111,7 @@ const TABS_POR_ROL = {
   ADMIN_BASE:         ['editar'],
   ADMIN_ENTIDAD:      ['editar'],
   COMANDANTE:         ['editar'],
+  BOMBERO:            ['editar'],
 };
 
 const INFO_SECUNDARIA_ROL = {
@@ -120,6 +122,7 @@ const INFO_SECUNDARIA_ROL = {
   ADMIN_BASE:          (_) => 'Administrador de Base',
   ADMIN_ENTIDAD:       (_) => 'Administrador de Entidad',
   COMANDANTE:          (_) => 'Comandante de Base',
+  BOMBERO:             (_) => 'Operador de combustible (Bombero)',
 };
 
 // ─── MODAL DE GESTIÓN POR ROL ────────────────────────────────────────────────
@@ -682,6 +685,7 @@ export default function Personal() {
           <option value="ADMIN_ENTIDAD">ADMINISTRADOR DE ENTIDAD</option>
           <option value="SUPERVISOR_PARQUEROS">SUPERVISOR DE PARQUEROS</option>
           <option value="SOCIO">SOCIO</option>
+          <option value="BOMBERO">BOMBERO</option>
         </>
       );
     }

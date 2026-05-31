@@ -30,6 +30,7 @@ export const Sidebar = () => {
       { to: '/comando/infracciones', label: 'Infracciones', icon: AlertTriangle },
       { to: '/comando/personal', label: 'Gestión Personal', icon: UserCog },
       { to: '/comando/carnets', label: 'Editor de carnets', icon: Palette },
+      { to: '/parque-automotor', label: 'Parque Automotor', icon: CarIcon },
     );
   } else if (user?.rol === 'SUPERVISOR') {
     navItems.push(

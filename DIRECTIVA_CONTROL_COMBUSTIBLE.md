@@ -87,5 +87,17 @@ Para evitar inconsistencias a lo largo del programa, todas las pantallas del mó
 
 ---
 
-*Última actualización: 2026-05-31 (Establecimiento de directivas de combustible e interfaces del Parque Automotor, Aprobaciones y Reportes de Aegis Fuel V8)*
+## 5. ROLES Y PRIVILEGIOS DE ADMINISTRACIÓN DE PERSONAL DE COMBUSTIBLE
+
+### 5.1 Alta del Rol BOMBERO
+- **Autorización de Registro:** Únicamente el Comandante de Base y el Administrador de Base tienen autorización para dar de alta nuevos usuarios con el rol de `BOMBERO` en la pantalla de Fuerza de Tareas.
+- **Vínculo de Entidad:** Al dar de alta a un `BOMBERO`, no se le asociará a ninguna entidad externa, ya que es un operador de servicio directo de la propia bomba de la base.
+- **Color de Identificación:** En los paneles y listados de Fuerza de Tareas, el rol de `BOMBERO` se identificará visualmente con la etiqueta naranja táctica (`text-orange-400 bg-orange-400/10 border-orange-400/20`).
+
+### 5.2 Acceso al Menú del Parque Automotor
+- **Barra de Navegación (Sidebar):** Los roles de Comandante y Administrador de Base tienen visible de forma fija el acceso al módulo "Parque Automotor" desde la barra de navegación lateral para la administración y carga de flotas.
+
+---
+
+*Última actualización: 2026-05-31 (Establecimiento de directivas de combustible, habilitación de rol Bombero y accesos al Parque Automotor Aegis Fuel V8.1)*
 *Aprobado por: Comandante de Base & Antigravity Aegis Command*
