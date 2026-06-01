@@ -367,7 +367,7 @@ export default function DashboardSupervisorBomberos() {
                   <div key={a.id} className="flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors">
                     <div className="flex items-center gap-3">
                       <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0', a.tiene_alerta ? 'bg-red-500/10 border border-red-500/20' : 'bg-emerald-500/10 border border-emerald-500/20')}>
-                        <Car size={13} className={a.tiene_alerta ? 'text-red-400' : 'text-emerald-400'} />
+                        <CarFront size={13} className={a.tiene_alerta ? 'text-red-400' : 'text-emerald-400'} />
                       </div>
                       <div>
                         <p className="text-xs font-black tracking-wider text-text-main">{a.placa}</p>
@@ -440,7 +440,7 @@ export default function DashboardSupervisorBomberos() {
                         )}
                         {esNoReg && (
                           <div className="flex items-center gap-2">
-                            <Car size={11} className="text-text-muted shrink-0" />
+                            <CarFront size={11} className="text-text-muted shrink-0" />
                             <span className="font-bold text-text-main uppercase">{sol.marca || 'S/M'} · {sol.modelo || 'S/M'} · {sol.color || 'S/C'}</span>
                           </div>
                         )}

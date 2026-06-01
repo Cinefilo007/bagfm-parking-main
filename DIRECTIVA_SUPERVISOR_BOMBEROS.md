@@ -131,3 +131,12 @@ ALTER TYPE tipo_lectura_tanque_enum ADD VALUE IF NOT EXISTS 'cierre_dia';
 ```
 
 > **Nota:** El valor `inicial_semana` se mantiene en el enum por compatibilidad con registros históricos. No debe usarse para nuevos registros.
+
+---
+
+## 9. Historial de Cambios y Correcciones
+
+### [2026-06-01] Corrección de Error de Referencia (`Car is not defined`)
+- **Problema:** El dashboard del supervisor fallaba al cargar con un error de ejecución `ReferenceError: Car is not defined`.
+- **Causa:** El componente `DashboardSupervisorBomberos.jsx` utilizaba `<Car />` en el listado de vehículos abastecidos y solicitudes excepcionales de vehículos no registrados, pero el icono `Car` no estaba importado de `lucide-react` (se importaba `CarFront` en su lugar).
+- **Solución:** Se reemplazaron todas las etiquetas `<Car />` por `<CarFront />` dentro de `DashboardSupervisorBomberos.jsx` para alinearse con los iconos importados y resolver la falla en tiempo de ejecución.
