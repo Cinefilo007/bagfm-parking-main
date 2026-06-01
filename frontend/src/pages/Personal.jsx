@@ -55,14 +55,15 @@ const ESTADO_SANCION = {
 
 const getRolStyles = (rol) => {
   switch (rol) {
-    case 'ADMIN_BASE':         return { badge: 'text-primary bg-primary/10 border-primary/20',       avatar: 'text-primary bg-primary/10 border-primary/20',       bar: 'bg-primary' };
-    case 'SUPERVISOR':         return { badge: 'text-amber-400 bg-amber-400/10 border-amber-400/20', avatar: 'text-amber-400 bg-amber-400/10 border-amber-400/20', bar: 'bg-amber-400' };
-    case 'PARQUERO':           return { badge: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20', avatar: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20', bar: 'bg-emerald-400' };
-    case 'ALCABALA':           return { badge: 'text-sky-400 bg-sky-400/10 border-sky-400/20',       avatar: 'text-sky-400 bg-sky-400/10 border-sky-400/20',       bar: 'bg-sky-400' };
-    case 'ADMIN_ENTIDAD':      return { badge: 'text-purple-400 bg-purple-400/10 border-purple-400/20', avatar: 'text-purple-400 bg-purple-400/10 border-purple-400/20', bar: 'bg-purple-400' };
-    case 'SUPERVISOR_PARQUEROS': return { badge: 'text-amber-500 bg-amber-500/10 border-amber-500/20', avatar: 'text-amber-500 bg-amber-500/10 border-amber-500/20', bar: 'bg-amber-500' };
-    case 'BOMBERO':            return { badge: 'text-orange-400 bg-orange-400/10 border-orange-400/20', avatar: 'text-orange-400 bg-orange-400/10 border-orange-400/20', bar: 'bg-orange-400' };
-    default:                   return { badge: 'text-text-muted bg-white/5 border-white/5',           avatar: 'text-text-muted bg-white/5 border-white/5',           bar: 'bg-text-muted' };
+    case 'ADMIN_BASE':           return { badge: 'text-primary bg-primary/10 border-primary/20',             avatar: 'text-primary bg-primary/10 border-primary/20',             bar: 'bg-primary' };
+    case 'SUPERVISOR':           return { badge: 'text-amber-400 bg-amber-400/10 border-amber-400/20',       avatar: 'text-amber-400 bg-amber-400/10 border-amber-400/20',       bar: 'bg-amber-400' };
+    case 'PARQUERO':             return { badge: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20', avatar: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20', bar: 'bg-emerald-400' };
+    case 'ALCABALA':             return { badge: 'text-sky-400 bg-sky-400/10 border-sky-400/20',             avatar: 'text-sky-400 bg-sky-400/10 border-sky-400/20',             bar: 'bg-sky-400' };
+    case 'ADMIN_ENTIDAD':        return { badge: 'text-purple-400 bg-purple-400/10 border-purple-400/20',   avatar: 'text-purple-400 bg-purple-400/10 border-purple-400/20',   bar: 'bg-purple-400' };
+    case 'SUPERVISOR_PARQUEROS': return { badge: 'text-amber-500 bg-amber-500/10 border-amber-500/20',       avatar: 'text-amber-500 bg-amber-500/10 border-amber-500/20',       bar: 'bg-amber-500' };
+    case 'BOMBERO':              return { badge: 'text-orange-400 bg-orange-400/10 border-orange-400/20',   avatar: 'text-orange-400 bg-orange-400/10 border-orange-400/20',   bar: 'bg-orange-400' };
+    case 'SUPERVISOR_BOMBEROS':  return { badge: 'text-red-400 bg-red-400/10 border-red-400/20',             avatar: 'text-red-400 bg-red-400/10 border-red-400/20',             bar: 'bg-red-400' };
+    default:                     return { badge: 'text-text-muted bg-white/5 border-white/5',                 avatar: 'text-text-muted bg-white/5 border-white/5',                 bar: 'bg-text-muted' };
   }
 };
 
@@ -123,6 +124,7 @@ const INFO_SECUNDARIA_ROL = {
   ADMIN_ENTIDAD:       (_) => 'Administrador de Entidad',
   COMANDANTE:          (_) => 'Comandante de Base',
   BOMBERO:             (_) => 'Operador de combustible (Bombero)',
+  SUPERVISOR_BOMBEROS: (_) => 'Supervisor de Bomberos — Aegis Fuel',
 };
 
 // ─── MODAL DE GESTIÓN POR ROL ────────────────────────────────────────────────
@@ -685,6 +687,7 @@ export default function Personal() {
           <option value="SUPERVISOR_PARQUEROS">SUPERVISOR DE PARQUEROS</option>
           <option value="SOCIO">SOCIO</option>
           <option value="BOMBERO">BOMBERO</option>
+          <option value="SUPERVISOR_BOMBEROS">SUPERVISOR DE BOMBEROS</option>
         </>
       );
     }
