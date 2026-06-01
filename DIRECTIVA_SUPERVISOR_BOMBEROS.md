@@ -140,3 +140,8 @@ ALTER TYPE tipo_lectura_tanque_enum ADD VALUE IF NOT EXISTS 'cierre_dia';
 - **Problema:** El dashboard del supervisor fallaba al cargar con un error de ejecución `ReferenceError: Car is not defined`.
 - **Causa:** El componente `DashboardSupervisorBomberos.jsx` utilizaba `<Car />` en el listado de vehículos abastecidos y solicitudes excepcionales de vehículos no registrados, pero el icono `Car` no estaba importado de `lucide-react` (se importaba `CarFront` en su lugar).
 - **Solución:** Se reemplazaron todas las etiquetas `<Car />` por `<CarFront />` dentro de `DashboardSupervisorBomberos.jsx` para alinearse con los iconos importados y resolver la falla en tiempo de ejecución.
+
+### [2026-06-01] Corrección de Error de Referencia en Navegación Móvil (`Car/Flame is not defined`)
+- **Problema:** El error de referencia no definida continuaba apareciendo al cargar la ruta del supervisor en pantallas móviles o emuladas en el navegador.
+- **Causa:** La barra de navegación inferior (`BottomNav.jsx`) definía accesos de combustible (`/parque-automotor` y `/combustible/tanques`) para el rol `SUPERVISOR_BOMBEROS` usando los iconos `Car` y `Flame`, pero omitía importarlos en `lucide-react`.
+- **Solución:** Se agregaron `Car` y `Flame` a los iconos importados en `BottomNav.jsx`, solucionando definitivamente el ReferenceError en tiempo de ejecución móvil.

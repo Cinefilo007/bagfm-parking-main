@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { ShieldCheck, Users, Menu, ClipboardList, Camera, UserCog, LogOut, ParkingSquare, Radio, Bell, ShieldAlert, QrCode, AlertTriangle, IdCard, ArrowRightLeft } from 'lucide-react';
+import { ShieldCheck, Users, Menu, ClipboardList, Camera, UserCog, LogOut, ParkingSquare, Radio, Bell, ShieldAlert, QrCode, AlertTriangle, IdCard, ArrowRightLeft, Car, Flame } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/auth.store';
 import { MobileMenuDrawer } from './MobileMenuDrawer';
