@@ -1,0 +1,133 @@
+# DIRECTIVA_SUPERVISOR_BOMBEROS.md
+> **BAGFM ACCESS — Sistema Táctico v2.1**  
+> Módulo: Aegis Fuel — Supervisión de Combustible  
+> Versión: 1.0 | Fecha: 2026-06-01
+
+---
+
+## 1. Descripción del Rol
+
+El **Supervisor de Bomberos** (`SUPERVISOR_BOMBEROS`) es el jefe operativo de la unidad de combustible. Actúa como enlace entre el Bombero en turno y el Mando (Comandante / Admin Base), teniendo autoridad para aprobar solicitudes excepcionales de suministro y controlar el inventario de forma diaria.
+
+---
+
+## 2. Accesos y Permisos
+
+| Módulo | Acción | Permitido |
+|---|---|---|
+| Dashboard Supervisor | Ver KPIs, monitor, buzón | ✅ |
+| Parque Automotor | Ver, crear, editar vehículos | ✅ |
+| Parque Automotor | Toggle autorización combustible | ✅ |
+| Gestión de Tanques | Ver estado, apertura/cierre | ✅ |
+| Gestión de Tanques | Crear/eliminar tanques | ❌ (solo Comando) |
+| Abastecimientos | Registrar suministro directo | ✅ |
+| Solicitudes Excepcionales | Aprobar / Rechazar | ✅ (con auditoría) |
+| Reportes de Combustible | Ver | ✅ |
+| Cola de Aprobaciones | Ver y resolver | ✅ |
+
+---
+
+## 3. Control Diario de Tanques (Apertura y Cierre)
+
+**Regla de Negocio:** A partir de la versión 2.1, el control de inventario de tanques es **diario**. Se elimina la apertura semanal como operación obligatoria.
+
+### 3.1 Apertura del Día
+- **Quién:** Bombero o Supervisor de Bomberos.
+- **Cuándo:** Inicio de cada jornada operativa.
+- **Qué:** Declarar la cantidad real medida en cada tanque al inicio del día.
+- **Restricción:** Solo se puede registrar **una apertura por tanque por día**. Si hay error, debe usarse `ajuste_auditoria`.
+
+### 3.2 Cierre del Día
+- **Quién:** Bombero o Supervisor de Bomberos.
+- **Cuándo:** Al finalizar la jornada operativa.
+- **Qué:** Declarar la cantidad real medida en cada tanque al cierre.
+- **Propósito:** Permite detectar inconsistencias entre litros computados y reales.
+
+### 3.3 Tipos de Lectura Válidos
+| Tipo | Descripción | Quién puede registrar |
+|---|---|---|
+| `apertura_dia` | Inventario real al inicio del día | Bombero, Supervisor Bomberos |
+| `cierre_dia` | Inventario real al cierre del día | Bombero, Supervisor Bomberos |
+| `recarga_externa` | Entrada de combustible desde proveedor | Bombero, Supervisor Bomberos, Comando |
+| `ajuste_auditoria` | Corrección autorizada de inventario | Bombero, Supervisor Bomberos, Comando |
+| `inicial_semana` | **Legado** — Conservado por compatibilidad histórica | Desuso |
+
+---
+
+## 4. Flujo de Aprobación de Solicitudes Excepcionales
+
+```
+Bombero eleva solicitud
+       ↓
+Notificación push → [SUPERVISOR_BOMBEROS, COMANDANTE, ADMIN_BASE]
+       ↓
+Supervisor de Bomberos puede APROBAR o RECHAZAR
+       ↓
+Si APRUEBA → Notificación push de AUDITORÍA → [COMANDANTE, ADMIN_BASE]
+Si RECHAZA → Notificación al Bombero
+       ↓
+Bombero recibe confirmación del estado final
+```
+
+**Nota de Auditoría:** Toda aprobación realizada por el Supervisor de Bomberos genera automáticamente una notificación push de auditoría al Comandante y Admin Base con:
+- Nombre del supervisor aprobador
+- Placa del vehículo beneficiado
+- Litros aprobados
+- Enlace directo al registro de aprobaciones
+
+---
+
+## 5. Dashboard Exclusivo del Supervisor
+
+Ruta: `/combustible-supervisor/dashboard`
+
+### Tabs del Dashboard
+
+| Tab | Contenido |
+|---|---|
+| **Tanques** | Estado de cada tanque, nivel, apertura/cierre del día, botones de registro |
+| **Monitor** | Feed en tiempo real (polling 30s) de vehículos abastecidos hoy |
+| **Solicitudes** | Cola de aprobaciones pendientes con botones Aprobar/Rechazar integrados |
+
+### KPIs Visibles
+- Litros abastecidos hoy
+- Cantidad de cargas realizadas hoy
+- Solicitudes pendientes (con alerta roja si > 0)
+- Stock total de todos los tanques
+
+---
+
+## 6. Navegación del Rol
+
+| Sección | Ruta |
+|---|---|
+| Centro de Control | `/combustible-supervisor/dashboard` |
+| Buzón de Aprobaciones | `/combustible/aprobaciones` |
+| Parque Automotor | `/parque-automotor` |
+| Tanques Combustible | `/combustible/tanques` |
+
+---
+
+## 7. Seguridad
+
+- El rol `SUPERVISOR_BOMBEROS` **no puede** crear ni eliminar tanques.
+- El rol `SUPERVISOR_BOMBEROS` **no puede** reasignar entidades a vehículos (solo editar parámetros de combustible).
+- Toda aprobación queda registrada en la tabla `solicitudes_combustible` con `aprobado_por_id`.
+- El campo `fecha_aprobacion` queda auditado automáticamente.
+
+---
+
+## 8. Migración de Base de Datos
+
+Migración aplicada: `f1a2b3c4d5e6_add_supervisor_bomberos_and_daily_reads`
+
+```sql
+-- Nuevo rol
+ALTER TYPE rol_tipo ADD VALUE IF NOT EXISTS 'SUPERVISOR_BOMBEROS';
+
+-- Nuevos tipos de lectura diaria
+ALTER TYPE tipo_lectura_tanque_enum ADD VALUE IF NOT EXISTS 'apertura_dia';
+ALTER TYPE tipo_lectura_tanque_enum ADD VALUE IF NOT EXISTS 'cierre_dia';
+```
+
+> **Nota:** El valor `inicial_semana` se mantiene en el enum por compatibilidad con registros históricos. No debe usarse para nuevos registros.

@@ -14,6 +14,7 @@ class RolTipo(str, enum.Enum):
     PARQUERO = "PARQUERO"
     SOCIO = "SOCIO"
     BOMBERO = "BOMBERO"
+    SUPERVISOR_BOMBEROS = "SUPERVISOR_BOMBEROS"
 
 class MembresiaEstado(str, enum.Enum):
     activa = "activa"
@@ -121,7 +122,9 @@ class UsoVehiculo(str, enum.Enum):
     servicio = "servicio"
 
 class TipoLecturaTanque(str, enum.Enum):
-    inicial_semana = "inicial_semana"
+    inicial_semana = "inicial_semana"   # Legado: conservado por compatibilidad histórica
+    apertura_dia = "apertura_dia"        # Nuevo: lectura de apertura diaria obligatoria
+    cierre_dia = "cierre_dia"            # Nuevo: lectura de cierre diaria obligatoria
     recarga_externa = "recarga_externa"
     ajuste_auditoria = "ajuste_auditoria"
 

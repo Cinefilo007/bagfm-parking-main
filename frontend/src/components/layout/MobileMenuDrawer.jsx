@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { 
   X, CalendarRange, AlertTriangle, UserCog, Palette, 
   ShieldAlert, Bell, Settings, LogOut, ShieldCheck,
-  User, ChevronRight
+  User, ChevronRight, Flame, Sunrise, Car as CarIcon
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/auth.store';
@@ -52,6 +52,13 @@ export const MobileMenuDrawer = ({ isOpen, onClose }) => {
     extendedNavItems.push(
       { to: '/parquero/perdidos', label: 'Vehículos Perdidos', icon: ShieldAlert, color: 'text-danger' },
       { to: '/parquero/notificaciones', label: 'Historial / Notif.', icon: Bell, color: 'text-primary' },
+    );
+  } else if (user?.rol === 'SUPERVISOR_BOMBEROS') {
+    extendedNavItems.push(
+      { to: '/combustible-supervisor/dashboard', label: 'Centro de Control', icon: Flame, color: 'text-amber-400' },
+      { to: '/combustible/aprobaciones', label: 'Buzón Aprob.', icon: Bell, color: 'text-red-400' },
+      { to: '/parque-automotor', label: 'Parque Automotor', icon: CarIcon, color: 'text-blue-400' },
+      { to: '/combustible/tanques', label: 'Tanques Comb.', icon: Sunrise, color: 'text-emerald-400' },
     );
   }
 

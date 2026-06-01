@@ -366,10 +366,11 @@ class NotificacionService:
     async def notificar_solicitud_combustible_pendiente(self, db: AsyncSession, solicitud):
         """
         Alerta Táctica: Notifica una solicitud de abastecimiento de emergencia pendiente de aprobación.
+        Destinatarios: Comandante, Admin Base y Supervisor de Bomberos.
         """
         query_destinatarios = select(Usuario).where(
             Usuario.activo == True,
-            Usuario.rol.in_([RolTipo.COMANDANTE, RolTipo.ADMIN_BASE])
+            Usuario.rol.in_([RolTipo.COMANDANTE, RolTipo.ADMIN_BASE, RolTipo.SUPERVISOR_BOMBEROS])
         )
         result = await db.execute(query_destinatarios)
         usuarios = result.scalars().all()
@@ -402,6 +403,51 @@ class NotificacionService:
             except Exception as e:
                 if "410 Gone" in str(e) or "404 Not Found" in str(e):
                     sub.activo = False
+
+    async def notificar_auditoria_aprobacion_supervisor(self, db: AsyncSession, aprobador, solicitud):
+        """
+        AUDITORÍA: Notifica al Comandante y Admin Base cuando el Supervisor de Bomberos
+        aprueba una solicitud de suministro. Obligatorio por regulación de auditoría.
+        """
+        query_destinatarios = select(Usuario).where(
+            Usuario.activo == True,
+            Usuario.rol.in_([RolTipo.COMANDANTE, RolTipo.ADMIN_BASE])
+        )
+        result = await db.execute(query_destinatarios)
+        usuarios = result.scalars().all()
+        ids_usuarios = [u.id for u in usuarios]
+
+        if not ids_usuarios: return
+
+        query_subs = select(PushSubscription).where(
+            PushSubscription.usuario_id.in_(ids_usuarios),
+            PushSubscription.activo == True
+        )
+        result_subs = await db.execute(query_subs)
+        suscripciones = result_subs.scalars().all()
+
+        nombre_aprobador = f"{aprobador.nombre} {aprobador.apellido}"
+        payload = {
+            "title": "📋 AUDITORÍA: Aprobación por Supervisor",
+            "body": f"Sup. {nombre_aprobador} aprobó suministro para {solicitud.placa} ({solicitud.cantidad_solicitada} L)",
+            "data": {
+                "url": "/combustible/aprobaciones",
+                "tipo": "auditoria_aprobacion_supervisor",
+                "solicitud_id": str(solicitud.id)
+            },
+            "icon": "/icons/icon-192x192.png",
+            "badge": "/icons/badge-96x96.png"
+        }
+
+        for sub in suscripciones:
+            try:
+                sub_info = {"endpoint": sub.endpoint, "keys": {"p256dh": sub.p256dh, "auth": sub.auth}}
+                webpush_service.send_notification(sub_info, payload)
+            except Exception as e:
+                if "410 Gone" in str(e) or "404 Not Found" in str(e):
+                    sub.activo = False
+                else:
+                    logging.error(f"Error enviando push de auditoría a mando: {e}")
 
     async def notificar_solicitud_combustible_resuelta(self, db: AsyncSession, bombero_id: UUID, estado: str, placa: str):
         """

@@ -179,5 +179,31 @@ export const combustibleService = {
   async obtenerHistorialBombero(limit = 15) {
     const { data } = await api.get(`/combustible/abastecimientos/historial-bombero`, { params: { limit } });
     return data;
-  }
+  },
+
+  /**
+   * Obtiene el estado de apertura y cierre del día para cada tanque.
+   */
+  async getEstadoDia() {
+    const { data } = await api.get('/combustible/tanques/estado-dia');
+    return data;
+  },
+
+  /**
+   * Registra una lectura de apertura o cierre del día para un tanque.
+   * tipo_lectura: 'apertura_dia' | 'cierre_dia' | 'recarga_externa' | 'ajuste_auditoria'
+   */
+  async registrarLecturaDiaria(datos) {
+    const { data } = await api.post('/combustible/tanques/lectura-inicial', datos);
+    return data;
+  },
+
+  /**
+   * Obtiene los KPIs del dashboard exclusivo del Supervisor de Bomberos.
+   */
+  async getDashboardKpisSupervisorBomberos() {
+    const { data } = await api.get('/combustible/dashboard-kpis-supervisor');
+    return data.data;
+  },
 };
+

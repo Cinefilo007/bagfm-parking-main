@@ -5,7 +5,7 @@ import {
   LayoutDashboard, UserCircle, Map as MapIcon,
   Camera, Sun, Moon, UserCog, ParkingCircle, Activity, Radio, AlertTriangle, Palette,
   ClipboardList, CalendarRange, Building2, Users, ParkingSquare, ShieldAlert,
-  QrCode, ArrowRightLeft, Car as CarIcon, Flame
+  QrCode, ArrowRightLeft, Car as CarIcon, Flame, Sunrise
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/auth.store';
@@ -69,6 +69,13 @@ export const Sidebar = () => {
       { to: '/parquero/dashboard', label: 'Vista Parquero', icon: ParkingSquare },
       { to: '/parquero/perdidos', label: 'Vehículos Perdidos', icon: ShieldAlert },
       { to: '/parquero/notificaciones', label: 'Historial / Notif.', icon: Bell },
+    );
+  } else if (user?.rol === 'SUPERVISOR_BOMBEROS') {
+    navItems.push(
+      { to: '/combustible-supervisor/dashboard', label: 'Centro de Control', icon: Flame },
+      { to: '/combustible/aprobaciones', label: 'Buzón Aprobaciones', icon: Bell },
+      { to: '/parque-automotor', label: 'Parque Automotor', icon: CarIcon },
+      { to: '/combustible/tanques', label: 'Tanques Combustible', icon: Sunrise },
     );
   } else if (user?.rol === 'SOCIO') {
     navItems.push(

@@ -14,7 +14,7 @@ from sqlalchemy import select, func
 from app.core.database import obtener_db
 from app.core.dependencias import obtener_usuario_actual
 from app.models.usuario import Usuario
-from app.models.enums import RolTipo, EstadoSolicitudCombustible
+from app.models.enums import RolTipo, EstadoSolicitudCombustible, TipoLecturaTanque
 from app.models.tanque_combustible import TanqueCombustible
 from app.services.abastecimiento_service import abastecimiento_service
 from app.services.import_combustible_service import import_combustible_service
@@ -51,6 +51,7 @@ class LecturaInicialRequest(BaseModel):
     tanque_id: UUID
     cantidad_medida: float
     observaciones: Optional[str] = None
+    tipo_lectura: Optional[str] = "apertura_dia"  # apertura_dia | cierre_dia | recarga_externa | ajuste_auditoria
 
 # --- Endpoints ---
 
@@ -78,7 +79,7 @@ async def registrar_abastecimiento(
     """
     Registra una carga de combustible y descuenta inventario del tanque.
     """
-    if usuario.rol not in [RolTipo.BOMBERO, RolTipo.ADMIN_BASE, RolTipo.COMANDANTE]:
+    if usuario.rol not in [RolTipo.BOMBERO, RolTipo.ADMIN_BASE, RolTipo.COMANDANTE, RolTipo.SUPERVISOR_BOMBEROS]:
         raise HTTPException(status_code=403, detail="Permisos insuficientes. Rol de Bombero requerido.")
         
     try:
@@ -103,7 +104,7 @@ async def registrar_solicitud(
     """
     Eleva una solicitud de abastecimiento por emergencia para aprobación remota.
     """
-    if usuario.rol not in [RolTipo.BOMBERO, RolTipo.ADMIN_BASE, RolTipo.COMANDANTE]:
+    if usuario.rol not in [RolTipo.BOMBERO, RolTipo.ADMIN_BASE, RolTipo.COMANDANTE, RolTipo.SUPERVISOR_BOMBEROS]:
         raise HTTPException(status_code=403, detail="Permisos insuficientes. Rol de Bombero requerido.")
         
     try:
@@ -167,7 +168,7 @@ async def listar_solicitudes_pendientes(
     """
     Obtiene las solicitudes pendientes de combustible a nivel global (Comandante/Admin Base).
     """
-    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE]:
+    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE, RolTipo.SUPERVISOR_BOMBEROS]:
         raise HTTPException(status_code=403, detail="Permisos insuficientes. Rol de mando requerido.")
         
     try:
@@ -210,7 +211,7 @@ async def resolver_solicitud(
     """
     Aprueba o rechaza una solicitud remota de combustible.
     """
-    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE]:
+    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE, RolTipo.SUPERVISOR_BOMBEROS]:
         raise HTTPException(status_code=403, detail="Permisos insuficientes. Rol de mando requerido.")
         
     try:
@@ -296,15 +297,24 @@ async def registrar_lectura_inicial(
     """
     Registra el inventario de litros al inicio de semana/turno (Solo Bombero).
     """
-    if usuario.rol not in [RolTipo.BOMBERO, RolTipo.ADMIN_BASE, RolTipo.COMANDANTE]:
-        raise HTTPException(status_code=403, detail="Rol de Bombero requerido.")
+    if usuario.rol not in [RolTipo.BOMBERO, RolTipo.ADMIN_BASE, RolTipo.COMANDANTE, RolTipo.SUPERVISOR_BOMBEROS]:
+        raise HTTPException(status_code=403, detail="Rol de Bombero o Supervisor requerido.")
         
     try:
+        from app.models.enums import TipoLecturaTanque
+        tipo_lectura_map = {
+            "apertura_dia": TipoLecturaTanque.apertura_dia,
+            "cierre_dia": TipoLecturaTanque.cierre_dia,
+            "recarga_externa": TipoLecturaTanque.recarga_externa,
+            "ajuste_auditoria": TipoLecturaTanque.ajuste_auditoria,
+            "inicial_semana": TipoLecturaTanque.inicial_semana,  # Legado
+        }
+        tipo = tipo_lectura_map.get(request.tipo_lectura or "apertura_dia", TipoLecturaTanque.apertura_dia)
         lectura = await abastecimiento_service.registrar_lectura_inicial_tanques(
-            db, usuario.id, request.tanque_id, request.cantidad_medida, request.observaciones
+            db, usuario.id, request.tanque_id, request.cantidad_medida, request.observaciones, tipo
         )
         await db.commit()
-        return {"status": "success", "message": "Lectura de inventario inicial declarada con éxito", "id": lectura.id}
+        return {"status": "success", "message": f"Lectura de '{tipo.value}' declarada con éxito", "id": lectura.id}
     except ValueError as ve:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(ve))
@@ -416,7 +426,7 @@ async def listar_vehiculos_parque(
     Lista los vehículos registrados en la base con sus datos de combustible.
     Mando y supervisión ven todo; admin de entidad ve sólo su entidad.
     """
-    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE, RolTipo.SUPERVISOR, RolTipo.ADMIN_ENTIDAD]:
+    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE, RolTipo.SUPERVISOR, RolTipo.ADMIN_ENTIDAD, RolTipo.SUPERVISOR_BOMBEROS]:
         raise HTTPException(status_code=403, detail="Permisos insuficientes.")
         
     try:
@@ -472,7 +482,7 @@ async def actualizar_vehiculo_combustible(
     """
     Actualiza la autorización y parámetros de combustible de un vehículo.
     """
-    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE, RolTipo.SUPERVISOR, RolTipo.ADMIN_ENTIDAD]:
+    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE, RolTipo.SUPERVISOR, RolTipo.ADMIN_ENTIDAD, RolTipo.SUPERVISOR_BOMBEROS]:
         raise HTTPException(status_code=403, detail="Permisos insuficientes.")
         
     try:
@@ -633,7 +643,7 @@ async def obtener_dashboard_kpis(
     """
     Devuelve los KPIs compactos del módulo de combustible para el Dashboard del Comandante.
     """
-    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE, RolTipo.SUPERVISOR]:
+    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE, RolTipo.SUPERVISOR, RolTipo.SUPERVISOR_BOMBEROS]:
         raise HTTPException(status_code=403, detail="Permisos insuficientes.")
 
     try:
@@ -903,7 +913,7 @@ async def obtener_historial_abastecimientos(
     """
     Obtiene el historial general de abastecimientos con paginacin.
     """
-    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE, RolTipo.SUPERVISOR, RolTipo.ADMIN_ENTIDAD]:
+    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE, RolTipo.SUPERVISOR, RolTipo.ADMIN_ENTIDAD, RolTipo.SUPERVISOR_BOMBEROS]:
         raise HTTPException(status_code=403, detail="Permisos insuficientes.")
         
     try:
@@ -1012,3 +1022,153 @@ async def obtener_historial_bombero(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error obteniendo historial: {str(e)}")
 
+# --- Endpoints de Apertura y Cierre Diario de Tanques ---
+
+@router.get("/tanques/estado-dia")
+async def obtener_estado_dia_tanques(
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = Depends(obtener_usuario_actual)
+):
+    """
+    Verifica si ya se registró apertura y/o cierre del día para cada tanque activo.
+    Roles permitidos: Bombero, Supervisor de Bomberos, Comandante, Admin Base.
+    """
+    if usuario.rol not in [RolTipo.BOMBERO, RolTipo.SUPERVISOR_BOMBEROS, RolTipo.COMANDANTE, RolTipo.ADMIN_BASE]:
+        raise HTTPException(status_code=403, detail="Permisos insuficientes.")
+
+    try:
+        # Obtener todos los tanques activos
+        query = select(TanqueCombustible).where(TanqueCombustible.activo == True).order_by(TanqueCombustible.nombre.asc())
+        res = await db.execute(query)
+        tanques = res.scalars().all()
+
+        estado_tanques = []
+        for t in tanques:
+            tiene_apertura = await abastecimiento_service.verificar_apertura_dia(db, t.id)
+            tiene_cierre = await abastecimiento_service.verificar_cierre_dia(db, t.id)
+            estado_tanques.append({
+                "id": str(t.id),
+                "nombre": t.nombre,
+                "tipo_combustible": t.tipo_combustible.value,
+                "cantidad_actual": t.cantidad_actual,
+                "capacidad_maxima": t.capacidad_maxima,
+                "porcentaje": round((t.cantidad_actual / t.capacidad_maxima) * 100, 1) if t.capacidad_maxima > 0 else 0,
+                "tiene_apertura_hoy": tiene_apertura,
+                "tiene_cierre_hoy": tiene_cierre
+            })
+
+        tiene_alguna_apertura = any(t["tiene_apertura_hoy"] for t in estado_tanques)
+        tiene_algun_cierre = any(t["tiene_cierre_hoy"] for t in estado_tanques)
+
+        return {
+            "status": "success",
+            "tiene_apertura_hoy": tiene_alguna_apertura,
+            "tiene_cierre_hoy": tiene_algun_cierre,
+            "data": estado_tanques
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/dashboard-kpis-supervisor")
+async def obtener_dashboard_kpis_supervisor(
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = Depends(obtener_usuario_actual)
+):
+    """
+    KPIs exclusivos del Dashboard del Supervisor de Bomberos.
+    Incluye: estado de tanques, litros abastecidos hoy, solicitudes pendientes, 
+    últimos abastecimientos del día y estado de apertura/cierre.
+    """
+    if usuario.rol not in [RolTipo.SUPERVISOR_BOMBEROS, RolTipo.COMANDANTE, RolTipo.ADMIN_BASE]:
+        raise HTTPException(status_code=403, detail="Permisos insuficientes.")
+
+    try:
+        from app.models.solicitud_combustible import SolicitudCombustible
+        from app.models.abastecimiento import Abastecimiento
+        from app.models.vehiculo import Vehiculo
+        from sqlalchemy.orm import selectinload
+
+        inicio_dia, fin_dia = await abastecimiento_service.obtener_rango_dia()
+
+        # 1. Litros abastecidos hoy
+        q_litros_hoy = select(func.coalesce(func.sum(Abastecimiento.cantidad_abastecida), 0.0)).where(
+            Abastecimiento.fecha.between(inicio_dia, fin_dia)
+        )
+        litros_hoy = (await db.execute(q_litros_hoy)).scalar() or 0.0
+
+        # 2. Cargas realizadas hoy
+        q_cargas_hoy = select(func.count(Abastecimiento.id)).where(
+            Abastecimiento.fecha.between(inicio_dia, fin_dia)
+        )
+        cargas_hoy = (await db.execute(q_cargas_hoy)).scalar() or 0
+
+        # 3. Solicitudes pendientes
+        q_pendientes = select(func.count(SolicitudCombustible.id)).where(
+            SolicitudCombustible.estado == EstadoSolicitudCombustible.pendiente
+        )
+        solicitudes_pendientes = (await db.execute(q_pendientes)).scalar() or 0
+
+        # 4. Estado de tanques con apertura/cierre del día
+        q_tanques = select(TanqueCombustible).where(TanqueCombustible.activo == True).order_by(TanqueCombustible.nombre.asc())
+        tanques_res = await db.execute(q_tanques)
+        tanques = tanques_res.scalars().all()
+
+        tanques_data = []
+        stock_total = 0.0
+        for t in tanques:
+            tiene_apertura = await abastecimiento_service.verificar_apertura_dia(db, t.id)
+            tiene_cierre = await abastecimiento_service.verificar_cierre_dia(db, t.id)
+            stock_total += t.cantidad_actual
+            tanques_data.append({
+                "id": str(t.id),
+                "nombre": t.nombre,
+                "tipo_combustible": t.tipo_combustible.value,
+                "capacidad_maxima": t.capacidad_maxima,
+                "cantidad_actual": t.cantidad_actual,
+                "porcentaje": round((t.cantidad_actual / t.capacidad_maxima) * 100, 1) if t.capacidad_maxima > 0 else 0,
+                "tiene_apertura_hoy": tiene_apertura,
+                "tiene_cierre_hoy": tiene_cierre
+            })
+
+        # 5. Últimos 20 abastecimientos del día
+        q_hoy = (
+            select(Abastecimiento)
+            .options(
+                selectinload(Abastecimiento.vehiculo).selectinload(Vehiculo.entidad),
+                selectinload(Abastecimiento.bombero)
+            )
+            .where(Abastecimiento.fecha.between(inicio_dia, fin_dia))
+            .order_by(Abastecimiento.fecha.desc())
+            .limit(20)
+        )
+        abast_hoy_res = await db.execute(q_hoy)
+        abast_hoy = abast_hoy_res.scalars().all()
+
+        abast_data = [
+            {
+                "id": str(a.id),
+                "placa": a.vehiculo.placa if a.vehiculo else "?",
+                "marca": a.vehiculo.marca if a.vehiculo else "?",
+                "modelo": a.vehiculo.modelo if a.vehiculo else "?",
+                "entidad": a.vehiculo.entidad.nombre if a.vehiculo and getattr(a.vehiculo, 'entidad', None) else "SIN ENTIDAD",
+                "bombero": f"{a.bombero.nombre} {a.bombero.apellido}" if a.bombero else "?",
+                "litros": a.cantidad_abastecida,
+                "fecha": a.fecha.isoformat(),
+                "tiene_alerta": a.tiene_alerta
+            } for a in abast_hoy
+        ]
+
+        return {
+            "status": "success",
+            "data": {
+                "litros_hoy": round(litros_hoy, 1),
+                "cargas_hoy": cargas_hoy,
+                "solicitudes_pendientes": solicitudes_pendientes,
+                "stock_total": round(stock_total, 1),
+                "tanques": tanques_data,
+                "abastecimientos_hoy": abast_data
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener KPIs del supervisor: {str(e)}")

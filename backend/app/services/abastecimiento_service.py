@@ -31,6 +31,15 @@ class AbastecimientoService:
         fin = datetime.combine(hoy.date(), time.max)
         return inicio, fin
 
+    async def obtener_rango_dia(self) -> tuple:
+        """
+        Retorna el inicio y fin del día actual (00:00:00 a 23:59:59).
+        """
+        hoy = datetime.now()
+        inicio = datetime.combine(hoy.date(), time.min)
+        fin = datetime.combine(hoy.date(), time.max)
+        return inicio, fin
+
     async def obtener_entidad_transito(self, db: AsyncSession) -> EntidadCivil:
         """
         Busca u obtiene la entidad especial para vehículos externos/tránsito.
@@ -261,6 +270,18 @@ class AbastecimientoService:
         except Exception as e:
             logging.error(f"Error al enviar push de resolución al bombero: {e}")
 
+        # AUDITORÍA: Si quien aprueba es el Supervisor de Bomberos, notificar al Comandante y Admin Base
+        try:
+            aprobador_query = select(Usuario).where(Usuario.id == aprobado_por_id)
+            aprobador_res = await db.execute(aprobador_query)
+            aprobador = aprobador_res.scalar_one_or_none()
+            if aprobador and aprobador.rol == RolTipo.SUPERVISOR_BOMBEROS and estado == EstadoSolicitudCombustible.aprobada:
+                await notificacion_service.notificar_auditoria_aprobacion_supervisor(
+                    db, aprobador, solicitud
+                )
+        except Exception as e:
+            logging.error(f"Error al enviar notificación de auditoría al comando: {e}")
+
         return solicitud
 
     async def registrar_abastecimiento(
@@ -405,10 +426,12 @@ class AbastecimientoService:
         bombero_id: uuid.UUID,
         tanque_id: uuid.UUID,
         cantidad_medida: float,
-        observaciones: Optional[str] = None
+        observaciones: Optional[str] = None,
+        tipo: TipoLecturaTanque = TipoLecturaTanque.apertura_dia
     ) -> LecturaTanque:
         """
-        Permite al bombero declarar los litros al inicio de la semana/turno, actualizando el inventario actual.
+        Permite al bombero o supervisor de bomberos declarar los litros de un tanque.
+        Soporta apertura_dia, cierre_dia, recarga_externa y ajuste_auditoria.
         """
         query_t = select(TanqueCombustible).where(TanqueCombustible.id == tanque_id)
         res_t = await db.execute(query_t)
@@ -419,36 +442,71 @@ class AbastecimientoService:
             
         if cantidad_medida > tanque.capacidad_maxima:
             raise ValueError(f"La cantidad ingresada ({cantidad_medida} L) supera la capacidad máxima del tanque ({tanque.capacidad_maxima} L).")
+        
+        # Validación: no permitir duplicar apertura del día para el mismo tanque
+        if tipo == TipoLecturaTanque.apertura_dia:
+            tiene_apertura = await self.verificar_apertura_dia(db, tanque_id)
+            if tiene_apertura:
+                raise ValueError(f"Ya existe una lectura de apertura del día para este tanque. Use el ajuste de auditoría para corregir.")
             
         lectura = LecturaTanque(
             id=uuid.uuid4(),
             tanque_id=tanque_id,
             bombero_id=bombero_id,
-            tipo_lectura=TipoLecturaTanque.inicial_semana,
+            tipo_lectura=tipo,
             cantidad_medida=cantidad_medida,
             observaciones=observaciones
         )
         
-        # Actualizar cantidad actual en el tanque
+        # Actualizar cantidad actual en el tanque (aplica a apertura, cierre y recargas)
         tanque.cantidad_actual = cantidad_medida
         
         db.add(lectura)
         await db.flush()
         return lectura
 
-    async def verificar_lectura_inicial_semanal(self, db: AsyncSession) -> bool:
+    async def verificar_apertura_dia(self, db: AsyncSession, tanque_id: Optional[uuid.UUID] = None) -> bool:
         """
-        Verifica si hay alguna lectura inicial declarada en la semana en curso (lunes a domingo).
+        Verifica si hay una lectura de apertura registrada hoy.
+        Si se pasa tanque_id, verifica sólo para ese tanque; si no, verifica cualquier tanque.
         """
-        inicio, fin = await self.obtener_rango_semana()
+        inicio, fin = await self.obtener_rango_dia()
         
         query = select(func.count(LecturaTanque.id)).where(
-            LecturaTanque.tipo_lectura == TipoLecturaTanque.inicial_semana,
+            LecturaTanque.tipo_lectura == TipoLecturaTanque.apertura_dia,
             LecturaTanque.fecha.between(inicio, fin)
         )
+        if tanque_id:
+            query = query.where(LecturaTanque.tanque_id == tanque_id)
+        
         res = await db.execute(query)
         conteo = res.scalar() or 0
         return conteo > 0
+
+    async def verificar_cierre_dia(self, db: AsyncSession, tanque_id: Optional[uuid.UUID] = None) -> bool:
+        """
+        Verifica si hay una lectura de cierre registrada hoy.
+        Si se pasa tanque_id, verifica sólo para ese tanque; si no, verifica cualquier tanque.
+        """
+        inicio, fin = await self.obtener_rango_dia()
+        
+        query = select(func.count(LecturaTanque.id)).where(
+            LecturaTanque.tipo_lectura == TipoLecturaTanque.cierre_dia,
+            LecturaTanque.fecha.between(inicio, fin)
+        )
+        if tanque_id:
+            query = query.where(LecturaTanque.tanque_id == tanque_id)
+        
+        res = await db.execute(query)
+        conteo = res.scalar() or 0
+        return conteo > 0
+
+    async def verificar_lectura_inicial_semanal(self, db: AsyncSession) -> bool:
+        """
+        Legado: Verifica si hay apertura o lectura semanal registrada hoy.
+        Usado internamente para compatibilidad con el dashboard del Bombero.
+        """
+        return await self.verificar_apertura_dia(db)
 
     async def obtener_reporte_combustible(
         self,

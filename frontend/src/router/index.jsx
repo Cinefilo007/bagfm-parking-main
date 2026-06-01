@@ -41,6 +41,7 @@ import ReporteCombustible from '../pages/combustible/ReporteCombustible';
 import ParqueAutomotor from '../pages/combustible/ParqueAutomotor';
 import ColaAprobacionesCombustible from '../pages/combustible/ColaAprobacionesCombustible';
 import GestionTanques from '../pages/combustible/GestionTanques';
+import DashboardSupervisorBomberos from '../pages/combustible/DashboardSupervisorBomberos';
 
 import { useAuthStore } from '../store/auth.store';
 
@@ -56,6 +57,7 @@ const HomeRedirect = () => {
   if (user.rol === 'COMANDANTE' || user.rol === 'ADMIN_BASE') return <Navigate to="/comando/dashboard" replace />;
   if (user.rol === 'SUPERVISOR') return <Navigate to="/supervisor-base/dashboard" replace />;
   if (user.rol === 'BOMBERO') return <Navigate to="/combustible/dashboard" replace />;
+  if (user.rol === 'SUPERVISOR_BOMBEROS') return <Navigate to="/combustible-supervisor/dashboard" replace />;
   if (user.rol === 'ADMIN_ENTIDAD') return <Navigate to="/entidad/dashboard" replace />;
   if (user.rol === 'ALCABALA') return <Navigate to="/alcabala/dashboard" replace />;
   if (user.rol === 'SUPERVISOR_PARQUEROS') return <Navigate to="/supervisor/dashboard" replace />;
@@ -164,7 +166,7 @@ export const router = createBrowserRouter([
           // COMBUSTIBLE (AEGIS FUEL)
           {
             path: 'combustible',
-            element: <RutaProtegida rolesPermitidos={['BOMBERO', 'ADMIN_BASE', 'COMANDANTE', 'SUPERVISOR']} />,
+            element: <RutaProtegida rolesPermitidos={['BOMBERO', 'ADMIN_BASE', 'COMANDANTE', 'SUPERVISOR', 'SUPERVISOR_BOMBEROS']} />,
             children: [
               { path: '', element: <DashboardBombero /> },
               { path: 'dashboard', element: <DashboardBombero /> },
@@ -172,17 +174,25 @@ export const router = createBrowserRouter([
               { path: 'aprobaciones', element: <ColaAprobacionesCombustible /> },
               {
                 path: 'tanques',
-                element: <RutaProtegida rolesPermitidos={['COMANDANTE', 'ADMIN_BASE']} />,
+                element: <RutaProtegida rolesPermitidos={['COMANDANTE', 'ADMIN_BASE', 'SUPERVISOR_BOMBEROS']} />,
                 children: [
                   { path: '', element: <GestionTanques /> }
                 ]
               }
             ]
           },
+          // SUPERVISOR DE BOMBEROS (AEGIS FUEL)
+          {
+            path: 'combustible-supervisor',
+            element: <RutaProtegida rolesPermitidos={['SUPERVISOR_BOMBEROS', 'COMANDANTE', 'ADMIN_BASE']} />,
+            children: [
+              { path: 'dashboard', element: <DashboardSupervisorBomberos /> }
+            ]
+          },
           // PARQUE AUTOMOTOR
           {
             path: 'parque-automotor',
-            element: <RutaProtegida rolesPermitidos={['COMANDANTE', 'ADMIN_BASE', 'ADMIN_ENTIDAD', 'SUPERVISOR']} />,
+            element: <RutaProtegida rolesPermitidos={['COMANDANTE', 'ADMIN_BASE', 'ADMIN_ENTIDAD', 'SUPERVISOR', 'SUPERVISOR_BOMBEROS']} />,
             children: [
               { path: '', element: <ParqueAutomotor /> }
             ]
