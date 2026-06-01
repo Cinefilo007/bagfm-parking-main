@@ -820,8 +820,8 @@ export default function ParqueAutomotor() {
                     onChange={(e) => setFormRegistro(p => ({ ...p, tipo_combustible: e.target.value }))}
                     className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-bold"
                   >
-                    <option value="gasolina">â›½ Gasolina</option>
-                    <option value="diesel">ðŸ›¢ï¸ Diésel</option>
+                    <option value="gasolina">⛽ Gasolina</option>
+                    <option value="diesel">🛢️ Diésel</option>
                   </select>
                 </div>
               </div>
