@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request, status
+import asyncio
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.excepciones import BagfmError, EntidadNoEncontrada, EntidadDuplicada, AccesoDenegado
@@ -17,6 +18,22 @@ app = FastAPI(
     docs_url="/api/docs" if not config.en_produccion else None,
     redoc_url="/api/redoc" if not config.en_produccion else None,
 )
+
+async def ciclo_cron_interno():
+    from app.core.database import FabricaSesion
+    from app.services.cron_service import cron_service
+    while True:
+        try:
+            await asyncio.sleep(60) # Ejecutar cada 60 segundos
+            async with FabricaSesion() as db:
+                await cron_service.ejecutar_ciclo_seguridad(db)
+        except Exception as e:
+            print(f">>> [CRON INTERNO ERROR] {e}")
+
+@app.on_event("startup")
+async def iniciar_cron_interno():
+    print("Iniciando cron interno del sistema...")
+    asyncio.create_task(ciclo_cron_interno())
 
 # Configuración de CORS basada en variables de entorno
 app.add_middleware(

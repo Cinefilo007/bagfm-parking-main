@@ -133,7 +133,7 @@ const FuelMonitor = () => {
                           <div>
                             <span className="text-[10px] font-black text-text-main uppercase tracking-wider block">{t.nombre}</span>
                             <span className="text-[8px] font-bold text-text-muted uppercase">
-                              {t.tipo_combustible === 'gasolina' ? '⛽ Gasolina' : 'Diésel'}
+                              {t.tipo_combustible === 'gasolina' ? '⛽ Gasolina' : '🛢️ Diésel'}
                             </span>
                           </div>
                         </div>
