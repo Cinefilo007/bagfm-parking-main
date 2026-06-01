@@ -1,8 +1,8 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Car, Compass, RefreshCw, AlertTriangle, CheckCircle2, 
   Send, Camera, Eye, PlusCircle, Power, User, ShieldAlert,
-  Flame, HardDrive, BarChart3, Clock, XCircle
+  Flame, HardDrive, BarChart3, Clock, XCircle, ClipboardList
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { toast } from 'react-hot-toast';
@@ -258,30 +258,38 @@ export default function DashboardBombero() {
     }
   };
 
+  const fileToBase64 = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+  });
+
   const handleRegistrarSuministro = async (e) => {
     e.preventDefault();
     if (!tanqueSeleccionado) { toast.error("Seleccione un tanque de suministro"); return; }
-    if (!kilometraje || isNaN(kilometraje) || parseInt(kilometraje) <= 0) { toast.error("Ingrese un kilometraje numÃ©rico vÃ¡lido"); return; }
-    if (!litrosCargar || isNaN(litrosCargar) || parseFloat(litrosCargar) <= 0) { toast.error("Ingrese litros vÃ¡lidos"); return; }
-    if (!fotoKilometraje || !fotoMaquina) { toast.error("Debe capturar la foto del odÃ³metro y del surtidor"); return; }
+    if (!kilometraje || isNaN(kilometraje) || parseInt(kilometraje) <= 0) { toast.error("Ingrese un kilometraje numérico válido"); return; }
+    if (!litrosCargar || isNaN(litrosCargar) || parseFloat(litrosCargar) <= 0) { toast.error("Ingrese litros válidos"); return; }
+    if (!fotoKilometraje || !fotoMaquina) { toast.error("Debe capturar la foto del odómetro y del surtidor"); return; }
 
     setCargandoSuministro(true);
     try {
-      // En producciÃ³n las fotos se subirÃ­an a storage y devolverÃ­an URLs
-      // Para simular las URLs guardamos un string temporal del nombre de archivo
+      const odoB64 = await fileToBase64(fotoKilometraje);
+      const maqB64 = await fileToBase64(fotoMaquina);
+
       const payload = {
         placa: vehiculoEncontrado.placa,
         tanque_id: tanqueSeleccionado,
         kilometraje_actual: parseInt(kilometraje),
         cantidad_abastecida: parseFloat(litrosCargar),
-        foto_kilometraje_url: `https://storage.bagfm.app/combustible/odo_${vehiculoEncontrado.placa}_${Date.now()}.jpg`,
-        foto_maquina_url: `https://storage.bagfm.app/combustible/maq_${vehiculoEncontrado.placa}_${Date.now()}.jpg`,
+        foto_kilometraje_url: odoB64,
+        foto_maquina_url: maqB64,
         solicitud_aprobacion_id: solicitudVinculada ? solicitudVinculada.id : null,
         datos_ia_ocr: { kilometraje_ia: parseInt(kilometraje) }
       };
 
       const res = await combustibleService.registrarAbastecimiento(payload);
-      toast.success(res.message || "Suministro registrado con Ã©xito");
+      toast.success(res.message || "Suministro registrado con éxito");
       
       // Limpiar estados
       setVehiculoEncontrado(null);
