@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Flame, Droplet, Activity, ClipboardList, AlertTriangle, CheckCircle2, X, Camera, User } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -68,7 +68,7 @@ const FuelMonitor = () => {
         </div>
       </div>
 
-      {/* PestaÃ±as */}
+      {/* Pestañas */}
       <div className="flex items-center gap-1 bg-bg-low/40 p-1.5 mx-3 mt-3 rounded-xl border border-white/5 shrink-0">
         {TABS.map((tab) => {
           const TabIcon = tab.icon;
@@ -133,7 +133,7 @@ const FuelMonitor = () => {
                           <div>
                             <span className="text-[10px] font-black text-text-main uppercase tracking-wider block">{t.nombre}</span>
                             <span className="text-[8px] font-bold text-text-muted uppercase">
-                              {t.tipo_combustible === 'gasolina' ? 'â›½ Gasolina' : 'ðŸ›¢ï¸ DiÃ©sel'}
+                              {t.tipo_combustible === 'gasolina' ? 'â›½ Gasolina' : 'ðŸ›¢ï¸ Diésel'}
                             </span>
                           </div>
                         </div>
@@ -230,7 +230,7 @@ const FuelMonitor = () => {
                 </h4>
                 <p className="text-[9px] text-text-muted mb-4">
                   {solicitudesPendientes > 0
-                    ? `Hay ${solicitudesPendientes} solicitud(es) de abastecimiento de emergencia esperando aprobaciÃ³n.`
+                    ? `Hay ${solicitudesPendientes} solicitud(es) de abastecimiento de emergencia esperando aprobación.`
                     : 'Todas las solicitudes de emergencia han sido resueltas.'}
                 </p>
                 {solicitudesPendientes > 0 && (
@@ -287,10 +287,10 @@ const FuelMonitor = () => {
               </div>
 
               <div className="space-y-2">
-                <p className="text-[9px] font-black uppercase text-text-muted tracking-widest flex items-center gap-1.5"><Camera size={12}/> Evidencia OdÃ³metro</p>
+                <p className="text-[9px] font-black uppercase text-text-muted tracking-widest flex items-center gap-1.5"><Camera size={12}/> Evidencia Odómetro</p>
                 <div className="bg-bg-low rounded-xl border border-white/5 overflow-hidden aspect-video flex items-center justify-center">
                   {abastecimientoSeleccionado.foto_odometro ? (
-                    <img src={abastecimientoSeleccionado.foto_odometro} alt="OdÃ³metro" className="w-full h-full object-cover" />
+                    <img src={abastecimientoSeleccionado.foto_odometro} alt="Odómetro" className="w-full h-full object-cover" />
                   ) : (
                     <span className="text-[10px] text-text-muted font-bold">Sin foto</span>
                   )}

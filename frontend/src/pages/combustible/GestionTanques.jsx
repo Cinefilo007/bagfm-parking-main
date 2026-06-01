@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Flame, RefreshCw, PlusCircle, Edit3, Trash2, 
   CheckCircle, AlertTriangle, XCircle, Database, Droplet,
@@ -30,7 +30,7 @@ export default function GestionTanques() {
   });
   const [editando, setEditando] = useState(false);
 
-  // ConfirmaciÃ³n de eliminaciÃ³n
+  // Confirmación de eliminación
   const [confirmEliminar, setConfirmEliminar] = useState(null);
   const [eliminando, setEliminando] = useState(false);
 
@@ -89,7 +89,7 @@ export default function GestionTanques() {
         capacidad_maxima: parseFloat(formCrear.capacidad_maxima),
         cantidad_actual: parseFloat(formCrear.cantidad_actual) || 0
       });
-      toast.success("Tanque registrado con Ã©xito.");
+      toast.success("Tanque registrado con éxito.");
       setModalCrear(false);
       setFormCrear({ nombre: '', tipo_combustible: 'gasolina', capacidad_maxima: '', cantidad_actual: '' });
       cargarTanques();
@@ -117,7 +117,7 @@ export default function GestionTanques() {
         nombre: formEditar.nombre.trim(),
         capacidad_maxima: parseFloat(formEditar.capacidad_maxima)
       });
-      toast.success("Tanque actualizado con Ã©xito.");
+      toast.success("Tanque actualizado con éxito.");
       setModalEditar(null);
       cargarTanques();
     } catch (err) {
@@ -150,14 +150,14 @@ export default function GestionTanques() {
 
   return (
     <div className="min-h-screen dark bg-bg-app text-text-main p-4 space-y-4 font-sans">
-      {/* HEADER TÃCTICO */}
+      {/* HEADER TÁCTICO */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-bg-card border border-bg-high/50 rounded-xl p-4">
         <div>
           <div className="flex items-center gap-2">
             <div className="w-2 h-5 rounded-full bg-success animate-pulse" />
             <h1 className="text-sm font-black uppercase tracking-widest text-text-main font-mono">Tanques de Combustible</h1>
           </div>
-          <p className="text-[10px] text-text-muted uppercase tracking-wider mt-0.5">GestiÃ³n de los tanques de la bomba de combustible de la base</p>
+          <p className="text-[10px] text-text-muted uppercase tracking-wider mt-0.5">Gestión de los tanques de la bomba de combustible de la base</p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <button 
@@ -195,7 +195,7 @@ export default function GestionTanques() {
             const nivel = getNivelColor(tanque.porcentaje);
             return (
               <div key={tanque.id} className="bg-bg-card border border-bg-high/50 rounded-xl p-5 relative overflow-hidden group hover:border-bg-high transition-all">
-                {/* Glow de fondo segÃºn nivel */}
+                {/* Glow de fondo según nivel */}
                 <div className={cn(
                   "absolute -right-4 -top-4 w-32 h-32 rounded-full filter blur-3xl opacity-10 pointer-events-none",
                   tanque.porcentaje > 50 ? 'bg-emerald-500' : tanque.porcentaje > 20 ? 'bg-amber-500' : 'bg-red-500'
@@ -270,7 +270,7 @@ export default function GestionTanques() {
       <div className="bg-warning/10 border border-warning/30 rounded-xl p-4 flex gap-3 text-warning">
         <AlertTriangle className="shrink-0 mt-0.5" size={16} />
         <p className="text-[10px] font-medium leading-relaxed">
-          <strong className="font-black">Nota de seguridad:</strong> La cantidad actual de cada tanque se actualiza automÃ¡ticamente con la lectura semanal del bombero y los abastecimientos realizados a los vehÃ­culos. No es posible modificarla directamente desde esta vista.
+          <strong className="font-black">Nota de seguridad:</strong> La cantidad actual de cada tanque se actualiza automáticamente con la lectura semanal del bombero y los abastecimientos realizados a los vehículos. No es posible modificarla directamente desde esta vista.
         </p>
       </div>
 
@@ -317,7 +317,7 @@ export default function GestionTanques() {
             <thead>
               <tr className="border-b border-white/5 bg-bg-low/30">
                 <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted">Fecha</th>
-                <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted">VehÃ­culo</th>
+                <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted">Vehículo</th>
                 <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted">Entidad</th>
                 <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted text-right">Litros</th>
                 <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted">Responsable</th>
@@ -415,7 +415,7 @@ export default function GestionTanques() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-[8px] font-black uppercase text-text-muted tracking-widest flex items-center gap-1">
-                    <Droplet size={10} /> Capacidad MÃƒÂ¡x. (L) *
+                    <Droplet size={10} /> Capacidad Máx. (L) *
                   </label>
                   <input
                     type="number"
@@ -457,7 +457,7 @@ export default function GestionTanques() {
         </div>
       )}
 
-      {/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ MODAL EDITAR TANQUE Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
+      {/* ââ€â‚¬ââ€â‚¬ââ€â‚¬ MODAL EDITAR TANQUE ââ€â‚¬ââ€â‚¬ââ€â‚¬ */}
       {modalEditar && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-bg-card border border-bg-high/50 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
@@ -482,7 +482,7 @@ export default function GestionTanques() {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Capacidad MÃƒÂ¡xima (Litros)</label>
+                <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Capacidad Máxima (Litros)</label>
                 <input
                   type="number"
                   step="0.1"
@@ -497,7 +497,7 @@ export default function GestionTanques() {
               <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 flex items-start gap-2">
                 <AlertTriangle size={14} className="text-amber-400 shrink-0 mt-0.5" />
                 <p className="text-[9px] text-text-muted leading-relaxed">
-                  La <strong className="text-amber-400">cantidad actual</strong> ({modalEditar.cantidad_actual.toLocaleString('es-ES', { maximumFractionDigits: 1 })} L) no es editable desde aquÃƒÂ­. Se actualiza automÃƒÂ¡ticamente por lectura semanal y abastecimientos.
+                  La <strong className="text-amber-400">cantidad actual</strong> ({modalEditar.cantidad_actual.toLocaleString('es-ES', { maximumFractionDigits: 1 })} L) no es editable desde aquí. Se actualiza automáticamente por lectura semanal y abastecimientos.
                 </p>
               </div>
 
@@ -514,7 +514,7 @@ export default function GestionTanques() {
         </div>
       )}
 
-      {/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ MODAL CONFIRMAR ELIMINAR Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
+      {/* ââ€â‚¬ââ€â‚¬ââ€â‚¬ MODAL CONFIRMAR ELIMINAR ââ€â‚¬ââ€â‚¬ââ€â‚¬ */}
       {confirmEliminar && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-bg-card border border-red-500/30 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
@@ -525,7 +525,7 @@ export default function GestionTanques() {
               <div>
                 <h3 className="text-sm font-black uppercase tracking-widest text-text-main mb-1">Desactivar Tanque</h3>
                 <p className="text-xs text-text-muted">
-                  Ã‚Â¿EstÃƒÂ¡ seguro que desea desactivar el tanque <strong className="text-red-400">"{confirmEliminar.nombre}"</strong>?
+                  ¿Está seguro que desea desactivar el tanque <strong className="text-red-400">"{confirmEliminar.nombre}"</strong>?
                 </p>
                 <p className="text-[9px] text-text-muted mt-2 italic">
                   No se puede desactivar si tiene abastecimientos vinculados esta semana.

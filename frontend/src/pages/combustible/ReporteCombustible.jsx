@@ -3,6 +3,7 @@ import {
   BarChart3, Calendar, Compass, RefreshCw, AlertTriangle, 
   Droplet, Database, User, ShieldAlert, Award, FileText, Search
 } from 'lucide-react';
+import { cn } from '../../lib/utils';
 import { toast } from 'react-hot-toast';
 import { combustibleService } from '../../services/combustible.service';
 import { entidadService } from '../../services/entidad.service';
@@ -221,7 +222,7 @@ export default function ReporteCombustible() {
               </div>
             </div>
 
-            {/* KPI 4: DIESEL */}
+            {/* KPI 4: Diésel */}
             <div className="bg-bg-card border border-bg-high/50 rounded-xl p-4">
               <div className="flex justify-between items-start mb-2">
                 <div>
