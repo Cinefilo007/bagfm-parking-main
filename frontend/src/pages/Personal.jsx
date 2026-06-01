@@ -730,7 +730,7 @@ export default function Personal() {
             Fuerza de Tareas
           </h1>
           <p className="text-text-muted text-sm mt-1 flex items-center gap-1.5 px-1 font-bold">
-            <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", personal.length > 0 ? "bg-success animate-pulse" : "bg-text-muted")} />
+            <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", todoElPersonal.length > 0 ? "bg-success animate-pulse" : "bg-text-muted")} />
             Gestión de personal operativo — Operación Activa
           </p>
         </div>
