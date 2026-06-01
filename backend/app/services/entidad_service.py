@@ -354,20 +354,53 @@ class EntidadCivilService:
         user_ids = [row[0] for row in res_usuarios.all()]
         
         try:
+            # Importaciones locales para evitar dependencias circulares
+            from app.models.alcabala_evento import LotePaseMasivo
+            from app.models.infraccion import Infraccion
+
             # 3. Purga secuencial para evitar errores de FK
             if user_ids:
                 # Borrar Accesos (donde el usuario es visitante o parquero de la entidad)
                 await db.execute(delete(Acceso).where(Acceso.usuario_id.in_(user_ids)))
                 # Borrar Códigos QR
                 await db.execute(delete(CodigoQR).where(CodigoQR.usuario_id.in_(user_ids)))
-                # Borrar Membresías
-                await db.execute(delete(Membresia).where(Membresia.entidad_id == entidad_id))
-                # Borrar Eventos
-                await db.execute(delete(SolicitudEvento).where(SolicitudEvento.entidad_id == entidad_id))
+                
+            # Borrar Membresías
+            await db.execute(delete(Membresia).where(Membresia.entidad_id == entidad_id))
+            # Borrar Eventos (Solicitudes de evento)
+            await db.execute(delete(SolicitudEvento).where(SolicitudEvento.entidad_id == entidad_id))
+            
+            # Desvincular e inactivar Vehículos ligados directamente a la entidad (evita restricción RESTRICT)
+            await db.execute(
+                update(Vehiculo)
+                .where(Vehiculo.entidad_id == entidad_id)
+                .values(entidad_id=None, activo=False)
+            )
+            
+            if user_ids:
                 # Borrar Vehículos asociados a esos usuarios (SOFT DELETE)
                 await db.execute(update(Vehiculo).where(Vehiculo.socio_id.in_(user_ids)).values(activo=False))
-                # Borrar Usuarios definidos para esta entidad (SOFT DELETE)
-                await db.execute(update(Usuario).where(Usuario.entidad_id == entidad_id).values(is_deleted=True, activo=False))
+                
+            # Desvincular Lotes de pases masivos de esta entidad (evita restricción RESTRICT)
+            await db.execute(
+                update(LotePaseMasivo)
+                .where(LotePaseMasivo.entidad_id == entidad_id)
+                .values(entidad_id=None)
+            )
+            
+            # Desvincular Infracciones de esta entidad (evita restricción RESTRICT)
+            await db.execute(
+                update(Infraccion)
+                .where(Infraccion.entidad_id == entidad_id)
+                .values(entidad_id=None)
+            )
+            
+            # Borrar Usuarios definidos para esta entidad (SOFT DELETE y desvinculación de entidad)
+            await db.execute(
+                update(Usuario)
+                .where(Usuario.entidad_id == entidad_id)
+                .values(is_deleted=True, activo=False, entidad_id=None)
+            )
             
             # 4. Finalmente, borrar la entidad
             await db.execute(delete(EntidadCivil).where(EntidadCivil.id == entidad_id))
