@@ -58,7 +58,8 @@ class PersonalService:
                 RolTipo.ADMIN_ENTIDAD,
                 RolTipo.PARQUERO,
                 RolTipo.SUPERVISOR_PARQUEROS,
-                RolTipo.ALCABALA
+                RolTipo.ALCABALA,
+                RolTipo.BOMBERO
             ]))
         elif usuario_actual.rol == RolTipo.ADMIN_ENTIDAD:
             query = query.where(

@@ -607,10 +607,9 @@ export default function Personal() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const skip = page * limit;
-      const data = await personalService.listar({ skip, limit, search });
+      const data = await personalService.listar({ skip: 0, limit: 1000, search });
       setPersonal(data);
-      setHasMore(data.length === limit);
+      setHasMore(data.length > (page + 1) * limit);
 
       if (['COMANDANTE', 'ADMIN_BASE'].includes(userActual.rol)) {
         try { const res = await api.get('/entidades'); setEntidades(res.data); } catch {}
@@ -744,7 +743,7 @@ export default function Personal() {
           ))
         ) : (
           <>
-            {personal.map(miembro => (
+            {personal.slice(page * limit, (page + 1) * limit).map(miembro => (
               <MiembroCard 
                 key={miembro.id}
                 miembro={miembro}
@@ -768,7 +767,7 @@ export default function Personal() {
         )}
       </section>
 
-      {!loading && (personal.length > 0 || page > 0) && (
+      {!loading && (personal.length > limit || page > 0) && (
         <div className="flex items-center justify-between pt-6 border-t border-white/5 mt-4">
           <Boton variant="ghost" disabled={page === 0} onClick={() => setPage(p => Math.max(0, p - 1))}
             className="gap-2 text-[10px] font-black uppercase tracking-widest disabled:opacity-30">

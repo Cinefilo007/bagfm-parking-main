@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   Car, RefreshCw, Upload, Edit3, Settings, ShieldAlert,
   CheckCircle, AlertTriangle, XCircle, Search, ToggleLeft, ToggleRight,
-  Database, Flame, FileSpreadsheet, PlusCircle, Download
+  Database, Flame, FileSpreadsheet, PlusCircle, Download,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { toast } from 'react-hot-toast';
@@ -18,6 +19,10 @@ export default function ParqueAutomotor() {
   // Filtros
   const [filtroEntidad, setFiltroEntidad] = useState('');
   const [placaBusqueda, setPlacaBusqueda] = useState('');
+
+  // Paginación
+  const [page, setPage] = useState(0);
+  const limit = 10;
 
   // Edición de límites de Entidad
   const [entidadSeleccionadaData, setEntidadSeleccionadaData] = useState(null);
@@ -100,6 +105,7 @@ export default function ParqueAutomotor() {
 
   const handleBuscar = (e) => {
     e.preventDefault();
+    setPage(0);
     cargarVehiculos();
   };
 
@@ -402,7 +408,7 @@ export default function ParqueAutomotor() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-bg-high/20 text-[11px] font-sans">
-                {vehiculos.map(v => (
+                {vehiculos.slice(page * limit, (page + 1) * limit).map(v => (
                   <tr key={v.id} className="hover:bg-bg-low/30 transition-all">
                     <td className="py-3 px-3 font-display font-black text-text-main tracking-wider">{v.placa}</td>
                     <td className="py-3 px-3 text-text-sec">
@@ -455,6 +461,28 @@ export default function ParqueAutomotor() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {!cargandoVehiculos && vehiculos.length > limit && (
+          <div className="flex items-center justify-between pt-4 mt-4 border-t border-bg-high/20">
+            <button 
+              disabled={page === 0} 
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-text-muted hover:text-text-main disabled:opacity-30 transition-all cursor-pointer"
+            >
+              <ChevronLeft size={14} /> Anterior
+            </button>
+            <div className="flex flex-col items-center">
+              <span className="text-xs font-display font-black text-success">PÁGINA {page + 1}</span>
+            </div>
+            <button 
+              disabled={vehiculos.length <= (page + 1) * limit} 
+              onClick={() => setPage(p => p + 1)}
+              className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-text-muted hover:text-text-main disabled:opacity-30 transition-all cursor-pointer"
+            >
+              Siguiente <ChevronRight size={14} />
+            </button>
           </div>
         )}
       </div>

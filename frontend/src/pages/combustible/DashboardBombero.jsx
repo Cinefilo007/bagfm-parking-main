@@ -111,7 +111,7 @@ export default function DashboardBombero() {
     setCargandoLectura(true);
     try {
       for (const [tanqueId, cant] of Object.entries(lecturasForm)) {
-        if (!cant || isNaN(cant) || float(cant) < 0) {
+        if (!cant || isNaN(cant) || parseFloat(cant) < 0) {
           toast.error("Ingrese cantidades válidas en litros para todos los tanques");
           setCargandoLectura(false);
           return;
