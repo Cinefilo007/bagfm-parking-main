@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Flame, Droplet, Activity, ClipboardList, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Flame, Droplet, Activity, ClipboardList, AlertTriangle, CheckCircle2, X, Camera, User } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { combustibleService } from '../../services/combustible.service';
 
@@ -19,6 +19,7 @@ const FuelMonitor = () => {
   const [kpis, setKpis] = useState(null);
   const [vistaMonitor, setVistaMonitor] = useState('tanques');
   const [cargando, setCargando] = useState(true);
+  const [abastecimientoSeleccionado, setAbastecimientoSeleccionado] = useState(null);
 
   const fetchKpis = async () => {
     try {
@@ -167,8 +168,9 @@ const FuelMonitor = () => {
                 ) : ultimos.map((a, i) => (
                   <div 
                     key={a.id || i}
+                    onClick={() => setAbastecimientoSeleccionado(a)}
                     className={cn(
-                      "flex items-start gap-2 p-2.5 rounded-xl border transition-all",
+                      "flex items-start gap-2 p-2.5 rounded-xl border transition-all cursor-pointer",
                       a.tiene_alerta 
                         ? "bg-red-500/[0.06] border-red-500/20 hover:bg-red-500/[0.1]"
                         : "bg-white/[0.02] border-bg-high/10 hover:bg-white/[0.04]"
@@ -188,12 +190,12 @@ const FuelMonitor = () => {
                         <span className="text-[8px] font-bold text-text-muted">{formatTimeAgo(a.fecha)}</span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-[8px] text-text-muted truncate">{a.bombero}</span>
+                        <span className="text-[8px] text-text-muted truncate">{a.entidad || 'Sin Entidad'} - {a.marca} {a.modelo}</span>
                         <span className={cn(
                           "text-[9px] font-display font-black",
                           a.tiene_alerta ? 'text-red-400' : 'text-emerald-400'
                         )}>
-                          {a.litros.toFixed(1)} L
+                          {Number(a.litros).toFixed(1)} L
                         </span>
                       </div>
                       {a.tiene_alerta && (
@@ -255,6 +257,61 @@ const FuelMonitor = () => {
           <div className="flex-1 bg-emerald-500/40 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.3)] delay-150" />
         </div>
       </div>
+
+      {/* Modal Abastecimiento Detalles */}
+      {abastecimientoSeleccionado && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-bg-card border border-white/10 rounded-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-white/5 flex justify-between items-center bg-bg-high/10">
+              <div>
+                <h3 className="text-sm font-black text-text-main font-display">DETALLES SUMINISTRO</h3>
+                <p className="text-[10px] text-text-muted">{abastecimientoSeleccionado.placa} • {formatTimeAgo(abastecimientoSeleccionado.fecha)}</p>
+              </div>
+              <button 
+                onClick={() => setAbastecimientoSeleccionado(null)}
+                className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-text-muted hover:text-white transition-all"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto scrollbar-tactical space-y-4">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-bg-low p-2.5 rounded-xl border border-white/5">
+                  <p className="text-[9px] font-black uppercase text-text-muted mb-1">Litros Surtidos</p>
+                  <p className="text-xl font-black font-display text-emerald-400">{Number(abastecimientoSeleccionado.litros).toFixed(1)} L</p>
+                </div>
+                <div className="bg-bg-low p-2.5 rounded-xl border border-white/5">
+                  <p className="text-[9px] font-black uppercase text-text-muted mb-1">Responsable</p>
+                  <p className="text-[11px] font-bold text-text-main flex items-center gap-1.5"><User size={12} className="text-text-muted" /> {abastecimientoSeleccionado.bombero}</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-[9px] font-black uppercase text-text-muted tracking-widest flex items-center gap-1.5"><Camera size={12}/> Evidencia Odómetro</p>
+                <div className="bg-bg-low rounded-xl border border-white/5 overflow-hidden aspect-video flex items-center justify-center">
+                  {abastecimientoSeleccionado.foto_odometro ? (
+                    <img src={abastecimientoSeleccionado.foto_odometro} alt="Odómetro" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-[10px] text-text-muted font-bold">Sin foto</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-[9px] font-black uppercase text-text-muted tracking-widest flex items-center gap-1.5"><Camera size={12}/> Evidencia Surtidor</p>
+                <div className="bg-bg-low rounded-xl border border-white/5 overflow-hidden aspect-video flex items-center justify-center">
+                  {abastecimientoSeleccionado.foto_surtidor ? (
+                    <img src={abastecimientoSeleccionado.foto_surtidor} alt="Surtidor" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-[10px] text-text-muted font-bold">Sin foto</span>
+                  )}
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

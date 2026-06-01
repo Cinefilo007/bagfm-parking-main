@@ -21,6 +21,7 @@ export default function DashboardBombero() {
 
   // Estados de búsqueda y suministro
   const [placaBusqueda, setPlacaBusqueda] = useState('');
+  const [placaNoEncontrada, setPlacaNoEncontrada] = useState(false);
   const [buscandoVehiculo, setBuscandoVehiculo] = useState(false);
   const [vehiculoEncontrado, setVehiculoEncontrado] = useState(null);
   
@@ -139,6 +140,7 @@ export default function DashboardBombero() {
     
     setBuscandoVehiculo(true);
     setVehiculoEncontrado(null);
+    setPlacaNoEncontrada(false);
     setSolicitudVinculada(null);
     setFotoKilometraje(null);
     setFotoKilometrajeUrl('');
@@ -159,7 +161,12 @@ export default function DashboardBombero() {
         toast.error("Cupo de combustible semanal de la entidad agotado.");
       }
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Error al buscar vehículo");
+      if (err.response?.status === 404) {
+        setPlacaNoEncontrada(true);
+        toast.error("Vehículo no registrado. Puede solicitar suministro especial.");
+      } else {
+        toast.error(err.response?.data?.detail || "Error al buscar vehículo");
+      }
     } finally {
       setBuscandoVehiculo(false);
     }
@@ -460,23 +467,25 @@ export default function DashboardBombero() {
                   <button
                     type="submit"
                     disabled={buscandoVehiculo || !placaBusqueda.trim()}
-                    className="w-14 h-14 bg-success/10 border border-success/30 rounded-xl flex items-center justify-center text-success hover:bg-success/20 active:scale-95 transition-all disabled:opacity-50"
+                    className="w-14 h-14 shrink-0 bg-success/10 border border-success/30 rounded-xl flex items-center justify-center text-success hover:bg-success/20 active:scale-95 transition-all disabled:opacity-50"
                   >
                     {buscandoVehiculo ? <RefreshCw size={20} className="animate-spin" /> : <Car size={20} />}
                   </button>
                 </div>
                 
                 {/* Botón de solicitud directa para no registrados / emergencia */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFormSolicitud({ ...formSolicitud, placa: placaBusqueda.toUpperCase() });
-                    setModalSolicitud(true);
-                  }}
-                  className="w-full h-10 rounded-xl bg-white/5 border border-white/10 text-text-sec text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all flex items-center justify-center gap-1.5"
-                >
-                  <PlusCircle size={13} /> Suministro Especial / Emergencia
-                </button>
+                {placaNoEncontrada && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormSolicitud({ ...formSolicitud, placa: placaBusqueda.toUpperCase() });
+                      setModalSolicitud(true);
+                    }}
+                    className="w-full h-10 rounded-xl bg-white/5 border border-white/10 text-text-sec text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <PlusCircle size={13} /> Suministro Especial / Emergencia
+                  </button>
+                )}
               </form>
             )}
 

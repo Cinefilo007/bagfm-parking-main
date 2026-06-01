@@ -699,7 +699,10 @@ async def obtener_dashboard_kpis(
         # 7. Últimos 15 abastecimientos
         q_ultimos = (
             select(Abastecimiento)
-            .options(selectinload(Abastecimiento.vehiculo), selectinload(Abastecimiento.bombero))
+            .options(
+                selectinload(Abastecimiento.vehiculo).selectinload(Vehiculo.entidad), 
+                selectinload(Abastecimiento.bombero)
+            )
             .order_by(Abastecimiento.fecha.desc())
             .limit(15)
         )
@@ -709,11 +712,16 @@ async def obtener_dashboard_kpis(
         ultimos_data = [
             {
                 "id": str(a.id),
-                "placa": a.vehiculo.placa if a.vehiculo else "—",
-                "bombero": f"{a.bombero.nombre} {a.bombero.apellido}" if a.bombero else "—",
+                "placa": a.vehiculo.placa if a.vehiculo else "?",
+                "marca": a.vehiculo.marca if a.vehiculo else "?",
+                "modelo": a.vehiculo.modelo if a.vehiculo else "?",
+                "entidad": a.vehiculo.entidad.nombre if a.vehiculo and getattr(a.vehiculo, 'entidad', None) else "SIN ENTIDAD",
+                "bombero": f"{a.bombero.nombre} {a.bombero.apellido}" if a.bombero else "?",
                 "litros": a.cantidad_abastecida,
                 "fecha": a.fecha.isoformat(),
-                "tiene_alerta": a.tiene_alerta
+                "tiene_alerta": a.tiene_alerta,
+                "foto_odometro": a.foto_kilometraje_url,
+                "foto_surtidor": a.foto_maquina_url
             } for a in ultimos
         ]
 

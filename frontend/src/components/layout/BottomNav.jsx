@@ -61,6 +61,11 @@ export const BottomNav = () => {
       { to: '/socio/accesos',      label: 'Accesos',      icon: ArrowRightLeft },
       { to: '/ajustes',            label: 'Perfil',       icon: IdCard }
     );
+  } else if (user?.rol === 'BOMBERO') {
+    navItems.push(
+      { to: '/combustible/dashboard', label: 'Inicio', icon: ShieldCheck },
+      { to: '/ajustes', label: 'Perfil', icon: IdCard }
+    );
   } else {
     navItems.push(
       { to: '/ajustes', label: 'Perfil', icon: IdCard }
