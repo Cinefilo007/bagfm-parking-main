@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Flame, RefreshCw, PlusCircle, Edit3, Trash2, 
-  CheckCircle, AlertTriangle, XCircle, Database, Droplet
+  CheckCircle, AlertTriangle, XCircle, Database, Droplet,
+  ClipboardList, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { toast } from 'react-hot-toast';
@@ -33,9 +34,34 @@ export default function GestionTanques() {
   const [confirmEliminar, setConfirmEliminar] = useState(null);
   const [eliminando, setEliminando] = useState(false);
 
+  // Historial General Paginado
+  const [historial, setHistorial] = useState([]);
+  const [cargandoHistorial, setCargandoHistorial] = useState(true);
+  const [pagina, setPagina] = useState(0);
+  const [totalHistorial, setTotalHistorial] = useState(0);
+  const limit = 10;
+
   useEffect(() => {
     cargarTanques();
   }, []);
+
+  useEffect(() => {
+    cargarHistorial();
+  }, [pagina]);
+
+  const cargarHistorial = async () => {
+    setCargandoHistorial(true);
+    try {
+      const skip = pagina * limit;
+      const res = await combustibleService.obtenerHistorialAbastecimientos(skip, limit);
+      setHistorial(res.data || []);
+      setTotalHistorial(res.total || 0);
+    } catch (e) {
+      console.error("Error al cargar historial:", e);
+    } finally {
+      setCargandoHistorial(false);
+    }
+  };
 
   const cargarTanques = async () => {
     setCargando(true);
@@ -129,7 +155,7 @@ export default function GestionTanques() {
         <div>
           <div className="flex items-center gap-2">
             <div className="w-2 h-5 rounded-full bg-success animate-pulse" />
-            <h1 className="text-sm font-black uppercase tracking-widest text-text-main font-mono">Aegis Fuel: Tanques de Combustible</h1>
+            <h1 className="text-sm font-black uppercase tracking-widest text-text-main font-mono">Tanques de Combustible</h1>
           </div>
           <p className="text-[10px] text-text-muted uppercase tracking-wider mt-0.5">Gestión de los tanques de la bomba de combustible de la base</p>
         </div>
@@ -241,14 +267,110 @@ export default function GestionTanques() {
       )}
 
       {/* NOTA INFORMATIVA */}
-      <div className="bg-bg-card border border-bg-high/50 rounded-xl p-4 flex items-start gap-3">
-        <AlertTriangle size={16} className="text-amber-400 shrink-0 mt-0.5" />
-        <p className="text-[10px] text-text-muted leading-relaxed">
-          <strong className="text-text-sec">Nota de seguridad:</strong> La cantidad actual de cada tanque se actualiza automáticamente con la lectura semanal del bombero y los abastecimientos realizados a los vehículos. No es posible modificarla directamente desde esta vista.
+      <div className="bg-warning/10 border border-warning/30 rounded-xl p-4 flex gap-3 text-warning">
+        <AlertTriangle className="shrink-0 mt-0.5" size={16} />
+        <p className="text-[10px] font-medium leading-relaxed">
+          <strong className="font-black">Nota de seguridad:</strong> La cantidad actual de cada tanque se actualiza automáticamente con la lectura semanal del bombero y los abastecimientos realizados a los vehículos. No es posible modificarla directamente desde esta vista.
         </p>
       </div>
 
-      {/* ─── MODAL CREAR TANQUE ─── */}
+      {/* Historial General Paginado */}
+      <div className="bg-bg-card border border-white/5 shadow-2xl rounded-2xl overflow-hidden mt-6">
+        <div className="p-4 border-b border-white/5 flex flex-col md:flex-row justify-between md:items-center gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center border border-success/20">
+              <ClipboardList size={20} className="text-success" />
+            </div>
+            <div>
+              <h3 className="font-black text-text-main tracking-wide">Historial General</h3>
+              <p className="text-[10px] text-text-muted mt-0.5">Registro de todos los abastecimientos realizados en la base</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <button 
+              disabled={pagina === 0 || cargandoHistorial}
+              onClick={() => setPagina(p => p - 1)}
+              className="w-10 h-10 rounded-xl border border-white/5 bg-bg-low flex items-center justify-center hover:bg-white/5 text-text-muted hover:text-text-main disabled:opacity-50 transition-all"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <div className="h-10 px-4 rounded-xl border border-white/5 bg-bg-low flex items-center justify-center text-xs font-black text-text-main font-mono">
+              {cargandoHistorial ? (
+                <RefreshCw size={14} className="animate-spin text-text-muted" />
+              ) : (
+                `${pagina + 1} / ${Math.max(1, Math.ceil(totalHistorial / limit))}`
+              )}
+            </div>
+            <button 
+              disabled={(pagina + 1) * limit >= totalHistorial || cargandoHistorial}
+              onClick={() => setPagina(p => p + 1)}
+              className="w-10 h-10 rounded-xl border border-white/5 bg-bg-low flex items-center justify-center hover:bg-white/5 text-text-muted hover:text-text-main disabled:opacity-50 transition-all"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-white/5 bg-bg-low/30">
+                <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted">Fecha</th>
+                <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted">Vehículo</th>
+                <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted">Entidad</th>
+                <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted text-right">Litros</th>
+                <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted">Responsable</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {cargandoHistorial ? (
+                <tr>
+                  <td colSpan="5" className="px-4 py-8 text-center text-text-muted">
+                    <RefreshCw size={24} className="animate-spin mx-auto mb-2 opacity-50" />
+                    <p className="text-xs uppercase tracking-widest font-black">Cargando Historial...</p>
+                  </td>
+                </tr>
+              ) : historial.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="px-4 py-8 text-center text-text-muted text-xs uppercase tracking-widest font-black">
+                    No hay registros de abastecimiento.
+                  </td>
+                </tr>
+              ) : (
+                historial.map(h => (
+                  <tr key={h.id} className="hover:bg-white/5 transition-colors">
+                    <td className="px-4 py-3">
+                      <span className="text-xs font-mono text-text-sec">
+                        {new Date(h.fecha).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="text-xs font-black text-text-main tracking-wider">{h.placa}</p>
+                      <p className="text-[10px] text-text-muted truncate max-w-[150px]">{h.marca} {h.modelo}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-[10px] font-bold text-text-sec uppercase tracking-wider">{h.entidad}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className="text-sm font-black text-emerald-400 font-mono">
+                        {Number(h.litros).toFixed(1)} L
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-[10px] font-bold text-text-muted uppercase truncate max-w-[120px] block">
+                        {h.bombero}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* --- MODAL CREAR TANQUE --- */}
       {modalCrear && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-bg-card border border-bg-high/50 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
@@ -285,15 +407,15 @@ export default function GestionTanques() {
                   onChange={(e) => setFormCrear(p => ({ ...p, tipo_combustible: e.target.value }))}
                   className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-bold"
                 >
-                  <option value="gasolina">⛽ Gasolina</option>
-                  <option value="diesel">🛢️ Diésel</option>
+                  <option value="gasolina">â›½ Gasolina</option>
+                  <option value="diesel">ðŸ›¢ï¸ DiÃ©sel</option>
                 </select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-[8px] font-black uppercase text-text-muted tracking-widest flex items-center gap-1">
-                    <Droplet size={10} /> Capacidad Máx. (L) *
+                    <Droplet size={10} /> Capacidad MÃ¡x. (L) *
                   </label>
                   <input
                     type="number"
@@ -335,7 +457,7 @@ export default function GestionTanques() {
         </div>
       )}
 
-      {/* ─── MODAL EDITAR TANQUE ─── */}
+      {/* â”€â”€â”€ MODAL EDITAR TANQUE â”€â”€â”€ */}
       {modalEditar && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-bg-card border border-bg-high/50 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
@@ -360,7 +482,7 @@ export default function GestionTanques() {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Capacidad Máxima (Litros)</label>
+                <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Capacidad MÃ¡xima (Litros)</label>
                 <input
                   type="number"
                   step="0.1"
@@ -375,7 +497,7 @@ export default function GestionTanques() {
               <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 flex items-start gap-2">
                 <AlertTriangle size={14} className="text-amber-400 shrink-0 mt-0.5" />
                 <p className="text-[9px] text-text-muted leading-relaxed">
-                  La <strong className="text-amber-400">cantidad actual</strong> ({modalEditar.cantidad_actual.toLocaleString('es-ES', { maximumFractionDigits: 1 })} L) no es editable desde aquí. Se actualiza automáticamente por lectura semanal y abastecimientos.
+                  La <strong className="text-amber-400">cantidad actual</strong> ({modalEditar.cantidad_actual.toLocaleString('es-ES', { maximumFractionDigits: 1 })} L) no es editable desde aquÃ­. Se actualiza automÃ¡ticamente por lectura semanal y abastecimientos.
                 </p>
               </div>
 
@@ -392,7 +514,7 @@ export default function GestionTanques() {
         </div>
       )}
 
-      {/* ─── MODAL CONFIRMAR ELIMINAR ─── */}
+      {/* â”€â”€â”€ MODAL CONFIRMAR ELIMINAR â”€â”€â”€ */}
       {confirmEliminar && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-bg-card border border-red-500/30 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
@@ -403,7 +525,7 @@ export default function GestionTanques() {
               <div>
                 <h3 className="text-sm font-black uppercase tracking-widest text-text-main mb-1">Desactivar Tanque</h3>
                 <p className="text-xs text-text-muted">
-                  ¿Está seguro que desea desactivar el tanque <strong className="text-red-400">"{confirmEliminar.nombre}"</strong>?
+                  Â¿EstÃ¡ seguro que desea desactivar el tanque <strong className="text-red-400">"{confirmEliminar.nombre}"</strong>?
                 </p>
                 <p className="text-[9px] text-text-muted mt-2 italic">
                   No se puede desactivar si tiene abastecimientos vinculados esta semana.
@@ -432,3 +554,4 @@ export default function GestionTanques() {
     </div>
   );
 }
+

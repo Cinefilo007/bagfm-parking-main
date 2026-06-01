@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { 
   Car, Compass, RefreshCw, AlertTriangle, CheckCircle2, 
   Send, Camera, Eye, PlusCircle, Power, User, ShieldAlert,
@@ -14,16 +14,20 @@ export default function DashboardBombero() {
   const [tieneLecturaSemana, setTieneLecturaSemana] = useState(true);
   const [cargandoTanques, setCargandoTanques] = useState(true);
   
-  // Estado para la declaración inicial de inventario
+  // Estado para la declaraciÃ³n inicial de inventario
   const [declarandoInventario, setDeclarandoInventario] = useState(false);
   const [lecturasForm, setLecturasForm] = useState({});
   const [cargandoLectura, setCargandoLectura] = useState(false);
 
-  // Estados de búsqueda y suministro
+  // Estados de bÃºsqueda y suministro
   const [placaBusqueda, setPlacaBusqueda] = useState('');
   const [placaNoEncontrada, setPlacaNoEncontrada] = useState(false);
   const [buscandoVehiculo, setBuscandoVehiculo] = useState(false);
   const [vehiculoEncontrado, setVehiculoEncontrado] = useState(null);
+  
+  // Historial Bombero
+  const [historialBombero, setHistorialBombero] = useState([]);
+  const [cargandoHistorial, setCargandoHistorial] = useState(false);
   
   // Formulario de Abastecimiento
   const [kilometraje, setKilometraje] = useState('');
@@ -62,14 +66,27 @@ export default function DashboardBombero() {
   });
   const [enviandoSolicitud, setEnviandoSolicitud] = useState(false);
 
-  // Refs para inputs de cámara forzada
+  // Refs para inputs de cÃ¡mara forzada
   const fileOdoRef = useRef(null);
   const fileMaquinaRef = useRef(null);
 
   useEffect(() => {
     cargarDatosTanques();
     cargarBandejaSolicitudes();
+    cargarHistorialBombero();
   }, []);
+
+  const cargarHistorialBombero = async () => {
+    setCargandoHistorial(true);
+    try {
+      const res = await combustibleService.obtenerHistorialBombero(5);
+      setHistorialBombero(res.data || []);
+    } catch (err) {
+      console.error("Error cargando historial bombero:", err);
+    } finally {
+      setCargandoHistorial(false);
+    }
+  };
 
   const cargarDatosTanques = async () => {
     setCargandoTanques(true);
@@ -79,7 +96,7 @@ export default function DashboardBombero() {
       setTieneLecturaSemana(res.tiene_lectura_semana);
       if (res.data && res.data.length > 0) {
         setTanqueSeleccionado(res.data[0].id);
-        // Pre-rellenar formulario de declaración si aplica
+        // Pre-rellenar formulario de declaraciÃ³n si aplica
         const formInit = {};
         res.data.forEach(t => {
           formInit[t.id] = '';
@@ -113,17 +130,17 @@ export default function DashboardBombero() {
     try {
       for (const [tanqueId, cant] of Object.entries(lecturasForm)) {
         if (!cant || isNaN(cant) || parseFloat(cant) < 0) {
-          toast.error("Ingrese cantidades válidas en litros para todos los tanques");
+          toast.error("Ingrese cantidades vÃ¡lidas en litros para todos los tanques");
           setCargandoLectura(false);
           return;
         }
         await combustibleService.registrarLecturaInicial({
           tanque_id: tanqueId,
           cantidad_medida: parseFloat(cant),
-          observaciones: "Declaración inicial de inicio de turno/semana"
+          observaciones: "DeclaraciÃ³n inicial de inicio de turno/semana"
         });
       }
-      toast.success("Inventario inicial declarado con éxito. Bomba lista.");
+      toast.success("Inventario inicial declarado con Ã©xito. Bomba lista.");
       setTieneLecturaSemana(true);
       cargarDatosTanques();
     } catch (err) {
@@ -136,7 +153,7 @@ export default function DashboardBombero() {
   const handleBuscarPlaca = async (e) => {
     if (e) e.preventDefault();
     const placa = placaBusqueda.trim().toUpperCase();
-    if (!placa) { toast.error("Ingrese una placa válida"); return; }
+    if (!placa) { toast.error("Ingrese una placa vÃ¡lida"); return; }
     
     setBuscandoVehiculo(true);
     setVehiculoEncontrado(null);
@@ -156,16 +173,16 @@ export default function DashboardBombero() {
         setLitrosCargar(datos.capacidad_tanque); // sugerir tanque lleno
       }
       if (!datos.autorizado) {
-        toast.error("Vehículo NO autorizado permanentemente para combustible.");
+        toast.error("VehÃ­culo NO autorizado permanentemente para combustible.");
       } else if (datos.cupo_entidad_excedido) {
         toast.error("Cupo de combustible semanal de la entidad agotado.");
       }
     } catch (err) {
       if (err.response?.status === 404) {
         setPlacaNoEncontrada(true);
-        toast.error("Vehículo no registrado. Puede solicitar suministro especial.");
+        toast.error("VehÃ­culo no registrado. Puede solicitar suministro especial.");
       } else {
-        toast.error(err.response?.data?.detail || "Error al buscar vehículo");
+        toast.error(err.response?.data?.detail || "Error al buscar vehÃ­culo");
       }
     } finally {
       setBuscandoVehiculo(false);
@@ -190,13 +207,13 @@ export default function DashboardBombero() {
       setKilometraje('');
       toast.success(`Cargando suministro especial para placa ${sol.placa}`);
     } catch (err) {
-      toast.error("Error al obtener datos del vehículo");
+      toast.error("Error al obtener datos del vehÃ­culo");
     } finally {
       setBuscandoVehiculo(false);
     }
   };
 
-  // Capturar foto desde cámara nativa
+  // Capturar foto desde cÃ¡mara nativa
   const handleFotoChange = async (e, tipo) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -204,7 +221,7 @@ export default function DashboardBombero() {
     if (tipo === 'kilometraje') {
       setSubiendoFotoK(true);
       setFotoKilometraje(file);
-      // Simular subida y conversión a URL local para previsualizar
+      // Simular subida y conversiÃ³n a URL local para previsualizar
       setFotoKilometrajeUrl(URL.createObjectURL(file));
       
       // Intentar OCR con IA en paralelo
@@ -219,7 +236,7 @@ export default function DashboardBombero() {
               setKilometraje(data.kilometraje);
               toast.success(`Kilometraje detectado por IA: ${data.kilometraje} km`);
             } else {
-              toast.error("No se pudo detectar el kilometraje por IA. Escríbalo manual.");
+              toast.error("No se pudo detectar el kilometraje por IA. EscrÃ­balo manual.");
             }
           } catch {
             toast.error("Fallo el OCR. Ingrese el kilometraje manualmente.");
@@ -244,13 +261,13 @@ export default function DashboardBombero() {
   const handleRegistrarSuministro = async (e) => {
     e.preventDefault();
     if (!tanqueSeleccionado) { toast.error("Seleccione un tanque de suministro"); return; }
-    if (!kilometraje || isNaN(kilometraje) || parseInt(kilometraje) <= 0) { toast.error("Ingrese un kilometraje numérico válido"); return; }
-    if (!litrosCargar || isNaN(litrosCargar) || parseFloat(litrosCargar) <= 0) { toast.error("Ingrese litros válidos"); return; }
-    if (!fotoKilometraje || !fotoMaquina) { toast.error("Debe capturar la foto del odómetro y del surtidor"); return; }
+    if (!kilometraje || isNaN(kilometraje) || parseInt(kilometraje) <= 0) { toast.error("Ingrese un kilometraje numÃ©rico vÃ¡lido"); return; }
+    if (!litrosCargar || isNaN(litrosCargar) || parseFloat(litrosCargar) <= 0) { toast.error("Ingrese litros vÃ¡lidos"); return; }
+    if (!fotoKilometraje || !fotoMaquina) { toast.error("Debe capturar la foto del odÃ³metro y del surtidor"); return; }
 
     setCargandoSuministro(true);
     try {
-      // En producción las fotos se subirían a storage y devolverían URLs
+      // En producciÃ³n las fotos se subirÃ­an a storage y devolverÃ­an URLs
       // Para simular las URLs guardamos un string temporal del nombre de archivo
       const payload = {
         placa: vehiculoEncontrado.placa,
@@ -264,7 +281,7 @@ export default function DashboardBombero() {
       };
 
       const res = await combustibleService.registrarAbastecimiento(payload);
-      toast.success(res.message || "Suministro registrado con éxito");
+      toast.success(res.message || "Suministro registrado con Ã©xito");
       
       // Limpiar estados
       setVehiculoEncontrado(null);
@@ -273,6 +290,7 @@ export default function DashboardBombero() {
       
       cargarDatosTanques();
       cargarBandejaSolicitudes();
+      cargarHistorialBombero();
     } catch (err) {
       toast.error(err.response?.data?.detail || "Error al registrar suministro");
     } finally {
@@ -285,7 +303,7 @@ export default function DashboardBombero() {
     e.preventDefault();
     if (!formSolicitud.placa.trim()) { toast.error("La placa es obligatoria"); return; }
     if (!formSolicitud.cantidad_solicitada || isNaN(formSolicitud.cantidad_solicitada)) { toast.error("Ingrese los litros solicitados"); return; }
-    if (!formSolicitud.motivo.trim()) { toast.error("Indique una justificación/motivo de emergencia"); return; }
+    if (!formSolicitud.motivo.trim()) { toast.error("Indique una justificaciÃ³n/motivo de emergencia"); return; }
 
     setEnviandoSolicitud(true);
     try {
@@ -321,7 +339,7 @@ export default function DashboardBombero() {
     }
   };
 
-  // Pantalla de Declaración Inicial de Inventario obligatoria
+  // Pantalla de DeclaraciÃ³n Inicial de Inventario obligatoria
   if (!tieneLecturaSemana && !cargandoTanques) {
     return (
       <div className="min-h-screen dark bg-bg-app flex items-center justify-center p-4">
@@ -330,7 +348,7 @@ export default function DashboardBombero() {
             <AlertTriangle className="text-warning animate-pulse-slow" size={24} />
             <div>
               <h2 className="text-sm font-black uppercase tracking-wider text-warning">Apertura de Ciclo Semanal</h2>
-              <p className="text-[10px] text-text-sec">Es obligatorio registrar la medición inicial de los tanques.</p>
+              <p className="text-[10px] text-text-sec">Es obligatorio registrar la mediciÃ³n inicial de los tanques.</p>
             </div>
           </div>
           <form onSubmit={handleDeclararInventario} className="p-6 space-y-4">
@@ -338,7 +356,7 @@ export default function DashboardBombero() {
               <div key={t.id} className="space-y-1.5">
                 <label className="text-[10px] font-black uppercase tracking-wider text-text-muted flex justify-between">
                   <span>{t.nombre} {t.tipo_combustible ? `(${t.tipo_combustible.toUpperCase()})` : ''}</span>
-                  <span className="text-text-sec">MÁX: {t.capacidad_maxima} L</span>
+                  <span className="text-text-sec">MÃX: {t.capacidad_maxima} L</span>
                 </label>
                 <div className="flex items-center bg-bg-low border border-white/10 rounded-xl overflow-hidden focus-within:border-warning/50 transition-all">
                   <input
@@ -360,7 +378,7 @@ export default function DashboardBombero() {
               className="w-full h-12 rounded-xl bg-warning text-black text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-warning/90 transition-all"
             >
               {cargandoLectura ? <RefreshCw size={15} className="animate-spin" /> : <Power size={15} />}
-              Confirmar Declaración e Iniciar
+              Confirmar DeclaraciÃ³n e Iniciar
             </button>
           </form>
         </div>
@@ -374,7 +392,7 @@ export default function DashboardBombero() {
       <header className="sticky top-0 z-40 bg-bg-card/90 backdrop-blur-md border-b border-white/5 px-4 py-3">
         <div className="flex items-center justify-between max-w-lg mx-auto w-full">
           <div>
-            <h1 className="text-xs font-black uppercase tracking-[0.3em] text-success leading-none">Aegis Fuel</h1>
+            <h1 className="text-xs font-black uppercase tracking-[0.3em] text-success leading-none">SISTEMA DE COMBUSTIBLE</h1>
             <p className="text-[9px] text-text-muted font-bold mt-1 flex items-center gap-1">
               <span className="w-1.5 h-1.5 bg-success rounded-full animate-pulse" />
               Surtidor Base BAGFM
@@ -455,14 +473,14 @@ export default function DashboardBombero() {
             {/* Buscador de placa */}
             {!vehiculoEncontrado && (
               <form onSubmit={handleBuscarPlaca} className="bg-bg-card rounded-2xl border border-white/5 p-4 space-y-3">
-                <p className="text-[9px] font-black text-text-muted uppercase tracking-widest">Ingrese placa del vehículo</p>
+                <p className="text-[9px] font-black text-text-muted uppercase tracking-widest">Ingrese placa del vehÃ­culo</p>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     placeholder="AB123CD"
                     value={placaBusqueda}
                     onChange={e => setPlacaBusqueda(e.target.value.toUpperCase())}
-                    className="flex-1 bg-bg-low border border-white/10 rounded-xl px-4 py-3 text-2xl font-black text-text-main uppercase tracking-widest focus:border-success/50 outline-none transition-all text-center"
+                    className="flex-1 min-w-0 bg-bg-low border border-white/10 rounded-xl px-4 py-3 text-2xl font-black text-text-main uppercase tracking-widest focus:border-success/50 outline-none transition-all text-center"
                   />
                   <button
                     type="submit"
@@ -473,7 +491,7 @@ export default function DashboardBombero() {
                   </button>
                 </div>
                 
-                {/* Botón de solicitud directa para no registrados / emergencia */}
+                {/* BotÃ³n de solicitud directa para no registrados / emergencia */}
                 {placaNoEncontrada && (
                   <button
                     type="button"
@@ -489,10 +507,30 @@ export default function DashboardBombero() {
               </form>
             )}
 
-            {/* Ficha de Vehículo y Formulario de Carga */}
+            {/* Historial Bombero (Solo si no hay vehiculo buscado) */}
+            {!vehiculoEncontrado && historialBombero.length > 0 && (
+              <div className="bg-bg-card rounded-2xl border border-white/5 p-4 space-y-3">
+                <p className="text-[9px] font-black text-text-muted uppercase tracking-widest mb-2 flex items-center gap-1.5"><ClipboardList size={12}/> Ãšltimos Abastecimientos</p>
+                <div className="space-y-2">
+                  {historialBombero.map((a, i) => (
+                    <div key={a.id || i} className="bg-bg-low border border-white/5 rounded-xl p-3 flex justify-between items-center opacity-80 hover:opacity-100 transition-all">
+                      <div>
+                        <p className="text-sm font-black text-text-main font-display tracking-wide">{a.placa}</p>
+                        <p className="text-[9px] text-text-muted mt-0.5">{a.entidad} Â· {a.marca} {a.modelo}</p>
+                      </div>
+                      <span className="text-[12px] font-black font-display text-emerald-400">
+                        {Number(a.litros).toFixed(1)} L
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Ficha de VehÃ­culo y Formulario de Carga */}
             {vehiculoEncontrado && (
               <div className="bg-bg-card rounded-2xl border border-white/5 p-4 space-y-4 animate-in fade-in duration-300">
-                {/* Datos del vehículo */}
+                {/* Datos del vehÃ­culo */}
                 <div className="flex items-center gap-3 border-b border-white/5 pb-3">
                   <div className="w-10 h-10 bg-success/10 rounded-xl flex items-center justify-center border border-success/20 shrink-0">
                     <Car size={20} className="text-success" />
@@ -510,7 +548,7 @@ export default function DashboardBombero() {
                       </span>
                     </div>
                     <p className="text-[10px] text-text-muted truncate mt-0.5">
-                      {vehiculoEncontrado.color} · {vehiculoEncontrado.marca} · {vehiculoEncontrado.modelo} {vehiculoEncontrado.tipo_combustible ? `(${vehiculoEncontrado.tipo_combustible.toUpperCase()})` : ''}
+                      {vehiculoEncontrado.color} Â· {vehiculoEncontrado.marca} Â· {vehiculoEncontrado.modelo} {vehiculoEncontrado.tipo_combustible ? `(${vehiculoEncontrado.tipo_combustible.toUpperCase()})` : ''}
                     </p>
                   </div>
                 </div>
@@ -533,13 +571,13 @@ export default function DashboardBombero() {
                   </div>
                 )}
 
-                {/* Si no está autorizado o cupo excedido, y NO hay solicitud de bypass */}
+                {/* Si no estÃ¡ autorizado o cupo excedido, y NO hay solicitud de bypass */}
                 {(!vehiculoEncontrado.autorizado || vehiculoEncontrado.cupo_entidad_excedido) && !solicitudVinculada ? (
                   <div className="p-4 bg-danger/10 border border-danger/30 rounded-xl text-center space-y-3">
                     <ShieldAlert size={28} className="text-danger mx-auto animate-pulse-slow" />
                     <div>
                       <h4 className="text-xs font-black uppercase text-danger">Acceso Denegado a Combustible</h4>
-                      <p className="text-[9px] text-text-sec mt-1">Este vehículo o su entidad no tienen cupo o autorización activa en el sistema.</p>
+                      <p className="text-[9px] text-text-sec mt-1">Este vehÃ­culo o su entidad no tienen cupo o autorizaciÃ³n activa en el sistema.</p>
                     </div>
                     <button
                       onClick={() => {
@@ -552,7 +590,7 @@ export default function DashboardBombero() {
                       }}
                       className="w-full h-10 rounded-xl bg-danger text-white text-[10px] font-black uppercase tracking-widest hover:bg-danger-deep transition-all"
                     >
-                      Solicitar Aprobación de Emergencia
+                      Solicitar AprobaciÃ³n de Emergencia
                     </button>
                   </div>
                 ) : (
@@ -562,7 +600,7 @@ export default function DashboardBombero() {
                       <div className="p-3 bg-success/15 border border-success/30 rounded-xl flex items-center gap-2">
                         <CheckCircle2 size={16} className="text-success shrink-0" />
                         <span className="text-[9px] font-black text-success uppercase tracking-widest">
-                          Bypass Aprobado: {solicitudVinculada.cantidad_solicitada} Litros Máx.
+                          Bypass Aprobado: {solicitudVinculada.cantidad_solicitada} Litros MÃ¡x.
                         </span>
                       </div>
                     )}
@@ -607,15 +645,15 @@ export default function DashboardBombero() {
                           className="w-full bg-bg-low border border-white/10 rounded-lg px-3 py-2.5 text-sm font-black text-text-main outline-none focus:border-success/50"
                           placeholder={`${vehiculoEncontrado.ultimo_kilometraje} km`}
                         />
-                        <span className="text-[8px] text-text-muted">Último: {vehiculoEncontrado.ultimo_kilometraje} km</span>
+                        <span className="text-[8px] text-text-muted">Ãšltimo: {vehiculoEncontrado.ultimo_kilometraje} km</span>
                       </div>
                     </div>
 
-                    {/* Fotos obligatorias de cámara */}
+                    {/* Fotos obligatorias de cÃ¡mara */}
                     <div className="grid grid-cols-2 gap-3">
-                      {/* Foto Odómetro */}
+                      {/* Foto OdÃ³metro */}
                       <div className="space-y-1">
-                        <span className="text-[8px] font-black uppercase tracking-widest text-text-muted">Foto Odómetro</span>
+                        <span className="text-[8px] font-black uppercase tracking-widest text-text-muted">Foto OdÃ³metro</span>
                         <button
                           type="button"
                           onClick={() => fileOdoRef.current.click()}
@@ -635,7 +673,7 @@ export default function DashboardBombero() {
                           ) : (
                             <>
                               <Camera size={20} className="text-text-muted" />
-                              <span className="text-[8px] font-black uppercase tracking-widest text-text-muted">Cámara</span>
+                              <span className="text-[8px] font-black uppercase tracking-widest text-text-muted">CÃ¡mara</span>
                             </>
                           )}
                         </button>
@@ -650,7 +688,7 @@ export default function DashboardBombero() {
                         {iaLoadOdo && <p className="text-[8px] text-success animate-pulse font-bold uppercase tracking-wider text-center mt-1">Leyendo con IA...</p>}
                       </div>
 
-                      {/* Foto Máquina */}
+                      {/* Foto MÃ¡quina */}
                       <div className="space-y-1">
                         <span className="text-[8px] font-black uppercase tracking-widest text-text-muted">Foto Dispensador</span>
                         <button
@@ -671,7 +709,7 @@ export default function DashboardBombero() {
                           ) : (
                             <>
                               <Camera size={20} className="text-text-muted" />
-                              <span className="text-[8px] font-black uppercase tracking-widest text-text-muted">Cámara</span>
+                              <span className="text-[8px] font-black uppercase tracking-widest text-text-muted">CÃ¡mara</span>
                             </>
                           )}
                         </button>
@@ -686,7 +724,7 @@ export default function DashboardBombero() {
                       </div>
                     </div>
 
-                    {/* Botón de envío */}
+                    {/* BotÃ³n de envÃ­o */}
                     <div className="pt-2 flex gap-2">
                       <button
                         type="button"
@@ -730,7 +768,7 @@ export default function DashboardBombero() {
                     <CheckCircle2 size={13} /> Aprobadas para Surtir ({solicitudesAprobadas.length})
                   </h3>
                   {solicitudesAprobadas.length === 0 ? (
-                    <p className="text-[10px] text-text-muted italic py-3 bg-bg-card rounded-xl border border-white/5 text-center">No hay órdenes aprobadas listas para carga.</p>
+                    <p className="text-[10px] text-text-muted italic py-3 bg-bg-card rounded-xl border border-white/5 text-center">No hay Ã³rdenes aprobadas listas para carga.</p>
                   ) : (
                     solicitudesAprobadas.map(sol => (
                       <div 
@@ -741,7 +779,7 @@ export default function DashboardBombero() {
                       >
                         <div>
                           <p className="text-sm font-black text-text-main font-display tracking-wide">{sol.placa}</p>
-                          <p className="text-[9px] text-text-muted mt-0.5">Suministro único autorizado: {sol.cantidad_solicitada} Litros</p>
+                          <p className="text-[9px] text-text-muted mt-0.5">Suministro Ãºnico autorizado: {sol.cantidad_solicitada} Litros</p>
                           {sol.conductor && <p className="text-[8px] text-success/80 mt-1 uppercase font-bold">Conductor: {sol.conductor}</p>}
                         </div>
                         <button 
@@ -767,7 +805,7 @@ export default function DashboardBombero() {
                       <div key={sol.id} className="bg-bg-card border border-white/5 rounded-xl p-3 flex justify-between items-center opacity-80">
                         <div>
                           <p className="text-sm font-black text-text-main font-display tracking-wide">{sol.placa}</p>
-                          <p className="text-[9px] text-text-muted mt-0.5">Litros pedidos: {sol.cantidad_solicitada} L {sol.tipo_solicitud ? `· ${sol.tipo_solicitud.replace(/_/g, ' ').toUpperCase()}` : ''}</p>
+                          <p className="text-[9px] text-text-muted mt-0.5">Litros pedidos: {sol.cantidad_solicitada} L {sol.tipo_solicitud ? `Â· ${sol.tipo_solicitud.replace(/_/g, ' ').toUpperCase()}` : ''}</p>
                           <p className="text-[8px] text-text-sec italic mt-1">Motivo: "{sol.motivo}"</p>
                         </div>
                         <span className="text-[8px] font-black uppercase tracking-widest text-warning bg-warning/10 border border-warning/20 px-2 py-1 rounded">
@@ -840,7 +878,7 @@ export default function DashboardBombero() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Cédula del Conductor</label>
+                <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">CÃ©dula del Conductor</label>
                 <input
                   type="text"
                   value={formSolicitud.cedula_conductor_manual}
@@ -884,16 +922,16 @@ export default function DashboardBombero() {
                 </div>
               </div>
 
-              {/* Justificación */}
+              {/* JustificaciÃ³n */}
               <div className="space-y-1">
-                <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Justificación y Entidad procedencia *</label>
+                <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">JustificaciÃ³n y Entidad procedencia *</label>
                 <textarea
                   required
                   rows={3}
                   value={formSolicitud.motivo}
                   onChange={e => setFormSolicitud({ ...formSolicitud, motivo: e.target.value })}
                   className="w-full bg-bg-low border border-white/10 rounded-lg px-3 py-2 text-xs font-semibold text-text-main outline-none focus:border-danger/40 resize-none"
-                  placeholder="Ej: Vehículo de Comandancia de otra base militar en tránsito. Requiere 30 L de gasolina."
+                  placeholder="Ej: VehÃ­culo de Comandancia de otra base militar en trÃ¡nsito. Requiere 30 L de gasolina."
                 />
               </div>
 
@@ -921,3 +959,4 @@ export default function DashboardBombero() {
     </div>
   );
 }
+

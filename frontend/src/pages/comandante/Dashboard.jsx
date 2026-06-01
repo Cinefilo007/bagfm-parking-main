@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Header } from '../../components/layout/Header';
 import { Card } from '../../components/ui/Card';
@@ -44,7 +44,7 @@ export default function DashboardComando() {
   }, []);
 
   const stats = situacion ? [
-    { label: 'Vehículos Dentro', valor: situacion.vehiculos_dentro, highlight: false, icon: CarFront },
+    { label: 'VehÃ­culos Dentro', valor: situacion.vehiculos_dentro, highlight: false, icon: CarFront },
     { label: 'Accesos Hoy', valor: situacion.total_accesos_hoy, highlight: false, icon: Target },
     { label: 'Infracciones Activas', valor: situacion.alertas_activas, highlight: 'alerta', icon: AlertTriangle },
     { label: 'Bloqueados', valor: situacion.bloqueados_total || 0, highlight: 'error', icon: ShieldAlert },
@@ -118,12 +118,12 @@ export default function DashboardComando() {
           })}
         </div>
 
-        {/* KPI ROW 2: 5 tarjetas de combustible (Aegis Fuel) */}
+        {/* KPI ROW 2: 5 tarjetas de combustible  */}
         {fuelKpis && (
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-3 px-1">
               <div className="w-1.5 h-4 rounded-full bg-cyan-500" />
-              <span className="text-[9px] font-black text-text-muted uppercase tracking-[0.2em]">Aegis Fuel — Bomba de Combustible</span>
+              <span className="text-[9px] font-black text-text-muted uppercase tracking-[0.2em]">Aegis Fuel â€” Bomba de Combustible</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
               {fuelStats.map((fs, i) => {
@@ -157,7 +157,7 @@ export default function DashboardComando() {
         {/* BOTTOM SECTION: Map + Chart and Events + Fuel Monitor */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
-          {/* Columna Izquierda: Mapa Táctico + Gráfico (Ocupa 8/12 = 66%) */}
+          {/* Columna Izquierda: Mapa TÃ¡ctico + GrÃ¡fico (Ocupa 8/12 = 66%) */}
           <div className="flex flex-col lg:col-span-8 gap-6">
              <div className="h-[480px]">
                 <MapaTactico pollingEnabled={false} situacionPreload={situacion} />
@@ -182,5 +182,6 @@ export default function DashboardComando() {
     </div>
   );
 }
+
 
 

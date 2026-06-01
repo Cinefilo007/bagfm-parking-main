@@ -890,3 +890,125 @@ async def desactivar_tanque(
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Error al desactivar el tanque: {str(e)}")
+
+# --- Endpoints de Historial de Abastecimientos ---
+
+@router.get("/abastecimientos")
+async def obtener_historial_abastecimientos(
+    skip: int = 0,
+    limit: int = 50,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = Depends(obtener_usuario_actual)
+):
+    """
+    Obtiene el historial general de abastecimientos con paginacin.
+    """
+    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE, RolTipo.SUPERVISOR, RolTipo.ADMIN_ENTIDAD]:
+        raise HTTPException(status_code=403, detail="Permisos insuficientes.")
+        
+    try:
+        from app.models.abastecimiento import Abastecimiento
+        from app.models.vehiculo import Vehiculo
+        from app.models.usuario import Usuario as UsuarioModel
+        from sqlalchemy.orm import selectinload
+        
+        # Filtro base
+        stmt = select(Abastecimiento).options(
+            selectinload(Abastecimiento.vehiculo).selectinload(Vehiculo.entidad),
+            selectinload(Abastecimiento.bombero),
+            selectinload(Abastecimiento.tanque)
+        )
+        
+        # Admin Entidad solo ve abastecimientos de su entidad
+        if usuario.rol == RolTipo.ADMIN_ENTIDAD:
+            stmt = stmt.join(Abastecimiento.vehiculo).where(Vehiculo.entidad_id == usuario.entidad_id)
+            
+        stmt = stmt.order_by(Abastecimiento.fecha.desc()).offset(skip).limit(limit)
+        
+        res = await db.execute(stmt)
+        abastecimientos = res.scalars().all()
+        
+        # Contar total para paginacin
+        count_stmt = select(func.count(Abastecimiento.id))
+        if usuario.rol == RolTipo.ADMIN_ENTIDAD:
+            count_stmt = count_stmt.join(Abastecimiento.vehiculo).where(Vehiculo.entidad_id == usuario.entidad_id)
+            
+        total = (await db.execute(count_stmt)).scalar() or 0
+        
+        data = [
+            {
+                "id": str(a.id),
+                "fecha": a.fecha.isoformat(),
+                "placa": a.vehiculo.placa if a.vehiculo else "?",
+                "marca": a.vehiculo.marca if a.vehiculo else "?",
+                "modelo": a.vehiculo.modelo if a.vehiculo else "?",
+                "entidad": a.vehiculo.entidad.nombre if a.vehiculo and getattr(a.vehiculo, 'entidad', None) else "SIN ENTIDAD",
+                "litros": a.cantidad_abastecida,
+                "bombero": f"{a.bombero.nombre} {a.bombero.apellido}" if a.bombero else "?",
+                "tanque": a.tanque.nombre if a.tanque else "?",
+                "tiene_alerta": a.tiene_alerta,
+                "foto_odometro": a.foto_kilometraje_url,
+                "foto_surtidor": a.foto_maquina_url
+            } for a in abastecimientos
+        ]
+        
+        return {
+            "status": "success",
+            "data": data,
+            "total": total,
+            "skip": skip,
+            "limit": limit
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error obteniendo historial: {str(e)}")
+
+@router.get("/abastecimientos/historial-bombero")
+async def obtener_historial_bombero(
+    limit: int = 15,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = Depends(obtener_usuario_actual)
+):
+    """
+    Obtiene los Ǹltimos abastecimientos realizados por el bombero logueado.
+    """
+    if usuario.rol != RolTipo.BOMBERO:
+        raise HTTPException(status_code=403, detail="Ruta exclusiva para bomberos.")
+        
+    try:
+        from app.models.abastecimiento import Abastecimiento
+        from app.models.vehiculo import Vehiculo
+        from sqlalchemy.orm import selectinload
+        
+        stmt = (
+            select(Abastecimiento)
+            .options(selectinload(Abastecimiento.vehiculo).selectinload(Vehiculo.entidad))
+            .where(Abastecimiento.bombero_id == usuario.id)
+            .order_by(Abastecimiento.fecha.desc())
+            .limit(limit)
+        )
+        
+        res = await db.execute(stmt)
+        abastecimientos = res.scalars().all()
+        
+        data = [
+            {
+                "id": str(a.id),
+                "fecha": a.fecha.isoformat(),
+                "placa": a.vehiculo.placa if a.vehiculo else "?",
+                "marca": a.vehiculo.marca if a.vehiculo else "?",
+                "modelo": a.vehiculo.modelo if a.vehiculo else "?",
+                "entidad": a.vehiculo.entidad.nombre if a.vehiculo and getattr(a.vehiculo, 'entidad', None) else "SIN ENTIDAD",
+                "litros": a.cantidad_abastecida,
+                "tiene_alerta": a.tiene_alerta,
+                "foto_odometro": a.foto_kilometraje_url,
+                "foto_surtidor": a.foto_maquina_url
+            } for a in abastecimientos
+        ]
+        
+        return {
+            "status": "success",
+            "data": data
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error obteniendo historial: {str(e)}")
+

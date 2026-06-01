@@ -163,5 +163,21 @@ export const combustibleService = {
   async eliminarTanque(id) {
     const { data } = await api.delete(`/combustible/tanques/${id}`);
     return data;
+  },
+
+  /**
+   * Obtiene el historial general de abastecimientos (paginado)
+   */
+  async obtenerHistorialAbastecimientos(skip = 0, limit = 50) {
+    const { data } = await api.get(`/combustible/abastecimientos`, { params: { skip, limit } });
+    return data;
+  },
+
+  /**
+   * Obtiene el historial de los últimos abastecimientos realizados por el bombero
+   */
+  async obtenerHistorialBombero(limit = 15) {
+    const { data } = await api.get(`/combustible/abastecimientos/historial-bombero`, { params: { limit } });
+    return data;
   }
 };

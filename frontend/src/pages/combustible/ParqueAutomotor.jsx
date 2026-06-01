@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { 
   Car, RefreshCw, Upload, Edit3, Settings, ShieldAlert,
   CheckCircle, AlertTriangle, XCircle, Search, ToggleLeft, ToggleRight,
@@ -20,16 +20,16 @@ export default function ParqueAutomotor() {
   const [filtroEntidad, setFiltroEntidad] = useState('');
   const [placaBusqueda, setPlacaBusqueda] = useState('');
 
-  // Paginación
+  // PaginaciÃ³n
   const [page, setPage] = useState(0);
   const limit = 10;
 
-  // Edición de límites de Entidad
+  // EdiciÃ³n de lÃ­mites de Entidad
   const [entidadSeleccionadaData, setEntidadSeleccionadaData] = useState(null);
   const [guardandoLimiteEntidad, setGuardandoLimiteEntidad] = useState(false);
   const [nuevoLimiteEntidad, setNuevoLimiteEntidad] = useState('');
 
-  // Modal Edición Vehículo
+  // Modal EdiciÃ³n VehÃ­culo
   const [modalVehiculo, setModalVehiculo] = useState(null);
   const [guardandoVehiculo, setGuardandoVehiculo] = useState(false);
   const [formVehiculo, setFormVehiculo] = useState({
@@ -115,12 +115,12 @@ export default function ParqueAutomotor() {
       await combustibleService.actualizarVehiculoCombustible(vehiculo.id, {
         autorizado_combustible: nuevoEstado
       });
-      toast.success(nuevoEstado ? `Vehículo ${vehiculo.placa} autorizado para surtir` : `Vehículo ${vehiculo.placa} inhabilitado para surtir`);
+      toast.success(nuevoEstado ? `VehÃ­culo ${vehiculo.placa} autorizado para surtir` : `VehÃ­culo ${vehiculo.placa} inhabilitado para surtir`);
       
       // Actualizar estado local
       setVehiculos(prev => prev.map(v => v.id === vehiculo.id ? { ...v, autorizado_combustible: nuevoEstado } : v));
     } catch (e) {
-      toast.error("No se pudo actualizar el estado de autorización.");
+      toast.error("No se pudo actualizar el estado de autorizaciÃ³n.");
     }
   };
 
@@ -146,11 +146,11 @@ export default function ParqueAutomotor() {
         asignacion_combustible_semanal: parseFloat(formVehiculo.asignacion_combustible_semanal) || 0,
         autorizado_combustible: formVehiculo.autorizado_combustible
       });
-      toast.success("Parámetros del vehículo actualizados correctamente.");
+      toast.success("ParÃ¡metros del vehÃ­culo actualizados correctamente.");
       setModalVehiculo(null);
       cargarVehiculos();
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Error al actualizar el vehículo.");
+      toast.error(err.response?.data?.detail || "Error al actualizar el vehÃ­culo.");
     } finally {
       setGuardandoVehiculo(false);
     }
@@ -166,7 +166,7 @@ export default function ParqueAutomotor() {
         nombre: entidadSeleccionadaData.nombre,
         limite_combustible_semanal: parseFloat(nuevoLimiteEntidad) || 0
       });
-      toast.success("Límite semanal de la entidad actualizado.");
+      toast.success("LÃ­mite semanal de la entidad actualizado.");
       
       // Actualizar lista de entidades locales
       setEntidades(prev => prev.map(e => e.id === entidadSeleccionadaData.id ? { ...e, limite_combustible_semanal: parseFloat(nuevoLimiteEntidad) || 0 } : e));
@@ -207,9 +207,9 @@ export default function ParqueAutomotor() {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      toast.success("Plantilla descargada con éxito.");
+      toast.success("Plantilla descargada con Ã©xito.");
     } catch (e) {
-      toast.error("No se pudo descargar la plantilla de importación.");
+      toast.error("No se pudo descargar la plantilla de importaciÃ³n.");
     }
   };
 
@@ -233,12 +233,12 @@ export default function ParqueAutomotor() {
         asignacion_combustible_semanal: parseFloat(formRegistro.asignacion_combustible_semanal) || 0,
         autorizado_combustible: formRegistro.autorizado_combustible
       });
-      toast.success(`Vehículo ${formRegistro.placa.toUpperCase()} registrado con éxito.`);
+      toast.success(`VehÃ­culo ${formRegistro.placa.toUpperCase()} registrado con Ã©xito.`);
       setModalRegistro(false);
       setFormRegistro({ placa: '', entidad_id: '', marca: '', modelo: '', color: '', uso_vehiculo: 'particular', tipo_combustible: 'gasolina', capacidad_tanque: '', asignacion_combustible_semanal: '', autorizado_combustible: false });
       cargarVehiculos();
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Error al registrar el vehículo.");
+      toast.error(err.response?.data?.detail || "Error al registrar el vehÃ­culo.");
     } finally {
       setRegistrando(false);
     }
@@ -260,14 +260,14 @@ export default function ParqueAutomotor() {
 
   return (
     <div className="min-h-screen dark bg-bg-app text-text-main p-4 space-y-4 font-sans">
-      {/* HEADER TÁCTICO */}
+      {/* HEADER TÃCTICO */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-bg-card border border-bg-high/50 rounded-xl p-4">
         <div>
           <div className="flex items-center gap-2">
             <div className="w-2 h-5 rounded-full bg-success animate-pulse" />
-            <h1 className="text-sm font-black uppercase tracking-widest text-text-main font-mono">Aegis Fuel: Parque Automotor</h1>
+            <h1 className="text-sm font-black uppercase tracking-widest text-text-main font-mono">Parque Automotor</h1>
           </div>
-          <p className="text-[10px] text-text-muted uppercase tracking-wider mt-0.5">Control táctico de la flota y asignación de combustible de la base</p>
+          <p className="text-[10px] text-text-muted uppercase tracking-wider mt-0.5">Control tÃ¡ctico de la flota y asignaciÃ³n de combustible de la base</p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <button 
@@ -275,7 +275,7 @@ export default function ParqueAutomotor() {
             className="flex-1 sm:flex-initial h-10 px-4 rounded-xl bg-primary text-on-primary font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-primary/90 transition-all cursor-pointer active:scale-95 shadow-tactica"
           >
             <PlusCircle size={14} />
-            Registrar Vehículo
+            Registrar VehÃ­culo
           </button>
           <button 
             onClick={() => setModalImportar(true)}
@@ -299,7 +299,7 @@ export default function ParqueAutomotor() {
         {/* BUSCADOR */}
         <div className="md:col-span-2 bg-bg-card border border-bg-high/50 rounded-xl p-4">
           <h3 className="text-[10px] font-black uppercase tracking-widest text-text-muted mb-3 flex items-center gap-1.5">
-            <Search size={12} /> Búsqueda y Segmentación
+            <Search size={12} /> BÃºsqueda y SegmentaciÃ³n
           </h3>
           <form onSubmit={handleBuscar} className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1 relative">
@@ -338,7 +338,7 @@ export default function ParqueAutomotor() {
         {/* AJUSTES DE CUOTA GLOBAL DE LA ENTIDAD SELECCIONADA */}
         <div className="bg-bg-card border border-bg-high/50 rounded-xl p-4">
           <h3 className="text-[10px] font-black uppercase tracking-widest text-text-muted mb-3 flex items-center gap-1.5">
-            <Settings size={12} /> Límite Semanal Entidad
+            <Settings size={12} /> LÃ­mite Semanal Entidad
           </h3>
           {entidadSeleccionadaData ? (
             <form onSubmit={handleActualizarLimiteEntidad} className="space-y-3">
@@ -369,16 +369,16 @@ export default function ParqueAutomotor() {
             </form>
           ) : (
             <div className="h-[76px] flex items-center justify-center bg-white/5 border border-dashed border-bg-high/30 rounded-xl">
-              <p className="text-[10px] text-text-muted uppercase tracking-wider text-center px-4">Seleccione una entidad para gestionar su límite semanal de litros</p>
+              <p className="text-[10px] text-text-muted uppercase tracking-wider text-center px-4">Seleccione una entidad para gestionar su lÃ­mite semanal de litros</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* LISTADO DE VEHÍCULOS (PARQUE AUTOMOTOR) */}
+      {/* LISTADO DE VEHÃCULOS (PARQUE AUTOMOTOR) */}
       <div className="bg-bg-card border border-bg-high/50 rounded-xl p-4 overflow-hidden">
         <h2 className="text-[10px] font-black uppercase tracking-widest text-text-muted mb-4 flex items-center gap-1.5">
-          <Database size={13} /> Flota Registrada ({vehiculos.length} Vehículos)
+          <Database size={13} /> Flota Registrada ({vehiculos.length} VehÃ­culos)
         </h2>
 
         {cargandoVehiculos ? (
@@ -389,7 +389,7 @@ export default function ParqueAutomotor() {
         ) : vehiculos.length === 0 ? (
           <div className="py-12 flex flex-col items-center justify-center gap-2 bg-white/5 border border-dashed border-bg-high/30 rounded-xl">
             <Car size={36} className="text-text-muted" />
-            <p className="text-xs text-text-muted italic">No se encontraron vehículos registrados con los criterios seleccionados.</p>
+            <p className="text-xs text-text-muted italic">No se encontraron vehÃ­culos registrados con los criterios seleccionados.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -397,12 +397,12 @@ export default function ParqueAutomotor() {
               <thead>
                 <tr className="border-b border-bg-high/20 text-[8px] font-black uppercase tracking-widest text-text-muted">
                   <th className="py-2.5 px-3">Placa</th>
-                  <th className="py-2.5 px-3">Vehículo</th>
+                  <th className="py-2.5 px-3">VehÃ­culo</th>
                   <th className="py-2.5 px-3">Entidad</th>
                   <th className="py-2.5 px-3">Uso</th>
                   <th className="py-2.5 px-3">Combustible</th>
-                  <th className="py-2.5 px-3">Límite Semanal</th>
-                  <th className="py-2.5 px-3">Último Odómetro</th>
+                  <th className="py-2.5 px-3">LÃ­mite Semanal</th>
+                  <th className="py-2.5 px-3">Ãšltimo OdÃ³metro</th>
                   <th className="py-2.5 px-3 text-center">Autorizado Bomba</th>
                   <th className="py-2.5 px-3 text-right">Ajustes</th>
                 </tr>
@@ -413,7 +413,7 @@ export default function ParqueAutomotor() {
                     <td className="py-3 px-3 font-display font-black text-text-main tracking-wider">{v.placa}</td>
                     <td className="py-3 px-3 text-text-sec">
                       <div className="font-bold text-text-main">{v.marca}</div>
-                      <div className="text-[9px] text-text-muted">{v.modelo} · {v.color}</div>
+                      <div className="text-[9px] text-text-muted">{v.modelo} Â· {v.color}</div>
                     </td>
                     <td className="py-3 px-3">
                       <span className="text-[10px] font-bold text-text-sec uppercase truncate max-w-[150px] inline-block">
@@ -452,7 +452,7 @@ export default function ParqueAutomotor() {
                       <button
                         onClick={() => handleAbrirEditarVehiculo(v)}
                         className="w-8 h-8 rounded-lg bg-white/5 border border-bg-high/30 hover:bg-white/10 transition-all flex items-center justify-center ml-auto text-text-muted hover:text-text-main cursor-pointer"
-                        title="Editar parámetros"
+                        title="Editar parÃ¡metros"
                       >
                         <Edit3 size={12} />
                       </button>
@@ -474,7 +474,7 @@ export default function ParqueAutomotor() {
               <ChevronLeft size={14} /> Anterior
             </button>
             <div className="flex flex-col items-center">
-              <span className="text-xs font-display font-black text-success">PÁGINA {page + 1}</span>
+              <span className="text-xs font-display font-black text-success">PÃGINA {page + 1}</span>
             </div>
             <button 
               disabled={vehiculos.length <= (page + 1) * limit} 
@@ -487,7 +487,7 @@ export default function ParqueAutomotor() {
         )}
       </div>
 
-      {/* MODAL EDICIÓN PARÁMETROS VEHÍCULO */}
+      {/* MODAL EDICIÃ“N PARÃMETROS VEHÃCULO */}
       {modalVehiculo && (
         <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="w-full max-w-sm bg-bg-card rounded-2xl border border-bg-high/50 shadow-2xl overflow-hidden">
@@ -505,7 +505,7 @@ export default function ParqueAutomotor() {
             </div>
 
             <form onSubmit={handleGuardarVehiculo} className="p-4 space-y-4">
-              {/* Autorización rápida */}
+              {/* AutorizaciÃ³n rÃ¡pida */}
               <div className="flex justify-between items-center bg-white/5 border border-bg-high/30 rounded-xl p-3">
                 <div>
                   <span className="text-[10px] font-black uppercase tracking-widest text-text-main block">Autorizado para Surtir</span>
@@ -526,7 +526,7 @@ export default function ParqueAutomotor() {
 
               {/* Tipo de uso */}
               <div className="space-y-1.5">
-                <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Tipo de Uso del Vehículo</label>
+                <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Tipo de Uso del VehÃ­culo</label>
                 <select
                   value={formVehiculo.uso_vehiculo}
                   onChange={(e) => setFormVehiculo(prev => ({ ...prev, uso_vehiculo: e.target.value }))}
@@ -551,7 +551,7 @@ export default function ParqueAutomotor() {
                 </select>
               </div>
 
-              {/* Litros Tanque y Límite Semanal */}
+              {/* Litros Tanque y LÃ­mite Semanal */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Capacidad Tanque</label>
@@ -568,7 +568,7 @@ export default function ParqueAutomotor() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Límite Semanal (Sugerido)</label>
+                  <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">LÃ­mite Semanal (Sugerido)</label>
                   <div className="relative">
                     <input
                       type="number"
@@ -582,7 +582,7 @@ export default function ParqueAutomotor() {
                 </div>
               </div>
 
-              {/* Botones de acción */}
+              {/* Botones de acciÃ³n */}
               <div className="pt-2 flex gap-3">
                 <button
                   type="button"
@@ -626,7 +626,7 @@ export default function ParqueAutomotor() {
               <form onSubmit={handleSubirExcel} className="space-y-4">
                 {/* Selector de Entidad */}
                 <div className="space-y-1.5">
-                  <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Entidad de Asignación (Obligatorio)</label>
+                  <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Entidad de AsignaciÃ³n (Obligatorio)</label>
                   <select
                     value={entidadImportacion}
                     onChange={(e) => setEntidadImportacion(e.target.value)}
@@ -686,7 +686,7 @@ export default function ParqueAutomotor() {
                 </div>
               </form>
 
-              {/* Resumen de importación si fue exitosa */}
+              {/* Resumen de importaciÃ³n si fue exitosa */}
               {resumenImportacion && (
                 <div className="bg-bg-app border border-bg-high/50 rounded-xl p-3 space-y-2">
                   <p className="text-[10px] font-black uppercase tracking-widest text-success flex items-center gap-1">
@@ -695,7 +695,7 @@ export default function ParqueAutomotor() {
                   
                   <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono font-bold mt-1">
                     <div className="bg-white/5 border border-bg-high/30 rounded p-2">
-                      <span className="text-text-muted text-[8px] uppercase block tracking-wider mb-1">Leídos</span>
+                      <span className="text-text-muted text-[8px] uppercase block tracking-wider mb-1">LeÃ­dos</span>
                       <span className="text-text-main text-sm">{resumenImportacion.leidos || 0}</span>
                     </div>
                     <div className="bg-emerald-500/5 border border-emerald-500/10 rounded p-2">
@@ -725,14 +725,14 @@ export default function ParqueAutomotor() {
         </div>
       )}
 
-      {/* ─── MODAL REGISTRO INDIVIDUAL ─── */}
+      {/* â”€â”€â”€ MODAL REGISTRO INDIVIDUAL â”€â”€â”€ */}
       {modalRegistro && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-bg-card border border-bg-high/50 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto scrollbar-tactical">
             <div className="p-4 border-b border-bg-high/20 flex justify-between items-center sticky top-0 bg-bg-card z-10">
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-5 rounded-full bg-primary" />
-                <h3 className="text-xs font-black uppercase tracking-widest text-text-main">Registrar Vehículo Individual</h3>
+                <h3 className="text-xs font-black uppercase tracking-widest text-text-main">Registrar VehÃ­culo Individual</h3>
               </div>
               <button onClick={() => setModalRegistro(false)} className="text-text-muted hover:text-text-main cursor-pointer">
                 <XCircle size={20} />
@@ -804,7 +804,7 @@ export default function ParqueAutomotor() {
               {/* Uso y Tipo Combustible */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Uso Vehículo</label>
+                  <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Uso VehÃ­culo</label>
                   <select value={formRegistro.uso_vehiculo}
                     onChange={(e) => setFormRegistro(p => ({ ...p, uso_vehiculo: e.target.value }))}
                     className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-bold"
@@ -820,13 +820,13 @@ export default function ParqueAutomotor() {
                     onChange={(e) => setFormRegistro(p => ({ ...p, tipo_combustible: e.target.value }))}
                     className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-bold"
                   >
-                    <option value="gasolina">⛽ Gasolina</option>
-                    <option value="diesel">🛢️ Diésel</option>
+                    <option value="gasolina">â›½ Gasolina</option>
+                    <option value="diesel">ðŸ›¢ï¸ DiÃ©sel</option>
                   </select>
                 </div>
               </div>
 
-              {/* Capacidad y Asignación */}
+              {/* Capacidad y AsignaciÃ³n */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Capacidad Tanque (L)</label>
@@ -846,7 +846,7 @@ export default function ParqueAutomotor() {
                 </div>
               </div>
 
-              {/* Toggle Autorización */}
+              {/* Toggle AutorizaciÃ³n */}
               <div className="flex items-center justify-between bg-bg-low border border-bg-high/30 rounded-xl p-3">
                 <span className="text-[9px] font-black uppercase tracking-widest text-text-muted">Autorizar para Surtir Combustible</span>
                 <button
@@ -868,7 +868,7 @@ export default function ParqueAutomotor() {
                 className="w-full h-12 rounded-xl bg-gradient-to-r from-primary to-emerald-600 text-on-primary font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:brightness-110 transition-all cursor-pointer active:scale-95 disabled:opacity-50 shadow-tactica"
               >
                 {registrando ? <RefreshCw size={14} className="animate-spin" /> : <PlusCircle size={14} />}
-                {registrando ? 'Registrando...' : 'Registrar Vehículo'}
+                {registrando ? 'Registrando...' : 'Registrar VehÃ­culo'}
               </button>
             </form>
           </div>
@@ -877,3 +877,4 @@ export default function ParqueAutomotor() {
     </div>
   );
 }
+

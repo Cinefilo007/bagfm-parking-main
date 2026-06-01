@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Flame, Droplet, Activity, ClipboardList, AlertTriangle, CheckCircle2, X, Camera, User } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -59,7 +59,7 @@ const FuelMonitor = () => {
       {/* Header */}
       <div className="p-4 border-b border-bg-high/10 bg-bg-high/5 flex justify-between items-center shrink-0">
         <div>
-          <h3 className="text-xs font-display font-black text-text-main uppercase tracking-widest">Monitor Aegis Fuel</h3>
+          <h3 className="text-xs font-display font-black text-text-main uppercase tracking-widest">Monitor SISTEMA DE COMBUSTIBLE</h3>
           <p className="text-[9px] text-text-muted font-bold font-mono uppercase mt-0.5">Bomba Combustible // Live</p>
         </div>
         <div className="flex items-center gap-2 px-2 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
@@ -68,7 +68,7 @@ const FuelMonitor = () => {
         </div>
       </div>
 
-      {/* Pestañas */}
+      {/* PestaÃ±as */}
       <div className="flex items-center gap-1 bg-bg-low/40 p-1.5 mx-3 mt-3 rounded-xl border border-white/5 shrink-0">
         {TABS.map((tab) => {
           const TabIcon = tab.icon;
@@ -111,7 +111,7 @@ const FuelMonitor = () => {
           </div>
         ) : (
           <>
-            {/* ── Tanques ── */}
+            {/* â”€â”€ Tanques â”€â”€ */}
             {vistaMonitor === 'tanques' && (
               <div className="h-full overflow-y-auto p-3 space-y-2.5 scrollbar-tactical">
                 {tanques.length === 0 ? (
@@ -133,7 +133,7 @@ const FuelMonitor = () => {
                           <div>
                             <span className="text-[10px] font-black text-text-main uppercase tracking-wider block">{t.nombre}</span>
                             <span className="text-[8px] font-bold text-text-muted uppercase">
-                              {t.tipo_combustible === 'gasolina' ? '⛽ Gasolina' : '🛢️ Diésel'}
+                              {t.tipo_combustible === 'gasolina' ? 'â›½ Gasolina' : 'ðŸ›¢ï¸ DiÃ©sel'}
                             </span>
                           </div>
                         </div>
@@ -157,7 +157,7 @@ const FuelMonitor = () => {
               </div>
             )}
 
-            {/* ── Flujo (Live Feed) ── */}
+            {/* â”€â”€ Flujo (Live Feed) â”€â”€ */}
             {vistaMonitor === 'flujo' && (
               <div className="h-full overflow-y-auto p-3 space-y-1.5 scrollbar-tactical">
                 {ultimos.length === 0 ? (
@@ -200,7 +200,7 @@ const FuelMonitor = () => {
                       </div>
                       {a.tiene_alerta && (
                         <span className="text-[7px] font-black text-red-400 uppercase tracking-wider bg-red-500/10 px-1.5 py-0.5 rounded mt-1 inline-block">
-                          ⚠ Sospecha de fraude
+                          âš  Sospecha de fraude
                         </span>
                       )}
                     </div>
@@ -209,7 +209,7 @@ const FuelMonitor = () => {
               </div>
             )}
 
-            {/* ── Solicitudes ── */}
+            {/* â”€â”€ Solicitudes â”€â”€ */}
             {vistaMonitor === 'solicitudes' && (
               <div className="h-full flex flex-col items-center justify-center p-4 text-center">
                 <div className={cn(
@@ -230,7 +230,7 @@ const FuelMonitor = () => {
                 </h4>
                 <p className="text-[9px] text-text-muted mb-4">
                   {solicitudesPendientes > 0
-                    ? `Hay ${solicitudesPendientes} solicitud(es) de abastecimiento de emergencia esperando aprobación.`
+                    ? `Hay ${solicitudesPendientes} solicitud(es) de abastecimiento de emergencia esperando aprobaciÃ³n.`
                     : 'Todas las solicitudes de emergencia han sido resueltas.'}
                 </p>
                 {solicitudesPendientes > 0 && (
@@ -250,7 +250,7 @@ const FuelMonitor = () => {
 
       {/* Footer */}
       <div className="p-3 bg-bg-high/5 border-t border-bg-high/10 flex justify-between items-center opacity-60 shrink-0">
-        <span className="text-[8px] font-mono uppercase tracking-widest text-text-muted">Aegis Fuel Protocol v9.0</span>
+        <span className="text-[8px] font-mono uppercase tracking-widest text-text-muted">SISTEMA DE COMBUSTIBLE Protocol v9.0</span>
         <div className="flex gap-1 h-1.5 w-16">
           <div className="flex-1 bg-emerald-500/40 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.3)]" />
           <div className="flex-1 bg-amber-500/40 rounded-full animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.3)] delay-75" />
@@ -265,7 +265,7 @@ const FuelMonitor = () => {
             <div className="p-4 border-b border-white/5 flex justify-between items-center bg-bg-high/10">
               <div>
                 <h3 className="text-sm font-black text-text-main font-display">DETALLES SUMINISTRO</h3>
-                <p className="text-[10px] text-text-muted">{abastecimientoSeleccionado.placa} • {formatTimeAgo(abastecimientoSeleccionado.fecha)}</p>
+                <p className="text-[10px] text-text-muted">{abastecimientoSeleccionado.placa} â€¢ {formatTimeAgo(abastecimientoSeleccionado.fecha)}</p>
               </div>
               <button 
                 onClick={() => setAbastecimientoSeleccionado(null)}
@@ -287,10 +287,10 @@ const FuelMonitor = () => {
               </div>
 
               <div className="space-y-2">
-                <p className="text-[9px] font-black uppercase text-text-muted tracking-widest flex items-center gap-1.5"><Camera size={12}/> Evidencia Odómetro</p>
+                <p className="text-[9px] font-black uppercase text-text-muted tracking-widest flex items-center gap-1.5"><Camera size={12}/> Evidencia OdÃ³metro</p>
                 <div className="bg-bg-low rounded-xl border border-white/5 overflow-hidden aspect-video flex items-center justify-center">
                   {abastecimientoSeleccionado.foto_odometro ? (
-                    <img src={abastecimientoSeleccionado.foto_odometro} alt="Odómetro" className="w-full h-full object-cover" />
+                    <img src={abastecimientoSeleccionado.foto_odometro} alt="OdÃ³metro" className="w-full h-full object-cover" />
                   ) : (
                     <span className="text-[10px] text-text-muted font-bold">Sin foto</span>
                   )}
@@ -317,3 +317,4 @@ const FuelMonitor = () => {
 };
 
 export default FuelMonitor;
+
