@@ -22,7 +22,6 @@ export const Sidebar = () => {
   if (user?.rol === 'COMANDANTE' || user?.rol === 'ADMIN_BASE') {
     navItems.push(
       { to: '/comando/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { to: '/supervisor-base/dashboard', label: 'Sentinel Interface', icon: ShieldCheck },
       { to: '/comando/zonas', label: 'Zonas Estacionamiento', icon: ParkingCircle },
       { to: '/comando/entidades', label: 'Entidades Alojadas', icon: Building2 },
       { to: '/comando/alcabalas', label: 'Gestión Alcabalas', icon: ClipboardList },
@@ -35,7 +34,6 @@ export const Sidebar = () => {
     );
   } else if (user?.rol === 'SUPERVISOR') {
     navItems.push(
-      { to: '/supervisor-base/dashboard', label: 'Sentinel Interface', icon: ShieldCheck },
       { to: '/supervisor-base/censo-vehicular', label: 'Censo Vehicular', icon: CarIcon },
       { to: '/supervisor-base/censo-personas', label: 'Censo Personas', icon: Users },
       { to: '/supervisor-base/pases', label: 'Emisión de Pases', icon: QrCode },

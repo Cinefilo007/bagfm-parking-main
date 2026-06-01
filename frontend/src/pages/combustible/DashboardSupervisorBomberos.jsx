@@ -8,6 +8,8 @@ import { cn } from '../../lib/utils';
 import { toast } from 'react-hot-toast';
 import { combustibleService } from '../../services/combustible.service';
 import { entidadService } from '../../services/entidad.service';
+import { useAuthStore } from '../../store/auth.store';
+import { generarReporteCierre } from '../../utils/fuelReportGenerator';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 const getNivel = (pct) => {
@@ -129,6 +131,7 @@ const TanqueCard = ({ tanque, onRegistrarLectura }) => {
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export default function DashboardSupervisorBomberos() {
+  const { user } = useAuthStore();
   const [kpis, setKpis] = useState(null);
   const [solicitudes, setSolicitudes] = useState([]);
   const [entidades, setEntidades] = useState([]);
@@ -204,6 +207,14 @@ export default function DashboardSupervisorBomberos() {
       });
       const tipoLabel = modalLectura.tipo === 'apertura_dia' ? 'Apertura' : 'Cierre';
       toast.success(`${tipoLabel} del día registrada para "${modalLectura.tanque.nombre}".`);
+      
+      // Si es Cierre, generar el PDF
+      if (modalLectura.tipo === 'cierre_dia') {
+        const supervisorNombre = `${user?.nombre || ''} ${user?.apellido || ''}`.trim();
+        generarReporteCierre(kpis, modalLectura, formLectura, supervisorNombre);
+        toast.success('Reporte de cierre generado (PDF).');
+      }
+
       setModalLectura(null);
       setFormLectura({ cantidad_medida: '', observaciones: '' });
       cargarKpis(false);

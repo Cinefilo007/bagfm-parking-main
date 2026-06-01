@@ -70,7 +70,6 @@ export default function DashboardComando() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           {stats.map((stat, i) => {
             const Icono = stat.icon;
-            const isSentinelLink = i === 0 || i === 1;
             const CardContent = (
               <>
                 <div className="flex justify-between items-start mb-4">
@@ -82,11 +81,7 @@ export default function DashboardComando() {
                       'text-primary/70'
                     } 
                   />
-                  {isSentinelLink ? (
-                    <ArrowUpRight size={14} className="text-text-muted opacity-30 group-hover:text-primary group-hover:opacity-100 transition-all" />
-                  ) : (
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary/20 group-hover:bg-primary/50 transition-colors"></div>
-                  )}
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary/20 group-hover:bg-primary/50 transition-colors"></div>
                 </div>
                 
                 <div 
@@ -104,13 +99,7 @@ export default function DashboardComando() {
               </>
             );
 
-            return isSentinelLink ? (
-              <Link key={i} to="/supervisor-base/dashboard">
-                <Card elevation={2} className="flex flex-col relative overflow-hidden group hover:bg-bg-high transition-all border-bg-high/10 cursor-pointer h-full">
-                  {CardContent}
-                </Card>
-              </Link>
-            ) : (
+            return (
               <Card key={i} elevation={2} className="flex flex-col relative overflow-hidden group hover:bg-bg-high transition-all border-bg-high/10">
                 {CardContent}
               </Card>

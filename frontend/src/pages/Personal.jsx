@@ -590,7 +590,8 @@ const MiembroCard = ({ miembro, userActual, zonas, onUpdate, onToggleActivo, onE
 
 export default function Personal() {
   const { user: userActual } = useAuthStore();
-  const [personal, setPersonal] = useState([]);
+  const [todoElPersonal, setTodoElPersonal] = useState([]);
+  const [personalFiltrado, setPersonalFiltrado] = useState([]);
   const [entidades, setEntidades] = useState([]);
   const [zonas, setZonas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -606,11 +607,29 @@ export default function Personal() {
   const [hasMore, setHasMore] = useState(true);
   const limit = 10;
 
+  // Filtro en cliente: no toca los KPIs ni necesita ir al servidor
+  useEffect(() => {
+    if (!search.trim()) {
+      setPersonalFiltrado(todoElPersonal);
+    } else {
+      const term = search.toLowerCase();
+      setPersonalFiltrado(
+        todoElPersonal.filter(m =>
+          m.nombre?.toLowerCase().includes(term) ||
+          m.apellido?.toLowerCase().includes(term) ||
+          m.cedula?.toLowerCase().includes(term)
+        )
+      );
+    }
+    setPage(0);
+  }, [search, todoElPersonal]);
+
   const fetchData = async () => {
     setLoading(true);
     try {
-      const data = await personalService.listar({ skip: 0, limit: 1000, search });
-      setPersonal(data);
+      // Traemos siempre todo el personal (sin filtro de búsqueda) para que los KPIs sean correctos
+      const data = await personalService.listar({ skip: 0, limit: 1000 });
+      setTodoElPersonal(data);
       setHasMore(data.length > (page + 1) * limit);
 
       if (['COMANDANTE', 'ADMIN_BASE'].includes(userActual.rol)) {
@@ -633,14 +652,14 @@ export default function Personal() {
   };
 
   useEffect(() => {
-    const delay = setTimeout(fetchData, search ? 500 : 0);
-    return () => clearTimeout(delay);
-  }, [page, search]);
+    fetchData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleToggleActivo = async (id) => {
     try {
       const updated = await personalService.toggleActivo(id);
-      setPersonal(prev => prev.map(m => m.id === id ? updated : m));
+      setTodoElPersonal(prev => prev.map(m => m.id === id ? updated : m));
       toast.success("Estado táctico actualizado");
     } catch { toast.error("Fallo al cambiar privilegios"); }
   };
@@ -649,13 +668,13 @@ export default function Personal() {
     if (!window.confirm(`¿Confirma protocolo de BAJA DEFINITIVA para ${nombre}?`)) return;
     try {
       await personalService.eliminar(id);
-      setPersonal(prev => prev.filter(m => m.id !== id));
+      setTodoElPersonal(prev => prev.filter(m => m.id !== id));
       toast.success("Baja procesada exitosamente");
     } catch { toast.error("Error en proceso de baja"); }
   };
 
   const handleUpdateMiembro = (updated) => {
-    setPersonal(prev => prev.map(m => m.id === updated.id ? updated : m));
+    setTodoElPersonal(prev => prev.map(m => m.id === updated.id ? updated : m));
   };
 
   const handleCrearPersonal = async (e) => {
@@ -724,7 +743,7 @@ export default function Personal() {
         </Boton>
       </header>
 
-      <TacticalKPIs personal={personal} />
+      <TacticalKPIs personal={todoElPersonal} />
 
       <div className="flex gap-4 items-center bg-bg-card/20 p-2 rounded-2xl border border-white/5">
         <div className="relative flex-1 w-full">
@@ -734,7 +753,7 @@ export default function Personal() {
             placeholder="BUSCAR POR NOMBRE O CÉDULA..."
             className="w-full h-12 bg-bg-card border border-bg-high/10 rounded-xl pl-12 pr-4 text-sm font-bold text-text-main focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-text-muted/40 uppercase"
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+            onChange={(e) => { setSearch(e.target.value); }}
           />
         </div>
       </div>
@@ -746,7 +765,7 @@ export default function Personal() {
           ))
         ) : (
           <>
-            {personal.slice(page * limit, (page + 1) * limit).map(miembro => (
+            {personalFiltrado.slice(page * limit, (page + 1) * limit).map(miembro => (
               <MiembroCard 
                 key={miembro.id}
                 miembro={miembro}
@@ -758,7 +777,7 @@ export default function Personal() {
               />
             ))}
 
-            {personal.length === 0 && (
+            {personalFiltrado.length === 0 && (
               <div className="py-20 text-center border border-dashed border-white/10 rounded-2xl bg-bg-card/20">
                 <UserCog size={48} className="mx-auto text-text-muted mb-4 opacity-15" />
                 <p className="text-text-muted text-[10px] font-black uppercase tracking-[0.3em] opacity-40">
@@ -770,7 +789,7 @@ export default function Personal() {
         )}
       </section>
 
-      {!loading && (personal.length > limit || page > 0) && (
+      {!loading && (personalFiltrado.length > limit || page > 0) && (
         <div className="flex items-center justify-between pt-6 border-t border-white/5 mt-4">
           <Boton variant="ghost" disabled={page === 0} onClick={() => setPage(p => Math.max(0, p - 1))}
             className="gap-2 text-[10px] font-black uppercase tracking-widest disabled:opacity-30">
@@ -778,7 +797,7 @@ export default function Personal() {
           </Boton>
           <div className="flex flex-col items-center">
             <span className="text-[10px] font-black text-text-muted uppercase tracking-[0.3em]">Sector Acceso</span>
-            <span className="text-sm font-display font-black text-primary">PÁGINA {page + 1}</span>
+            <span className="text-sm font-display font-black text-primary">PÁGINA {page + 1} · {personalFiltrado.length} resultado{personalFiltrado.length !== 1 ? 's' : ''}</span>
           </div>
           <Boton variant="ghost" disabled={!hasMore} onClick={() => setPage(p => p + 1)}
             className="gap-2 text-[10px] font-black uppercase tracking-widest disabled:opacity-30">
