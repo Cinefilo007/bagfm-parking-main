@@ -329,8 +329,8 @@ async def descargar_plantilla_parque(
     """
     Descarga la plantilla Excel (.xlsx) para importación de la flota del parque automotor.
     """
-    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE]:
-        raise HTTPException(status_code=403, detail="Permisos insuficientes. Rol de mando requerido.")
+    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE, RolTipo.SUPERVISOR, RolTipo.ADMIN_ENTIDAD, RolTipo.SUPERVISOR_BOMBEROS]:
+        raise HTTPException(status_code=403, detail="Permisos insuficientes.")
         
     excel_data = template_service.generar_excel_parque_template()
     return Response(
@@ -351,8 +351,11 @@ async def importar_excel_parque(
     """
     Carga masiva de la flota vehicular y autorización de combustible mediante plantilla Excel.
     """
-    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE]:
-        raise HTTPException(status_code=403, detail="Permisos insuficientes. Rol de mando requerido.")
+    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE, RolTipo.SUPERVISOR, RolTipo.ADMIN_ENTIDAD, RolTipo.SUPERVISOR_BOMBEROS]:
+        raise HTTPException(status_code=403, detail="Permisos insuficientes.")
+        
+    if usuario.rol == RolTipo.ADMIN_ENTIDAD and entidad_id != usuario.entidad_id:
+        raise HTTPException(status_code=403, detail="No tienes permisos para registrar vehículos en otra entidad.")
         
     try:
         contenido = await file.read()
@@ -566,8 +569,11 @@ async def crear_vehiculo_individual(
     """
     Registra un vehículo individual en el parque automotor con placa y entidad obligatorios.
     """
-    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE]:
-        raise HTTPException(status_code=403, detail="Permisos insuficientes. Rol de mando requerido.")
+    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE, RolTipo.SUPERVISOR, RolTipo.ADMIN_ENTIDAD, RolTipo.SUPERVISOR_BOMBEROS]:
+        raise HTTPException(status_code=403, detail="Permisos insuficientes.")
+
+    if usuario.rol == RolTipo.ADMIN_ENTIDAD and request.entidad_id != usuario.entidad_id:
+        raise HTTPException(status_code=403, detail="No tienes permisos para registrar vehículos en otra entidad.")
 
     try:
         from app.models.vehiculo import Vehiculo

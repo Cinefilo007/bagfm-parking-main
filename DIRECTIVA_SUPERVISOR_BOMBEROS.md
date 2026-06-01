@@ -145,3 +145,8 @@ ALTER TYPE tipo_lectura_tanque_enum ADD VALUE IF NOT EXISTS 'cierre_dia';
 - **Problema:** El error de referencia no definida continuaba apareciendo al cargar la ruta del supervisor en pantallas móviles o emuladas en el navegador.
 - **Causa:** La barra de navegación inferior (`BottomNav.jsx`) definía accesos de combustible (`/parque-automotor` y `/combustible/tanques`) para el rol `SUPERVISOR_BOMBEROS` usando los iconos `Car` y `Flame`, pero omitía importarlos en `lucide-react`.
 - **Solución:** Se agregaron `Car` y `Flame` a los iconos importados en `BottomNav.jsx`, solucionando definitivamente el ReferenceError en tiempo de ejecución móvil.
+
+### [2026-06-01] Corrección de Permisos en la Carga Masiva e Individual del Parque Automotor
+- **Problema:** El Supervisor de Bomberos recibía un error `403 Forbidden` al intentar descargar la plantilla de importación, procesar un archivo Excel de vehículos, o registrar un vehículo de forma individual.
+- **Causa:** Los endpoints del backend (`GET /template`, `POST /importar-excel` y `POST /vehiculos` en `combustible.py`) estaban restringidos de forma rígida únicamente a los roles `COMANDANTE` y `ADMIN_BASE`.
+- **Solución:** Se añadieron los roles `SUPERVISOR_BOMBEROS`, `SUPERVISOR` y `ADMIN_ENTIDAD` a la lista de permitidos en dichos endpoints del backend. Se incluyó además un control de seguridad para restringir a los usuarios con rol `ADMIN_ENTIDAD` para que solo importen o registren vehículos pertenecientes a su propia entidad civil.
