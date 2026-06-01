@@ -123,5 +123,45 @@ export const combustibleService = {
       responseType: 'blob'
     });
     return data;
+  },
+
+  /**
+   * Crea un vehículo individual en el parque automotor (placa + entidad obligatorios).
+   */
+  async crearVehiculo(datos) {
+    const { data } = await api.post('/combustible/vehiculos', datos);
+    return data;
+  },
+
+  /**
+   * Obtiene los KPIs compactos del módulo de combustible para el Dashboard del Comandante.
+   */
+  async getDashboardKpis() {
+    const { data } = await api.get('/combustible/dashboard-kpis');
+    return data.data;
+  },
+
+  /**
+   * Crea un nuevo tanque de combustible.
+   */
+  async crearTanque(datos) {
+    const { data } = await api.post('/combustible/tanques', datos);
+    return data;
+  },
+
+  /**
+   * Edita nombre y/o capacidad máxima de un tanque (cantidad_actual NO editable).
+   */
+  async editarTanque(id, datos) {
+    const { data } = await api.patch(`/combustible/tanques/${id}`, datos);
+    return data;
+  },
+
+  /**
+   * Desactiva un tanque de combustible (soft-delete).
+   */
+  async eliminarTanque(id) {
+    const { data } = await api.delete(`/combustible/tanques/${id}`);
+    return data;
   }
 };

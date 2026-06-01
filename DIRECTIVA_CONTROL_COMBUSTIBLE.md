@@ -87,6 +87,16 @@ Para evitar inconsistencias a lo largo del programa, todas las pantallas del mó
 
 ---
 
+### 4.4 Gestión de Tanques de Combustible (`GestionTanques.jsx`)
+- **CRUD de Tanques:** Permite al Comandante y Admin Base registrar tanques, editar su capacidad máxima y darlos de baja (soft-delete, solo si no tienen consumos en la semana en curso).
+- **Protección de Stock:** La `cantidad_actual` nunca es editable de forma directa. Solo se actualiza a través de las lecturas semanales del bombero y los descuentos automáticos al despachar combustible.
+
+### 4.5 Monitor de Bomba y KPIs en Tiempo Real
+- **Dashboard del Comandante:** Integra 5 KPIs tácticos de combustible (Litros Surtidos, Cargas, Stock de Combustible en Tanques, Solicitudes Pendientes y Alertas de Fraude) y un componente `FuelMonitor` con polling de 30 segundos.
+- **Pestañas del Monitor:** Tanques (niveles con barra de color), Flujo (feed de últimas 15 cargas), y Solicitudes (resumen de pendientes con botón de acción rápido).
+
+---
+
 ## 5. ROLES Y PRIVILEGIOS DE ADMINISTRACIÓN DE PERSONAL DE COMBUSTIBLE
 
 ### 5.1 Alta del Rol BOMBERO
@@ -94,10 +104,10 @@ Para evitar inconsistencias a lo largo del programa, todas las pantallas del mó
 - **Vínculo de Entidad:** Al dar de alta a un `BOMBERO`, no se le asociará a ninguna entidad externa, ya que es un operador de servicio directo de la propia bomba de la base.
 - **Color de Identificación:** En los paneles y listados de Fuerza de Tareas, el rol de `BOMBERO` se identificará visualmente con la etiqueta naranja táctica (`text-orange-400 bg-orange-400/10 border-orange-400/20`).
 
-### 5.2 Acceso al Menú del Parque Automotor
-- **Barra de Navegación (Sidebar):** Los roles de Comandante y Administrador de Base tienen visible de forma fija el acceso al módulo "Parque Automotor" desde la barra de navegación lateral para la administración y carga de flotas.
+### 5.2 Acceso al Menú del Parque Automotor y Tanques
+- **Barra de Navegación (Sidebar):** Los roles de Comandante y Administrador de Base tienen visible de forma fija el acceso al módulo "Parque Automotor" y "Tanques Combustible" desde la barra de navegación lateral para la administración, carga de flotas e inventario.
 
 ---
 
-*Última actualización: 2026-05-31 (Habilitación de descarga de plantilla con columna de entidades en importación masiva Aegis Fuel V8.2)*
+*Última actualización: 2026-06-01 (Implementación de registro individual, gestión CRUD de tanques, KPIs de combustible y FuelMonitor en tiempo real V9.0)*
 *Aprobado por: Comandante de Base & Antigravity Aegis Command*

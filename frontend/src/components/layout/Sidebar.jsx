@@ -5,7 +5,7 @@ import {
   LayoutDashboard, UserCircle, Map as MapIcon,
   Camera, Sun, Moon, UserCog, ParkingCircle, Activity, Radio, AlertTriangle, Palette,
   ClipboardList, CalendarRange, Building2, Users, ParkingSquare, ShieldAlert,
-  QrCode, ArrowRightLeft, Car as CarIcon
+  QrCode, ArrowRightLeft, Car as CarIcon, Flame
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/auth.store';
@@ -31,6 +31,7 @@ export const Sidebar = () => {
       { to: '/comando/personal', label: 'Gestión Personal', icon: UserCog },
       { to: '/comando/carnets', label: 'Editor de carnets', icon: Palette },
       { to: '/parque-automotor', label: 'Parque Automotor', icon: CarIcon },
+      { to: '/combustible/tanques', label: 'Tanques Combustible', icon: Flame },
     );
   } else if (user?.rol === 'SUPERVISOR') {
     navItems.push(

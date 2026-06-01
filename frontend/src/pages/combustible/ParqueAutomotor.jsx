@@ -42,6 +42,15 @@ export default function ParqueAutomotor() {
   const [importandoExcel, setImportandoExcel] = useState(false);
   const [resumenImportacion, setResumenImportacion] = useState(null);
 
+  // Modal Registro Individual
+  const [modalRegistro, setModalRegistro] = useState(false);
+  const [formRegistro, setFormRegistro] = useState({
+    placa: '', entidad_id: '', marca: '', modelo: '', color: '',
+    uso_vehiculo: 'particular', tipo_combustible: 'gasolina',
+    capacidad_tanque: '', asignacion_combustible_semanal: '', autorizado_combustible: false
+  });
+  const [registrando, setRegistrando] = useState(false);
+
   useEffect(() => {
     cargarEntidades();
     cargarVehiculos();
@@ -198,6 +207,37 @@ export default function ParqueAutomotor() {
     }
   };
 
+  const handleRegistrarVehiculo = async (e) => {
+    e.preventDefault();
+    if (!formRegistro.placa.trim() || !formRegistro.entidad_id) {
+      toast.error("La placa y la entidad son obligatorios.");
+      return;
+    }
+    setRegistrando(true);
+    try {
+      await combustibleService.crearVehiculo({
+        placa: formRegistro.placa.trim().toUpperCase(),
+        entidad_id: formRegistro.entidad_id,
+        marca: formRegistro.marca || null,
+        modelo: formRegistro.modelo || null,
+        color: formRegistro.color || null,
+        uso_vehiculo: formRegistro.uso_vehiculo,
+        tipo_combustible: formRegistro.tipo_combustible,
+        capacidad_tanque: parseFloat(formRegistro.capacidad_tanque) || 0,
+        asignacion_combustible_semanal: parseFloat(formRegistro.asignacion_combustible_semanal) || 0,
+        autorizado_combustible: formRegistro.autorizado_combustible
+      });
+      toast.success(`Vehículo ${formRegistro.placa.toUpperCase()} registrado con éxito.`);
+      setModalRegistro(false);
+      setFormRegistro({ placa: '', entidad_id: '', marca: '', modelo: '', color: '', uso_vehiculo: 'particular', tipo_combustible: 'gasolina', capacidad_tanque: '', asignacion_combustible_semanal: '', autorizado_combustible: false });
+      cargarVehiculos();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Error al registrar el vehículo.");
+    } finally {
+      setRegistrando(false);
+    }
+  };
+
   // Helper para renderizar badges de uso
   const renderUsoBadge = (uso) => {
     switch (uso) {
@@ -225,11 +265,18 @@ export default function ParqueAutomotor() {
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <button 
+            onClick={() => setModalRegistro(true)}
+            className="flex-1 sm:flex-initial h-10 px-4 rounded-xl bg-primary text-on-primary font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-primary/90 transition-all cursor-pointer active:scale-95 shadow-tactica"
+          >
+            <PlusCircle size={14} />
+            Registrar Vehículo
+          </button>
+          <button 
             onClick={() => setModalImportar(true)}
             className="flex-1 sm:flex-initial h-10 px-4 rounded-xl bg-success text-on-primary font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-success/90 transition-all cursor-pointer active:scale-95 shadow-tactica"
           >
             <Upload size={14} />
-            Carga Masiva Excel
+            Carga Masiva
           </button>
           <button 
             onClick={() => { cargarEntidades(); cargarVehiculos(); }}
@@ -646,6 +693,156 @@ export default function ParqueAutomotor() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL REGISTRO INDIVIDUAL ─── */}
+      {modalRegistro && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-bg-card border border-bg-high/50 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto scrollbar-tactical">
+            <div className="p-4 border-b border-bg-high/20 flex justify-between items-center sticky top-0 bg-bg-card z-10">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-5 rounded-full bg-primary" />
+                <h3 className="text-xs font-black uppercase tracking-widest text-text-main">Registrar Vehículo Individual</h3>
+              </div>
+              <button onClick={() => setModalRegistro(false)} className="text-text-muted hover:text-text-main cursor-pointer">
+                <XCircle size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleRegistrarVehiculo} className="p-5 space-y-4">
+              {/* Placa (obligatorio) */}
+              <div className="space-y-1.5">
+                <label className="text-[8px] font-black uppercase text-text-muted tracking-widest flex items-center gap-1">
+                  <Car size={10} /> Placa *
+                </label>
+                <input
+                  type="text"
+                  value={formRegistro.placa}
+                  onChange={(e) => setFormRegistro(p => ({ ...p, placa: e.target.value.toUpperCase() }))}
+                  placeholder="Ej: ABC123D"
+                  maxLength={10}
+                  className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main font-display font-black tracking-widest focus:outline-none focus:border-success transition-all uppercase"
+                  required
+                />
+              </div>
+
+              {/* Entidad (obligatorio) */}
+              <div className="space-y-1.5">
+                <label className="text-[8px] font-black uppercase text-text-muted tracking-widest flex items-center gap-1">
+                  <Database size={10} /> Entidad *
+                </label>
+                <select
+                  value={formRegistro.entidad_id}
+                  onChange={(e) => setFormRegistro(p => ({ ...p, entidad_id: e.target.value }))}
+                  className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-bold"
+                  required
+                >
+                  <option value="">Seleccionar entidad...</option>
+                  {entidades.map(ent => (
+                    <option key={ent.id} value={ent.id}>{ent.nombre.toUpperCase()}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Marca, Modelo, Color (opcionales) */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Marca</label>
+                  <input type="text" value={formRegistro.marca}
+                    onChange={(e) => setFormRegistro(p => ({ ...p, marca: e.target.value }))}
+                    placeholder="Toyota"
+                    className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-bold"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Modelo</label>
+                  <input type="text" value={formRegistro.modelo}
+                    onChange={(e) => setFormRegistro(p => ({ ...p, modelo: e.target.value }))}
+                    placeholder="Hilux"
+                    className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-bold"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Color</label>
+                  <input type="text" value={formRegistro.color}
+                    onChange={(e) => setFormRegistro(p => ({ ...p, color: e.target.value }))}
+                    placeholder="Blanco"
+                    className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-bold"
+                  />
+                </div>
+              </div>
+
+              {/* Uso y Tipo Combustible */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Uso Vehículo</label>
+                  <select value={formRegistro.uso_vehiculo}
+                    onChange={(e) => setFormRegistro(p => ({ ...p, uso_vehiculo: e.target.value }))}
+                    className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-bold"
+                  >
+                    <option value="particular">Particular</option>
+                    <option value="protocolar">Protocolar</option>
+                    <option value="servicio">Servicio</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Combustible</label>
+                  <select value={formRegistro.tipo_combustible}
+                    onChange={(e) => setFormRegistro(p => ({ ...p, tipo_combustible: e.target.value }))}
+                    className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-bold"
+                  >
+                    <option value="gasolina">⛽ Gasolina</option>
+                    <option value="diesel">🛢️ Diésel</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Capacidad y Asignación */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Capacidad Tanque (L)</label>
+                  <input type="number" step="0.1" min="0" value={formRegistro.capacidad_tanque}
+                    onChange={(e) => setFormRegistro(p => ({ ...p, capacidad_tanque: e.target.value }))}
+                    placeholder="60"
+                    className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-display font-bold"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Asig. Semanal (L)</label>
+                  <input type="number" step="0.1" min="0" value={formRegistro.asignacion_combustible_semanal}
+                    onChange={(e) => setFormRegistro(p => ({ ...p, asignacion_combustible_semanal: e.target.value }))}
+                    placeholder="50"
+                    className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-display font-bold"
+                  />
+                </div>
+              </div>
+
+              {/* Toggle Autorización */}
+              <div className="flex items-center justify-between bg-bg-low border border-bg-high/30 rounded-xl p-3">
+                <span className="text-[9px] font-black uppercase tracking-widest text-text-muted">Autorizar para Surtir Combustible</span>
+                <button
+                  type="button"
+                  onClick={() => setFormRegistro(p => ({ ...p, autorizado_combustible: !p.autorizado_combustible }))}
+                  className="cursor-pointer"
+                >
+                  {formRegistro.autorizado_combustible ? (
+                    <ToggleRight size={28} className="text-success" />
+                  ) : (
+                    <ToggleLeft size={28} className="text-text-muted" />
+                  )}
+                </button>
+              </div>
+
+              <button
+                type="submit"
+                disabled={registrando}
+                className="w-full h-12 rounded-xl bg-gradient-to-r from-primary to-emerald-600 text-on-primary font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:brightness-110 transition-all cursor-pointer active:scale-95 disabled:opacity-50 shadow-tactica"
+              >
+                {registrando ? <RefreshCw size={14} className="animate-spin" /> : <PlusCircle size={14} />}
+                {registrando ? 'Registrando...' : 'Registrar Vehículo'}
+              </button>
+            </form>
           </div>
         </div>
       )}

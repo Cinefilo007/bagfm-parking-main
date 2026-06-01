@@ -6,9 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Query, 
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from uuid import UUID
+import uuid
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.core.database import obtener_db
 from app.core.dependencias import obtener_usuario_actual
@@ -528,3 +529,356 @@ async def actualizar_vehiculo_combustible(
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- Endpoint: Creación Individual de Vehículo ---
+
+class VehiculoCreateRequest(BaseModel):
+    placa: str = Field(..., max_length=20)
+    entidad_id: UUID
+    marca: Optional[str] = None
+    modelo: Optional[str] = None
+    color: Optional[str] = None
+    año: Optional[int] = None
+    tipo: Optional[str] = None
+    uso_vehiculo: Optional[str] = "particular"
+    tipo_combustible: Optional[str] = "gasolina"
+    capacidad_tanque: Optional[float] = 0.0
+    asignacion_combustible_semanal: Optional[float] = 0.0
+    autorizado_combustible: Optional[bool] = False
+
+@router.post("/vehiculos")
+async def crear_vehiculo_individual(
+    request: VehiculoCreateRequest,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = Depends(obtener_usuario_actual)
+):
+    """
+    Registra un vehículo individual en el parque automotor con placa y entidad obligatorios.
+    """
+    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE]:
+        raise HTTPException(status_code=403, detail="Permisos insuficientes. Rol de mando requerido.")
+
+    try:
+        from app.models.vehiculo import Vehiculo
+        from app.models.entidad_civil import EntidadCivil
+        from app.models.enums import UsoVehiculo, TipoCombustible
+
+        placa_normalizada = request.placa.strip().upper()
+        if not placa_normalizada:
+            raise HTTPException(status_code=400, detail="La placa es obligatoria.")
+
+        # Validar placa única
+        query_existente = select(Vehiculo).where(
+            func.upper(Vehiculo.placa) == placa_normalizada,
+            Vehiculo.activo == True
+        )
+        res_existente = await db.execute(query_existente)
+        if res_existente.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail=f"Ya existe un vehículo activo con la placa {placa_normalizada}.")
+
+        # Validar que la entidad existe
+        query_entidad = select(EntidadCivil).where(
+            EntidadCivil.id == request.entidad_id,
+            EntidadCivil.activo == True
+        )
+        res_entidad = await db.execute(query_entidad)
+        if not res_entidad.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="La entidad seleccionada no existe o no está activa.")
+
+        # Parsear enums con fallback seguro
+        try:
+            uso_v = UsoVehiculo(request.uso_vehiculo) if request.uso_vehiculo else UsoVehiculo.particular
+        except ValueError:
+            uso_v = UsoVehiculo.particular
+        try:
+            tipo_c = TipoCombustible(request.tipo_combustible) if request.tipo_combustible else TipoCombustible.gasolina
+        except ValueError:
+            tipo_c = TipoCombustible.gasolina
+
+        nuevo_vehiculo = Vehiculo(
+            id=uuid.uuid4(),
+            placa=placa_normalizada,
+            marca=request.marca.strip() if request.marca and request.marca.strip() else "S/M",
+            modelo=request.modelo.strip() if request.modelo and request.modelo.strip() else "S/M",
+            color=request.color.strip() if request.color and request.color.strip() else "S/C",
+            año=request.año,
+            tipo=request.tipo,
+            entidad_id=request.entidad_id,
+            uso_vehiculo=uso_v,
+            tipo_combustible=tipo_c,
+            autorizado_combustible=request.autorizado_combustible or False,
+            capacidad_tanque=request.capacidad_tanque or 0.0,
+            asignacion_combustible_semanal=request.asignacion_combustible_semanal or 0.0,
+            ultimo_kilometraje=0,
+            activo=True
+        )
+        db.add(nuevo_vehiculo)
+        await db.commit()
+        return {"status": "success", "message": f"Vehículo {placa_normalizada} registrado con éxito.", "id": nuevo_vehiculo.id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al crear el vehículo: {str(e)}")
+
+
+# --- Endpoint: KPIs del Dashboard de Combustible ---
+
+@router.get("/dashboard-kpis")
+async def obtener_dashboard_kpis(
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = Depends(obtener_usuario_actual)
+):
+    """
+    Devuelve los KPIs compactos del módulo de combustible para el Dashboard del Comandante.
+    """
+    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE, RolTipo.SUPERVISOR]:
+        raise HTTPException(status_code=403, detail="Permisos insuficientes.")
+
+    try:
+        from app.models.solicitud_combustible import SolicitudCombustible
+        from app.models.abastecimiento import Abastecimiento
+        from app.models.vehiculo import Vehiculo
+        from app.models.usuario import Usuario as UsuarioModel
+        from sqlalchemy.orm import selectinload
+        import uuid as uuid_mod
+
+        inicio_semana, fin_semana = await abastecimiento_service.obtener_rango_semana()
+
+        # 1. Total litros surtidos esta semana
+        q_litros = select(func.coalesce(func.sum(Abastecimiento.cantidad_abastecida), 0.0)).where(
+            Abastecimiento.fecha >= inicio_semana,
+            Abastecimiento.fecha <= fin_semana
+        )
+        total_litros = (await db.execute(q_litros)).scalar() or 0.0
+
+        # 2. Total cargas esta semana
+        q_cargas = select(func.count(Abastecimiento.id)).where(
+            Abastecimiento.fecha >= inicio_semana,
+            Abastecimiento.fecha <= fin_semana
+        )
+        total_cargas = (await db.execute(q_cargas)).scalar() or 0
+
+        # 3. Solicitudes pendientes
+        q_pendientes = select(func.count(SolicitudCombustible.id)).where(
+            SolicitudCombustible.estado == EstadoSolicitudCombustible.pendiente
+        )
+        solicitudes_pendientes = (await db.execute(q_pendientes)).scalar() or 0
+
+        # 4. Alertas de fraude esta semana
+        q_alertas = select(func.count(Abastecimiento.id)).where(
+            Abastecimiento.fecha >= inicio_semana,
+            Abastecimiento.fecha <= fin_semana,
+            Abastecimiento.tiene_alerta == True
+        )
+        alertas_fraude = (await db.execute(q_alertas)).scalar() or 0
+
+        # 5. Stock total de combustible (todos los tanques activos)
+        q_stock = select(func.coalesce(func.sum(TanqueCombustible.cantidad_actual), 0.0)).where(
+            TanqueCombustible.activo == True
+        )
+        stock_total = (await db.execute(q_stock)).scalar() or 0.0
+
+        # 6. Estado de tanques
+        q_tanques = select(TanqueCombustible).where(TanqueCombustible.activo == True).order_by(TanqueCombustible.nombre.asc())
+        tanques_res = await db.execute(q_tanques)
+        tanques = tanques_res.scalars().all()
+
+        tanques_data = [
+            {
+                "id": str(t.id),
+                "nombre": t.nombre,
+                "tipo_combustible": t.tipo_combustible.value,
+                "capacidad_maxima": t.capacidad_maxima,
+                "cantidad_actual": t.cantidad_actual,
+                "porcentaje": round((t.cantidad_actual / t.capacidad_maxima) * 100, 1) if t.capacidad_maxima > 0 else 0
+            } for t in tanques
+        ]
+
+        # 7. Últimos 15 abastecimientos
+        q_ultimos = (
+            select(Abastecimiento)
+            .options(selectinload(Abastecimiento.vehiculo), selectinload(Abastecimiento.bombero))
+            .order_by(Abastecimiento.fecha.desc())
+            .limit(15)
+        )
+        ultimos_res = await db.execute(q_ultimos)
+        ultimos = ultimos_res.scalars().all()
+
+        ultimos_data = [
+            {
+                "id": str(a.id),
+                "placa": a.vehiculo.placa if a.vehiculo else "—",
+                "bombero": f"{a.bombero.nombre} {a.bombero.apellido}" if a.bombero else "—",
+                "litros": a.cantidad_abastecida,
+                "fecha": a.fecha.isoformat(),
+                "tiene_alerta": a.tiene_alerta
+            } for a in ultimos
+        ]
+
+        return {
+            "status": "success",
+            "data": {
+                "total_litros_semana": round(total_litros, 1),
+                "total_cargas_semana": total_cargas,
+                "solicitudes_pendientes": solicitudes_pendientes,
+                "alertas_fraude_semana": alertas_fraude,
+                "stock_combustible_total": round(stock_total, 1),
+                "tanques": tanques_data,
+                "ultimos_abastecimientos": ultimos_data
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener KPIs: {str(e)}")
+
+
+# --- Endpoints: CRUD de Tanques de Combustible ---
+
+class TanqueCreateRequest(BaseModel):
+    nombre: str = Field(..., max_length=100)
+    tipo_combustible: str  # 'gasolina' | 'diesel'
+    capacidad_maxima: float
+    cantidad_actual: float
+
+class TanqueUpdateRequest(BaseModel):
+    nombre: Optional[str] = None
+    capacidad_maxima: Optional[float] = None
+
+@router.post("/tanques")
+async def crear_tanque(
+    request: TanqueCreateRequest,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = Depends(obtener_usuario_actual)
+):
+    """
+    Registra un nuevo tanque de combustible en la bomba de la base.
+    """
+    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE]:
+        raise HTTPException(status_code=403, detail="Permisos insuficientes. Rol de mando requerido.")
+
+    try:
+        from app.models.enums import TipoCombustible
+
+        nombre_limpio = request.nombre.strip()
+        if not nombre_limpio:
+            raise HTTPException(status_code=400, detail="El nombre del tanque es obligatorio.")
+
+        if request.capacidad_maxima <= 0:
+            raise HTTPException(status_code=400, detail="La capacidad máxima debe ser mayor a 0.")
+        if request.cantidad_actual < 0:
+            raise HTTPException(status_code=400, detail="La cantidad actual no puede ser negativa.")
+        if request.cantidad_actual > request.capacidad_maxima:
+            raise HTTPException(status_code=400, detail="La cantidad actual no puede exceder la capacidad máxima.")
+
+        try:
+            tipo_c = TipoCombustible(request.tipo_combustible)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Tipo de combustible inválido. Use 'gasolina' o 'diesel'.")
+
+        nuevo_tanque = TanqueCombustible(
+            id=uuid.uuid4(),
+            nombre=nombre_limpio,
+            tipo_combustible=tipo_c,
+            capacidad_maxima=request.capacidad_maxima,
+            cantidad_actual=request.cantidad_actual,
+            activo=True
+        )
+        db.add(nuevo_tanque)
+        await db.commit()
+        return {
+            "status": "success",
+            "message": f"Tanque '{nombre_limpio}' registrado con éxito.",
+            "id": nuevo_tanque.id
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al crear el tanque: {str(e)}")
+
+@router.patch("/tanques/{tanque_id}")
+async def editar_tanque(
+    tanque_id: UUID,
+    request: TanqueUpdateRequest,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = Depends(obtener_usuario_actual)
+):
+    """
+    Edita el nombre y/o la capacidad máxima de un tanque.
+    La cantidad actual NO es editable desde este endpoint (solo vía lectura semanal y abastecimientos).
+    """
+    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE]:
+        raise HTTPException(status_code=403, detail="Permisos insuficientes. Rol de mando requerido.")
+
+    try:
+        query = select(TanqueCombustible).where(TanqueCombustible.id == tanque_id, TanqueCombustible.activo == True)
+        res = await db.execute(query)
+        tanque = res.scalar_one_or_none()
+
+        if not tanque:
+            raise HTTPException(status_code=404, detail="Tanque no encontrado o desactivado.")
+
+        if request.nombre is not None:
+            nombre_limpio = request.nombre.strip()
+            if not nombre_limpio:
+                raise HTTPException(status_code=400, detail="El nombre del tanque no puede estar vacío.")
+            tanque.nombre = nombre_limpio
+
+        if request.capacidad_maxima is not None:
+            if request.capacidad_maxima <= 0:
+                raise HTTPException(status_code=400, detail="La capacidad máxima debe ser mayor a 0.")
+            tanque.capacidad_maxima = request.capacidad_maxima
+
+        await db.commit()
+        return {"status": "success", "message": f"Tanque '{tanque.nombre}' actualizado con éxito."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al editar el tanque: {str(e)}")
+
+@router.delete("/tanques/{tanque_id}")
+async def desactivar_tanque(
+    tanque_id: UUID,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = Depends(obtener_usuario_actual)
+):
+    """
+    Desactiva un tanque de combustible (soft-delete).
+    """
+    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE]:
+        raise HTTPException(status_code=403, detail="Permisos insuficientes. Rol de mando requerido.")
+
+    try:
+        from app.models.abastecimiento import Abastecimiento
+
+        query = select(TanqueCombustible).where(TanqueCombustible.id == tanque_id, TanqueCombustible.activo == True)
+        res = await db.execute(query)
+        tanque = res.scalar_one_or_none()
+
+        if not tanque:
+            raise HTTPException(status_code=404, detail="Tanque no encontrado o ya desactivado.")
+
+        # Verificar si tiene abastecimientos en la semana actual
+        inicio_semana, _ = await abastecimiento_service.obtener_rango_semana()
+        q_abast = select(func.count(Abastecimiento.id)).where(
+            Abastecimiento.tanque_id == tanque_id,
+            Abastecimiento.fecha >= inicio_semana
+        )
+        abast_semana = (await db.execute(q_abast)).scalar() or 0
+
+        if abast_semana > 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"No se puede desactivar: el tanque tiene {abast_semana} abastecimiento(s) vinculado(s) esta semana."
+            )
+
+        tanque.activo = False
+        await db.commit()
+        return {"status": "success", "message": f"Tanque '{tanque.nombre}' desactivado con éxito."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al desactivar el tanque: {str(e)}")

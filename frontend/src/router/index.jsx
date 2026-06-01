@@ -40,6 +40,7 @@ import DashboardBombero from '../pages/combustible/DashboardBombero';
 import ReporteCombustible from '../pages/combustible/ReporteCombustible';
 import ParqueAutomotor from '../pages/combustible/ParqueAutomotor';
 import ColaAprobacionesCombustible from '../pages/combustible/ColaAprobacionesCombustible';
+import GestionTanques from '../pages/combustible/GestionTanques';
 
 import { useAuthStore } from '../store/auth.store';
 
@@ -168,7 +169,14 @@ export const router = createBrowserRouter([
               { path: '', element: <DashboardBombero /> },
               { path: 'dashboard', element: <DashboardBombero /> },
               { path: 'reportes', element: <ReporteCombustible /> },
-              { path: 'aprobaciones', element: <ColaAprobacionesCombustible /> }
+              { path: 'aprobaciones', element: <ColaAprobacionesCombustible /> },
+              {
+                path: 'tanques',
+                element: <RutaProtegida rolesPermitidos={['COMANDANTE', 'ADMIN_BASE']} />,
+                children: [
+                  { path: '', element: <GestionTanques /> }
+                ]
+              }
             ]
           },
           // PARQUE AUTOMOTOR
