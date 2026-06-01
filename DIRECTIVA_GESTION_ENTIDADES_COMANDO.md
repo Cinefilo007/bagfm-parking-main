@@ -45,3 +45,4 @@ Proveer al **Comandante** y **Admin Base** la capacidad de administrar el ciclo 
 | Fecha | Versión | Cambio |
 |-------|---------|--------|
 | 2026-05-12 | v2.6 | Se agregó la edición de Entidades desde el Dashboard de Comando y se corrigió el schema PUT en el backend. |
+| 2026-06-01 | v2.7 | Se corrigió error `NameError: name 'update' is not defined` en el borrado en cascada profunda de entidades. |

@@ -17,7 +17,7 @@ from app.models.enums import RolTipo
 from app.schemas.entidad_civil import EntidadCivilCrear, EntidadCivilActualizar
 from app.core.excepciones import EntidadDuplicada, EntidadNoEncontrada
 from app.core.security import hashear_password
-from sqlalchemy import delete
+from sqlalchemy import delete, update
 
 class EntidadCivilService:
     def _generar_slug(self, texto: str) -> str:

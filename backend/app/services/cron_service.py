@@ -148,7 +148,7 @@ class CronService:
         stmt = select(PuestoEstacionamiento).where(
             and_(
                 PuestoEstacionamiento.estado == EstadoPuesto.ocupado,
-                PuestoEstacionamiento.ocupado_at < umbral_alerta
+                PuestoEstacionamiento.ocupado_desde < umbral_alerta
             )
         )
         result = await db.execute(stmt)
