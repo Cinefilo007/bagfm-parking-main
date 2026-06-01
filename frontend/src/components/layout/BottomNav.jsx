@@ -61,6 +61,13 @@ export const BottomNav = () => {
       { to: '/socio/accesos',      label: 'Accesos',      icon: ArrowRightLeft },
       { to: '/ajustes',            label: 'Perfil',       icon: IdCard }
     );
+  } else if (user?.rol === 'SUPERVISOR_BOMBEROS') {
+    navItems.push(
+      { to: '/combustible-supervisor/dashboard', label: 'Centro', icon: ShieldCheck },
+      { to: '/parque-automotor', label: 'Parque', icon: Car },
+      { to: '/combustible/tanques', label: 'Tanques', icon: Flame },
+      { label: 'Más', icon: Menu, isDrawerTrigger: true }
+    );
   } else if (user?.rol === 'BOMBERO') {
     navItems.push(
       { to: '/combustible/dashboard', label: 'Inicio', icon: ShieldCheck },

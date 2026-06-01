@@ -831,7 +831,7 @@ export default function DashboardBombero() {
 
       {/* MODAL NUEVA SOLICITUD DE EMERGENCIA */}
       {modalSolicitud && (
-        <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="w-full max-w-sm bg-bg-card rounded-2xl border border-white/10 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-bg-low/50">
               <div className="flex items-center gap-2">

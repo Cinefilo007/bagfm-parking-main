@@ -55,10 +55,7 @@ export const MobileMenuDrawer = ({ isOpen, onClose }) => {
     );
   } else if (user?.rol === 'SUPERVISOR_BOMBEROS') {
     extendedNavItems.push(
-      { to: '/combustible-supervisor/dashboard', label: 'Centro de Control', icon: Flame, color: 'text-amber-400' },
       { to: '/combustible/aprobaciones', label: 'Buzón Aprob.', icon: Bell, color: 'text-red-400' },
-      { to: '/parque-automotor', label: 'Parque Automotor', icon: CarIcon, color: 'text-blue-400' },
-      { to: '/combustible/tanques', label: 'Tanques Comb.', icon: Sunrise, color: 'text-emerald-400' },
     );
   }
 

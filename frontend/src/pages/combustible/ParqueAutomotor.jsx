@@ -19,6 +19,7 @@ export default function ParqueAutomotor() {
   // Filtros
   const [filtroEntidad, setFiltroEntidad] = useState('');
   const [placaBusqueda, setPlacaBusqueda] = useState('');
+  const [filtroAutorizado, setFiltroAutorizado] = useState('autorizados'); // todos | autorizados | inhabilitados
 
   // Paginación
   const [page, setPage] = useState(0);
@@ -325,6 +326,16 @@ export default function ParqueAutomotor() {
                 <option key={ent.id} value={ent.id}>{ent.nombre.toUpperCase()}</option>
               ))}
             </select>
+            
+            <select
+              value={filtroAutorizado}
+              onChange={(e) => setFiltroAutorizado(e.target.value)}
+              className="bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-bold"
+            >
+              <option value="autorizados">SÓLO AUTORIZADOS</option>
+              <option value="inhabilitados">SÓLO INHABILITADOS</option>
+              <option value="todos">TODOS LOS VEHÍCULOS</option>
+            </select>
 
             <button
               type="submit"
@@ -378,7 +389,7 @@ export default function ParqueAutomotor() {
       {/* LISTADO DE VEHÍCULOS (PARQUE AUTOMOTOR) */}
       <div className="bg-bg-card border border-bg-high/50 rounded-xl p-4 overflow-hidden">
         <h2 className="text-[10px] font-black uppercase tracking-widest text-text-muted mb-4 flex items-center gap-1.5">
-          <Database size={13} /> Flota Registrada ({vehiculos.length} Vehículos)
+          <Database size={13} /> Flota Registrada ({vehiculos.length} Total)
         </h2>
 
         {cargandoVehiculos ? (
@@ -386,14 +397,22 @@ export default function ParqueAutomotor() {
             <RefreshCw size={28} className="animate-spin text-success" />
             <p className="text-[10px] text-text-muted uppercase tracking-widest">Cargando parque automotor...</p>
           </div>
-        ) : vehiculos.length === 0 ? (
-          <div className="py-12 flex flex-col items-center justify-center gap-2 bg-white/5 border border-dashed border-bg-high/30 rounded-xl">
-            <Car size={36} className="text-text-muted" />
-            <p className="text-xs text-text-muted italic">No se encontraron vehículos registrados con los criterios seleccionados.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+        ) : (() => {
+          const vehiculosAMostrar = vehiculos.filter(v => {
+            if (filtroAutorizado === 'autorizados' && !v.autorizado_combustible) return false;
+            if (filtroAutorizado === 'inhabilitados' && v.autorizado_combustible) return false;
+            return true;
+          });
+
+          return vehiculosAMostrar.length === 0 ? (
+            <div className="py-12 flex flex-col items-center justify-center gap-2 bg-white/5 border border-dashed border-bg-high/30 rounded-xl">
+              <Car size={36} className="text-text-muted" />
+              <p className="text-xs text-text-muted italic">No se encontraron vehículos registrados con los criterios seleccionados.</p>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-bg-high/20 text-[8px] font-black uppercase tracking-widest text-text-muted">
                   <th className="py-2.5 px-3">Placa</th>
@@ -408,7 +427,7 @@ export default function ParqueAutomotor() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-bg-high/20 text-[11px] font-sans">
-                {vehiculos.slice(page * limit, (page + 1) * limit).map(v => (
+                {vehiculosAMostrar.slice(page * limit, (page + 1) * limit).map(v => (
                   <tr key={v.id} className="hover:bg-bg-low/30 transition-all">
                     <td className="py-3 px-3 font-display font-black text-text-main tracking-wider">{v.placa}</td>
                     <td className="py-3 px-3 text-text-sec">
@@ -461,35 +480,37 @@ export default function ParqueAutomotor() {
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
-
-        {!cargandoVehiculos && vehiculos.length > limit && (
-          <div className="flex items-center justify-between pt-4 mt-4 border-t border-bg-high/20">
-            <button 
-              disabled={page === 0} 
-              onClick={() => setPage(p => Math.max(0, p - 1))}
-              className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-text-muted hover:text-text-main disabled:opacity-30 transition-all cursor-pointer"
-            >
-              <ChevronLeft size={14} /> Anterior
-            </button>
-            <div className="flex flex-col items-center">
-              <span className="text-xs font-display font-black text-success">PÁGINA {page + 1}</span>
-            </div>
-            <button 
-              disabled={vehiculos.length <= (page + 1) * limit} 
-              onClick={() => setPage(p => p + 1)}
-              className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-text-muted hover:text-text-main disabled:opacity-30 transition-all cursor-pointer"
-            >
-              Siguiente <ChevronRight size={14} />
-            </button>
-          </div>
-        )}
+              </div>
+              
+              {vehiculosAMostrar.length > limit && (
+                <div className="flex items-center justify-between pt-4 mt-4 border-t border-bg-high/20">
+                  <button 
+                    disabled={page === 0} 
+                    onClick={() => setPage(p => Math.max(0, p - 1))}
+                    className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-text-muted hover:text-text-main disabled:opacity-30 transition-all cursor-pointer"
+                  >
+                    <ChevronLeft size={14} /> Anterior
+                  </button>
+                  <div className="flex flex-col items-center">
+                    <span className="text-xs font-display font-black text-success">PÁGINA {page + 1}</span>
+                  </div>
+                  <button 
+                    disabled={vehiculosAMostrar.length <= (page + 1) * limit} 
+                    onClick={() => setPage(p => p + 1)}
+                    className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-text-muted hover:text-text-main disabled:opacity-30 transition-all cursor-pointer"
+                  >
+                    Siguiente <ChevronRight size={14} />
+                  </button>
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
 
       {/* MODAL EDICIÓN PARÁMETROS VEHÍCULO */}
       {modalVehiculo && (
-        <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="w-full max-w-sm bg-bg-card rounded-2xl border border-bg-high/50 shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-bg-high/30 bg-bg-app">
               <div className="flex items-center gap-2">
@@ -606,7 +627,7 @@ export default function ParqueAutomotor() {
 
       {/* MODAL CARGA MASIVA DE EXCEL */}
       {modalImportar && (
-        <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="w-full max-w-md bg-bg-card rounded-2xl border border-bg-high/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between px-4 py-3 border-b border-bg-high/30 bg-bg-app">
               <div className="flex items-center gap-2">

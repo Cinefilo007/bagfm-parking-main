@@ -1072,12 +1072,13 @@ async def obtener_estado_dia_tanques(
 
 @router.get("/dashboard-kpis-supervisor")
 async def obtener_dashboard_kpis_supervisor(
+    fecha: Optional[str] = None,
     db: AsyncSession = Depends(obtener_db),
     usuario: Usuario = Depends(obtener_usuario_actual)
 ):
     """
     KPIs exclusivos del Dashboard del Supervisor de Bomberos.
-    Incluye: estado de tanques, litros abastecidos hoy, solicitudes pendientes, 
+    Incluye: estado de tanques, litros abastecidos hoy/semana, solicitudes pendientes, 
     últimos abastecimientos del día y estado de apertura/cierre.
     """
     if usuario.rol not in [RolTipo.SUPERVISOR_BOMBEROS, RolTipo.COMANDANTE, RolTipo.ADMIN_BASE]:
@@ -1089,7 +1090,8 @@ async def obtener_dashboard_kpis_supervisor(
         from app.models.vehiculo import Vehiculo
         from sqlalchemy.orm import selectinload
 
-        inicio_dia, fin_dia = await abastecimiento_service.obtener_rango_dia()
+        inicio_dia, fin_dia = await abastecimiento_service.obtener_rango_dia(fecha)
+        inicio_semana, _ = await abastecimiento_service.obtener_rango_semana(fecha)
 
         # 1. Litros abastecidos hoy
         q_litros_hoy = select(func.coalesce(func.sum(Abastecimiento.cantidad_abastecida), 0.0)).where(
@@ -1097,11 +1099,23 @@ async def obtener_dashboard_kpis_supervisor(
         )
         litros_hoy = (await db.execute(q_litros_hoy)).scalar() or 0.0
 
+        # Litros semana
+        q_litros_semana = select(func.coalesce(func.sum(Abastecimiento.cantidad_abastecida), 0.0)).where(
+            Abastecimiento.fecha.between(inicio_semana, fin_dia)
+        )
+        litros_semana = (await db.execute(q_litros_semana)).scalar() or 0.0
+
         # 2. Cargas realizadas hoy
         q_cargas_hoy = select(func.count(Abastecimiento.id)).where(
             Abastecimiento.fecha.between(inicio_dia, fin_dia)
         )
         cargas_hoy = (await db.execute(q_cargas_hoy)).scalar() or 0
+
+        # Cargas semana
+        q_cargas_semana = select(func.count(Abastecimiento.id)).where(
+            Abastecimiento.fecha.between(inicio_semana, fin_dia)
+        )
+        cargas_semana = (await db.execute(q_cargas_semana)).scalar() or 0
 
         # 3. Solicitudes pendientes
         q_pendientes = select(func.count(SolicitudCombustible.id)).where(
@@ -1117,8 +1131,8 @@ async def obtener_dashboard_kpis_supervisor(
         tanques_data = []
         stock_total = 0.0
         for t in tanques:
-            tiene_apertura = await abastecimiento_service.verificar_apertura_dia(db, t.id)
-            tiene_cierre = await abastecimiento_service.verificar_cierre_dia(db, t.id)
+            tiene_apertura = await abastecimiento_service.verificar_apertura_dia(db, t.id, fecha)
+            tiene_cierre = await abastecimiento_service.verificar_cierre_dia(db, t.id, fecha)
             stock_total += t.cantidad_actual
             tanques_data.append({
                 "id": str(t.id),
@@ -1163,7 +1177,9 @@ async def obtener_dashboard_kpis_supervisor(
             "status": "success",
             "data": {
                 "litros_hoy": round(litros_hoy, 1),
+                "litros_semana": round(litros_semana, 1),
                 "cargas_hoy": cargas_hoy,
+                "cargas_semana": cargas_semana,
                 "solicitudes_pendientes": solicitudes_pendientes,
                 "stock_total": round(stock_total, 1),
                 "tanques": tanques_data,

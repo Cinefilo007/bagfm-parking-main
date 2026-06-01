@@ -21,21 +21,33 @@ from app.services.notificacion_service import notificacion_service
 
 class AbastecimientoService:
     
-    async def obtener_rango_semana(self) -> tuple:
+    async def obtener_rango_semana(self, fecha_str: Optional[str] = None) -> tuple:
         """
-        Retorna el inicio de la semana actual (lunes a las 00:00:00) y el fin del día de hoy.
+        Retorna el inicio de la semana (lunes a las 00:00:00) y el fin del día (domingo o el día indicado).
         """
-        hoy = datetime.now()
+        if fecha_str:
+            try:
+                hoy = datetime.fromisoformat(fecha_str.replace("Z", "+00:00"))
+            except ValueError:
+                hoy = datetime.now()
+        else:
+            hoy = datetime.now()
         lunes = hoy - timedelta(days=hoy.weekday())
         inicio = datetime.combine(lunes.date(), time.min)
         fin = datetime.combine(hoy.date(), time.max)
         return inicio, fin
 
-    async def obtener_rango_dia(self) -> tuple:
+    async def obtener_rango_dia(self, fecha_str: Optional[str] = None) -> tuple:
         """
-        Retorna el inicio y fin del día actual (00:00:00 a 23:59:59).
+        Retorna el inicio y fin del día actual o de la fecha indicada (00:00:00 a 23:59:59).
         """
-        hoy = datetime.now()
+        if fecha_str:
+            try:
+                hoy = datetime.fromisoformat(fecha_str.replace("Z", "+00:00"))
+            except ValueError:
+                hoy = datetime.now()
+        else:
+            hoy = datetime.now()
         inicio = datetime.combine(hoy.date(), time.min)
         fin = datetime.combine(hoy.date(), time.max)
         return inicio, fin
@@ -465,12 +477,12 @@ class AbastecimientoService:
         await db.flush()
         return lectura
 
-    async def verificar_apertura_dia(self, db: AsyncSession, tanque_id: Optional[uuid.UUID] = None) -> bool:
+    async def verificar_apertura_dia(self, db: AsyncSession, tanque_id: Optional[uuid.UUID] = None, fecha_str: Optional[str] = None) -> bool:
         """
         Verifica si hay una lectura de apertura registrada hoy.
         Si se pasa tanque_id, verifica sólo para ese tanque; si no, verifica cualquier tanque.
         """
-        inicio, fin = await self.obtener_rango_dia()
+        inicio, fin = await self.obtener_rango_dia(fecha_str)
         
         query = select(func.count(LecturaTanque.id)).where(
             LecturaTanque.tipo_lectura == TipoLecturaTanque.apertura_dia,
@@ -483,12 +495,12 @@ class AbastecimientoService:
         conteo = res.scalar() or 0
         return conteo > 0
 
-    async def verificar_cierre_dia(self, db: AsyncSession, tanque_id: Optional[uuid.UUID] = None) -> bool:
+    async def verificar_cierre_dia(self, db: AsyncSession, tanque_id: Optional[uuid.UUID] = None, fecha_str: Optional[str] = None) -> bool:
         """
         Verifica si hay una lectura de cierre registrada hoy.
         Si se pasa tanque_id, verifica sólo para ese tanque; si no, verifica cualquier tanque.
         """
-        inicio, fin = await self.obtener_rango_dia()
+        inicio, fin = await self.obtener_rango_dia(fecha_str)
         
         query = select(func.count(LecturaTanque.id)).where(
             LecturaTanque.tipo_lectura == TipoLecturaTanque.cierre_dia,

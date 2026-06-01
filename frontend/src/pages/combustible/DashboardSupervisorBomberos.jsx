@@ -143,11 +143,14 @@ export default function DashboardSupervisorBomberos() {
   const [formLectura, setFormLectura] = useState({ cantidad_medida: '', observaciones: '' });
   const [guardandoLectura, setGuardandoLectura] = useState(false);
   const [tabActiva, setTabActiva] = useState('tanques'); // tanques | monitor | solicitudes
+  const [fechaFiltro, setFechaFiltro] = useState('');
 
-  const cargarKpis = useCallback(async (silencioso = false) => {
+  const cargarKpis = useCallback(async (silencioso = false, fechaArg = null) => {
     if (!silencioso) setCargando(true);
     try {
-      const d = await combustibleService.getDashboardKpisSupervisorBomberos();
+      const fechaUsar = fechaArg !== null ? fechaArg : fechaFiltro;
+      const fechaISO = fechaUsar ? new Date(fechaUsar + 'T00:00:00').toISOString() : null;
+      const d = await combustibleService.getDashboardKpisSupervisorBomberos(fechaISO);
       setKpis(d);
     } catch (e) {
       if (!silencioso) toast.error('Error al cargar el dashboard.');
@@ -169,15 +172,15 @@ export default function DashboardSupervisorBomberos() {
   }, []);
 
   useEffect(() => {
-    cargarKpis();
+    cargarKpis(false, fechaFiltro);
     cargarSolicitudes();
     entidadService.listarEntidades().then(r => setEntidades(r || [])).catch(() => {});
     const interval = setInterval(() => {
-      cargarKpis(true);
+      cargarKpis(true, fechaFiltro);
       cargarSolicitudes(true);
     }, 30000);
     return () => clearInterval(interval);
-  }, [cargarKpis, cargarSolicitudes]);
+  }, [cargarKpis, cargarSolicitudes, fechaFiltro]);
 
   const handleResolver = async (id, estado, placa) => {
     setProcesandoId(id);
@@ -245,9 +248,17 @@ export default function DashboardSupervisorBomberos() {
               <p className="text-[9px] text-amber-400 font-black uppercase tracking-widest">Supervisor de Bomberos</p>
             </div>
           </div>
-          <button onClick={() => { cargarKpis(false); cargarSolicitudes(false); }} className="w-9 h-9 rounded-xl bg-white/5 border border-bg-high/30 flex items-center justify-center text-text-muted hover:text-text-main transition-all cursor-pointer">
-            <RefreshCw size={14} className={cargando ? 'animate-spin text-amber-400' : ''} />
-          </button>
+          <div className="flex items-center gap-2">
+            <input 
+              type="date"
+              value={fechaFiltro}
+              onChange={(e) => setFechaFiltro(e.target.value)}
+              className="bg-bg-card border border-bg-high/30 rounded-xl px-2 h-9 text-xs font-mono text-text-main focus:border-amber-500/50 outline-none"
+            />
+            <button onClick={() => { cargarKpis(false); cargarSolicitudes(false); }} className="w-9 h-9 rounded-xl bg-white/5 border border-bg-high/30 flex items-center justify-center text-text-muted hover:text-text-main transition-all cursor-pointer">
+              <RefreshCw size={14} className={cargando ? 'animate-spin text-amber-400' : ''} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -255,8 +266,26 @@ export default function DashboardSupervisorBomberos() {
         {/* KPIs RÁPIDOS */}
         {!cargando && kpis && (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <KpiCard icon={Droplet} label="Abastecido Hoy" value={kpis.litros_hoy.toLocaleString('es-ES', { maximumFractionDigits: 1 })} unit="L" color="text-emerald-400" />
-            <KpiCard icon={Car} label="Cargas Hoy" value={kpis.cargas_hoy} color="text-blue-400" />
+            <div className="bg-bg-card border border-bg-high/50 p-4 rounded-xl flex flex-col justify-between">
+              <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center gap-1.5 text-emerald-400"><Droplet size={14} /><span className="text-[9px] font-black uppercase tracking-widest text-text-muted">Abastecido</span></div>
+              </div>
+              <div className="flex justify-between items-end">
+                <div><span className="text-xl font-display font-black text-emerald-400">{kpis.litros_hoy.toLocaleString('es-ES', { maximumFractionDigits: 1 })} <span className="text-[10px] text-text-muted">L / DÍA</span></span></div>
+                <div className="text-right"><span className="text-sm font-display font-bold text-text-sec">{kpis.litros_semana?.toLocaleString('es-ES', { maximumFractionDigits: 1 }) || 0} <span className="text-[8px] text-text-muted">L / SEM</span></span></div>
+              </div>
+            </div>
+            
+            <div className="bg-bg-card border border-bg-high/50 p-4 rounded-xl flex flex-col justify-between">
+              <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center gap-1.5 text-blue-400"><Car size={14} /><span className="text-[9px] font-black uppercase tracking-widest text-text-muted">Cargas</span></div>
+              </div>
+              <div className="flex justify-between items-end">
+                <div><span className="text-xl font-display font-black text-blue-400">{kpis.cargas_hoy} <span className="text-[10px] text-text-muted">/ DÍA</span></span></div>
+                <div className="text-right"><span className="text-sm font-display font-bold text-text-sec">{kpis.cargas_semana || 0} <span className="text-[8px] text-text-muted">/ SEM</span></span></div>
+              </div>
+            </div>
+
             <KpiCard icon={Bell} label="Solicitudes Pendientes" value={kpis.solicitudes_pendientes} color={kpis.solicitudes_pendientes > 0 ? 'text-red-400' : 'text-text-muted'} />
             <KpiCard icon={TrendingUp} label="Stock Total" value={kpis.stock_total.toLocaleString('es-ES', { maximumFractionDigits: 1 })} unit="L" color="text-amber-400" />
           </div>
@@ -467,7 +496,7 @@ export default function DashboardSupervisorBomberos() {
 
       {/* MODAL REGISTRAR LECTURA */}
       {modalLectura && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-bg-card border border-bg-high/50 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
             <div className="p-4 border-b border-bg-high/20 flex justify-between items-center">
               <div className="flex items-center gap-2">

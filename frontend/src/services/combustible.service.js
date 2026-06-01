@@ -201,8 +201,9 @@ export const combustibleService = {
   /**
    * Obtiene los KPIs del dashboard exclusivo del Supervisor de Bomberos.
    */
-  async getDashboardKpisSupervisorBomberos() {
-    const { data } = await api.get('/combustible/dashboard-kpis-supervisor');
+  async getDashboardKpisSupervisorBomberos(fecha = null) {
+    const params = fecha ? { fecha } : {};
+    const { data } = await api.get('/combustible/dashboard-kpis-supervisor', { params });
     return data.data;
   },
 };
