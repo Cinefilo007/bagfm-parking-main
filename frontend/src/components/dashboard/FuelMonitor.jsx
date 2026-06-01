@@ -111,7 +111,7 @@ const FuelMonitor = () => {
           </div>
         ) : (
           <>
-            {/* â”€â”€ Tanques â”€â”€ */}
+            {/* â”--”€ Tanques â”--”€ */}
             {vistaMonitor === 'tanques' && (
               <div className="h-full overflow-y-auto p-3 space-y-2.5 scrollbar-tactical">
                 {tanques.length === 0 ? (
@@ -133,7 +133,7 @@ const FuelMonitor = () => {
                           <div>
                             <span className="text-[10px] font-black text-text-main uppercase tracking-wider block">{t.nombre}</span>
                             <span className="text-[8px] font-bold text-text-muted uppercase">
-                              {t.tipo_combustible === 'gasolina' ? 'â›½ Gasolina' : 'ðŸ›¢ï¸ Diésel'}
+                              {t.tipo_combustible === 'gasolina' ? '⛽ Gasolina' : 'Diésel'}
                             </span>
                           </div>
                         </div>
@@ -157,7 +157,7 @@ const FuelMonitor = () => {
               </div>
             )}
 
-            {/* â”€â”€ Flujo (Live Feed) â”€â”€ */}
+            {/* â”--”€ Flujo (Live Feed) â”--”€ */}
             {vistaMonitor === 'flujo' && (
               <div className="h-full overflow-y-auto p-3 space-y-1.5 scrollbar-tactical">
                 {ultimos.length === 0 ? (
@@ -209,7 +209,7 @@ const FuelMonitor = () => {
               </div>
             )}
 
-            {/* â”€â”€ Solicitudes â”€â”€ */}
+            {/* â”--”€ Solicitudes â”--”€ */}
             {vistaMonitor === 'solicitudes' && (
               <div className="h-full flex flex-col items-center justify-center p-4 text-center">
                 <div className={cn(
@@ -265,7 +265,7 @@ const FuelMonitor = () => {
             <div className="p-4 border-b border-white/5 flex justify-between items-center bg-bg-high/10">
               <div>
                 <h3 className="text-sm font-black text-text-main font-display">DETALLES SUMINISTRO</h3>
-                <p className="text-[10px] text-text-muted">{abastecimientoSeleccionado.placa} â€¢ {formatTimeAgo(abastecimientoSeleccionado.fecha)}</p>
+                <p className="text-[10px] text-text-muted">{abastecimientoSeleccionado.placa} · {formatTimeAgo(abastecimientoSeleccionado.fecha)}</p>
               </div>
               <button 
                 onClick={() => setAbastecimientoSeleccionado(null)}

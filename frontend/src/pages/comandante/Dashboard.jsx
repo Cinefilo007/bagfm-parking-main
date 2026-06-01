@@ -123,7 +123,7 @@ export default function DashboardComando() {
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-3 px-1">
               <div className="w-1.5 h-4 rounded-full bg-cyan-500" />
-              <span className="text-[9px] font-black text-text-muted uppercase tracking-[0.2em]">Bomba de Combustible â€” Bomba de Combustible</span>
+              <span className="text-[9px] font-black text-text-muted uppercase tracking-[0.2em]">Bomba de Combustible</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
               {fuelStats.map((fs, i) => {
