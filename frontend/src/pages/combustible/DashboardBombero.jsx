@@ -330,7 +330,7 @@ export default function DashboardBombero() {
             {tanques.map(t => (
               <div key={t.id} className="space-y-1.5">
                 <label className="text-[10px] font-black uppercase tracking-wider text-text-muted flex justify-between">
-                  <span>{t.nombre} ({t.tipo_combustible.toUpperCase()})</span>
+                  <span>{t.nombre} {t.tipo_combustible ? `(${t.tipo_combustible.toUpperCase()})` : ''}</span>
                   <span className="text-text-sec">MÁX: {t.capacidad_maxima} L</span>
                 </label>
                 <div className="flex items-center bg-bg-low border border-white/10 rounded-xl overflow-hidden focus-within:border-warning/50 transition-all">
@@ -501,7 +501,7 @@ export default function DashboardBombero() {
                       </span>
                     </div>
                     <p className="text-[10px] text-text-muted truncate mt-0.5">
-                      {vehiculoEncontrado.color} · {vehiculoEncontrado.marca} · {vehiculoEncontrado.modelo} ({vehiculoEncontrado.tipo_combustible.toUpperCase()})
+                      {vehiculoEncontrado.color} · {vehiculoEncontrado.marca} · {vehiculoEncontrado.modelo} {vehiculoEncontrado.tipo_combustible ? `(${vehiculoEncontrado.tipo_combustible.toUpperCase()})` : ''}
                     </p>
                   </div>
                 </div>
@@ -567,7 +567,7 @@ export default function DashboardBombero() {
                         className="w-full bg-bg-low border border-white/10 rounded-lg px-3 py-2 text-xs font-black text-text-main outline-none focus:border-success/50"
                       >
                         {tanques.map(t => (
-                          <option key={t.id} value={t.id}>{t.nombre} - {t.tipo_combustible.toUpperCase()} ({t.cantidad_actual.toFixed(0)} L disp.)</option>
+                          <option key={t.id} value={t.id}>{t.nombre} {t.tipo_combustible ? `- ${t.tipo_combustible.toUpperCase()}` : ''} ({t.cantidad_actual.toFixed(0)} L disp.)</option>
                         ))}
                       </select>
                     </div>
@@ -758,7 +758,7 @@ export default function DashboardBombero() {
                       <div key={sol.id} className="bg-bg-card border border-white/5 rounded-xl p-3 flex justify-between items-center opacity-80">
                         <div>
                           <p className="text-sm font-black text-text-main font-display tracking-wide">{sol.placa}</p>
-                          <p className="text-[9px] text-text-muted mt-0.5">Litros pedidos: {sol.cantidad_solicitada} L · {sol.tipo_solicitud.replace(/_/g, ' ').toUpperCase()}</p>
+                          <p className="text-[9px] text-text-muted mt-0.5">Litros pedidos: {sol.cantidad_solicitada} L {sol.tipo_solicitud ? `· ${sol.tipo_solicitud.replace(/_/g, ' ').toUpperCase()}` : ''}</p>
                           <p className="text-[8px] text-text-sec italic mt-1">Motivo: "{sol.motivo}"</p>
                         </div>
                         <span className="text-[8px] font-black uppercase tracking-widest text-warning bg-warning/10 border border-warning/20 px-2 py-1 rounded">
