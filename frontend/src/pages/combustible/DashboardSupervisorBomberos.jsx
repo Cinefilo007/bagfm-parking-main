@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Flame, RefreshCw, CheckCircle, XCircle, Clock, AlertTriangle,
-  Droplet, TrendingUp, Car, ShieldCheck, Activity, Sunrise, Sunset,
+  Droplet, TrendingUp, CarFront, ShieldCheck, Activity, Sunrise, Sunset,
   X, Check, ChevronDown, ChevronUp, Bell, FileText, User, Award
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -278,7 +278,7 @@ export default function DashboardSupervisorBomberos() {
             
             <div className="bg-bg-card border border-bg-high/50 p-4 rounded-xl flex flex-col justify-between">
               <div className="flex justify-between items-center mb-2">
-                <div className="flex items-center gap-1.5 text-blue-400"><Car size={14} /><span className="text-[9px] font-black uppercase tracking-widest text-text-muted">Cargas</span></div>
+                <div className="flex items-center gap-1.5 text-blue-400"><CarFront size={14} /><span className="text-[9px] font-black uppercase tracking-widest text-text-muted">Cargas</span></div>
               </div>
               <div className="flex justify-between items-end">
                 <div><span className="text-xl font-display font-black text-blue-400">{kpis.cargas_hoy} <span className="text-[10px] text-text-muted">/ DÍA</span></span></div>
