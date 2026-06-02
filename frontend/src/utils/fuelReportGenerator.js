@@ -28,7 +28,7 @@ export const generarReporteCierre = (kpis, modalLectura, formLectura, supervisor
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
-  doc.text('AEGIS FUEL MANAGEMENT', marginX, 22);
+  doc.text('BOMBA DE COMBUSTIBLE BAGFM', marginX, 22);
 
   doc.setTextColor(...colors.primary);
   doc.setFontSize(12);
