@@ -3,7 +3,7 @@ import {
   Car, RefreshCw, Upload, Edit3, Settings, ShieldAlert,
   CheckCircle, AlertTriangle, XCircle, Search, ToggleLeft, ToggleRight,
   Database, Flame, FileSpreadsheet, PlusCircle, Download,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, TrendingUp
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { toast } from 'react-hot-toast';
@@ -57,9 +57,29 @@ export default function ParqueAutomotor() {
   });
   const [registrando, setRegistrando] = useState(false);
 
+  // Planificador semanal
+  const [vehiculosPlanner, setVehiculosPlanner] = useState([]);
+  const [tanques, setTanques] = useState([]);
+  const [cargandoPlanner, setCargandoPlanner] = useState(false);
+
+  const cargarDatosPlanner = async () => {
+    setCargandoPlanner(true);
+    try {
+      const resTanques = await combustibleService.getTanques();
+      setTanques(resTanques.data || []);
+      const resVehiculos = await combustibleService.getVehiculosParque({});
+      setVehiculosPlanner(resVehiculos || []);
+    } catch (e) {
+      console.error("Error al cargar datos del planificador:", e);
+    } finally {
+      setCargandoPlanner(false);
+    }
+  };
+
   useEffect(() => {
     cargarEntidades();
     cargarVehiculos();
+    cargarDatosPlanner();
   }, []);
 
   useEffect(() => {
@@ -118,8 +138,8 @@ export default function ParqueAutomotor() {
       });
       toast.success(nuevoEstado ? `Vehículo ${vehiculo.placa} autorizado para surtir` : `Vehículo ${vehiculo.placa} inhabilitado para surtir`);
       
-      // Actualizar estado local
-      setVehiculos(prev => prev.map(v => v.id === vehiculo.id ? { ...v, autorizado_combustible: nuevoEstado } : v));
+      cargarVehiculos();
+      cargarDatosPlanner();
     } catch (e) {
       toast.error("No se pudo actualizar el estado de autorización.");
     }
@@ -150,6 +170,7 @@ export default function ParqueAutomotor() {
       toast.success("Parámetros del vehículo actualizados correctamente.");
       setModalVehiculo(null);
       cargarVehiculos();
+      cargarDatosPlanner();
     } catch (err) {
       toast.error(err.response?.data?.detail || "Error al actualizar el vehículo.");
     } finally {
@@ -189,8 +210,14 @@ export default function ParqueAutomotor() {
       
       const res = await combustibleService.importarExcelParque(formData, entidadImportacion);
       toast.success("Carga masiva procesada exitosamente");
-      setResumenImportacion(res.data);
+      setResumenImportacion({
+        leidos: res.data.total || 0,
+        creados: res.data.exitosos || 0,
+        actualizados: res.data.actualizados || 0,
+        errores: res.data.errores || []
+      });
       cargarVehiculos();
+      cargarDatosPlanner();
     } catch (err) {
       toast.error(err.response?.data?.detail || "Error al procesar la plantilla Excel.");
     } finally {
@@ -238,6 +265,7 @@ export default function ParqueAutomotor() {
       setModalRegistro(false);
       setFormRegistro({ placa: '', entidad_id: '', marca: '', modelo: '', color: '', uso_vehiculo: 'particular', tipo_combustible: 'gasolina', capacidad_tanque: '', asignacion_combustible_semanal: '', autorizado_combustible: false });
       cargarVehiculos();
+      cargarDatosPlanner();
     } catch (err) {
       toast.error(err.response?.data?.detail || "Error al registrar el vehículo.");
     } finally {
@@ -258,6 +286,37 @@ export default function ParqueAutomotor() {
         return <span className="px-2 py-0.5 text-[8px] font-black uppercase tracking-widest rounded bg-white/5 border border-white/10 text-text-muted">{uso}</span>;
     }
   };
+
+  // ─── Cálculos del Planificador de Abastecimiento Semanal ───
+  const plannerStats = (() => {
+    const capGasolina = tanques
+      .filter(t => t.tipo_combustible === 'gasolina')
+      .reduce((sum, t) => sum + (t.capacidad_maxima || 0), 0);
+      
+    const capDiesel = tanques
+      .filter(t => t.tipo_combustible === 'diesel')
+      .reduce((sum, t) => sum + (t.capacidad_maxima || 0), 0);
+
+    const asignadoGasolina = vehiculosPlanner
+      .filter(v => v.tipo_combustible === 'gasolina' && v.autorizado_combustible)
+      .reduce((sum, v) => sum + (v.asignacion_combustible_semanal || 0), 0);
+      
+    const asignadoDiesel = vehiculosPlanner
+      .filter(v => v.tipo_combustible === 'diesel' && v.autorizado_combustible)
+      .reduce((sum, v) => sum + (v.asignacion_combustible_semanal || 0), 0);
+
+    const pctGasolina = capGasolina > 0 ? (asignadoGasolina / capGasolina) * 100 : 0;
+    const pctDiesel = capDiesel > 0 ? (asignadoDiesel / capDiesel) * 100 : 0;
+
+    return {
+      capGasolina,
+      capDiesel,
+      asignadoGasolina,
+      asignadoDiesel,
+      pctGasolina,
+      pctDiesel
+    };
+  })();
 
   return (
     <div className="min-h-screen dark bg-bg-app text-text-main p-4 space-y-4 font-sans">
@@ -292,6 +351,89 @@ export default function ParqueAutomotor() {
           >
             <RefreshCw size={15} />
           </button>
+        </div>
+      </div>
+
+      {/* PLANIFICADOR SEMANAL DE ABASTECIMIENTO */}
+      <div className="bg-bg-card border border-bg-high/50 rounded-xl p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <TrendingUp size={16} className="text-success animate-pulse" />
+            <h3 className="text-xs font-black uppercase tracking-widest text-text-main font-mono">Planificador de Abastecimiento Semanal</h3>
+          </div>
+          <span className="text-[8px] font-black uppercase bg-success/10 border border-success/20 text-success px-2 py-0.5 rounded font-mono">Capacidad vs Asignaciones</span>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* GASOLINA */}
+          <div className="bg-bg-app border border-bg-high/40 rounded-xl p-4 space-y-3 relative overflow-hidden">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-[10px] font-black text-emerald-400 uppercase tracking-wider">⛽ Gasolina Táctica</p>
+                <p className="text-[8px] text-text-muted uppercase mt-0.5">Asignación Semanal vs Capacidad Máxima</p>
+              </div>
+              <div className="text-right">
+                <span className="text-sm font-black font-display text-emerald-400">
+                  {plannerStats.asignadoGasolina.toLocaleString('es-ES', { maximumFractionDigits: 1 })} L
+                </span>
+                <span className="text-[9px] font-bold text-text-muted font-mono block">
+                  de {plannerStats.capGasolina.toLocaleString('es-ES', { maximumFractionDigits: 0 })} L
+                </span>
+              </div>
+            </div>
+            
+            {/* Progress bar */}
+            <div className="space-y-1">
+              <div className="w-full bg-bg-card h-2.5 rounded-full overflow-hidden border border-bg-high/30 relative">
+                <div 
+                  className={cn(
+                    'h-full rounded-full transition-all duration-700',
+                    plannerStats.pctGasolina > 100 ? 'bg-red-500 animate-pulse' : plannerStats.pctGasolina > 85 ? 'bg-amber-500' : 'bg-emerald-500'
+                  )} 
+                  style={{ width: `${Math.min(plannerStats.pctGasolina, 100)}%` }} 
+                />
+              </div>
+              <div className="flex justify-between text-[9px] font-mono text-text-muted">
+                <span>{plannerStats.pctGasolina.toFixed(1)}% Asignado</span>
+                {plannerStats.pctGasolina > 100 && <span className="text-red-400 font-bold uppercase animate-pulse">Sobreasignado</span>}
+              </div>
+            </div>
+          </div>
+
+          {/* DIESEL */}
+          <div className="bg-bg-app border border-bg-high/40 rounded-xl p-4 space-y-3 relative overflow-hidden">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-[10px] font-black text-blue-400 uppercase tracking-wider">🛢️ Diésel Táctico</p>
+                <p className="text-[8px] text-text-muted uppercase mt-0.5">Asignación Semanal vs Capacidad Máxima</p>
+              </div>
+              <div className="text-right">
+                <span className="text-sm font-black font-display text-blue-400">
+                  {plannerStats.asignadoDiesel.toLocaleString('es-ES', { maximumFractionDigits: 1 })} L
+                </span>
+                <span className="text-[9px] font-bold text-text-muted font-mono block">
+                  de {plannerStats.capDiesel.toLocaleString('es-ES', { maximumFractionDigits: 0 })} L
+                </span>
+              </div>
+            </div>
+            
+            {/* Progress bar */}
+            <div className="space-y-1">
+              <div className="w-full bg-bg-card h-2.5 rounded-full overflow-hidden border border-bg-high/30 relative">
+                <div 
+                  className={cn(
+                    'h-full rounded-full transition-all duration-700',
+                    plannerStats.pctDiesel > 100 ? 'bg-red-500 animate-pulse' : plannerStats.pctDiesel > 85 ? 'bg-amber-500' : 'bg-blue-500'
+                  )} 
+                  style={{ width: `${Math.min(plannerStats.pctDiesel, 100)}%` }} 
+                />
+              </div>
+              <div className="flex justify-between text-[9px] font-mono text-text-muted">
+                <span>{plannerStats.pctDiesel.toFixed(1)}% Asignado</span>
+                {plannerStats.pctDiesel > 100 && <span className="text-red-400 font-bold uppercase animate-pulse">Sobreasignado</span>}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -720,9 +862,11 @@ export default function ParqueAutomotor() {
                       <span className="text-text-main text-sm">{resumenImportacion.leidos || 0}</span>
                     </div>
                     <div className="bg-emerald-500/5 border border-emerald-500/10 rounded p-2">
+                      <span className="text-emerald-400 text-[8px] uppercase block tracking-wider mb-1">Creados</span>
                       <span className="text-emerald-400 text-sm">{resumenImportacion.creados || 0}</span>
                     </div>
                     <div className="bg-blue-500/5 border border-blue-500/10 rounded p-2">
+                      <span className="text-blue-400 text-[8px] uppercase block tracking-wider mb-1">Actualizados</span>
                       <span className="text-blue-400 text-sm">{resumenImportacion.actualizados || 0}</span>
                     </div>
                   </div>

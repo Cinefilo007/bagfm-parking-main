@@ -72,8 +72,9 @@ Para evitar inconsistencias a lo largo del programa, todas las pantallas del mó
 ### 4.1 Parque Automotor (`ParqueAutomotor.jsx`)
 - **Gestión de Flotas:** Visualización de todos los vehículos activos agrupados/filtrados por entidad con paginación y búsqueda por placa.
 - **Asignación de Combustible:** Toggle interactivo para habilitar/inhabilitar el suministro en bomba a vehículos particulares registrados, y campos para configurar límites y capacidades del tanque en litros.
+- **Planificador de Abastecimiento Semanal (Asignación vs Capacidad):** Panel táctico reactivo en la parte superior que consolida la suma total de las cuotas semanales de combustible asignadas a los vehículos activos y autorizados de gasolina y diésel, contrastándolas contra la capacidad de almacenamiento total de los tanques correspondientes. Emite una alerta visual en color rojo y animación de pulso en caso de sobreasignación (>100% de la capacidad).
 - **Límite Semanal de Entidad:** Panel integrado para ajustar el límite total de litros permitidos semanalmente por entidad civil/militar.
-- **Importación Masiva:** Procesamiento de flotas a través de plantillas Excel (`.xlsx`) con un resumen de filas procesadas y bitácora de errores en tiempo real. Incluye un botón para descargar la plantilla oficial que contiene la columna `ENTIDAD`, permitiendo asociar cada vehículo a su respectiva dependencia.
+- **Importación Masiva:** Procesamiento de flotas a través de plantillas Excel (`.xlsx`) con un resumen de filas procesadas en tiempo real. Se mapean correctamente las respuestas de éxito y actualización del backend (`total`, `exitosos` y `actualizados`) en los indicadores visuales `Leídos`, `Creados` y `Actualizados`. Incluye bitácora de errores en tiempo real y descarga de la plantilla oficial.
 
 ### 4.2 Cola de Aprobaciones (`ColaAprobacionesCombustible.jsx`)
 - **Resolución Remota Asíncrona:** Panel que refresca automáticamente cada 15 segundos y lista las solicitudes de emergencia pendientes.
@@ -109,5 +110,5 @@ Para evitar inconsistencias a lo largo del programa, todas las pantallas del mó
 
 ---
 
-*Última actualización: 2026-06-01 (Implementación de registro individual, gestión CRUD de tanques, KPIs de combustible y FuelMonitor en tiempo real V9.0)*
+*Última actualización: 2026-06-02 (Integración del Planificador Semanal de Abastecimiento y corrección de indicadores de carga masiva en ParqueAutomotor v10.0)*
 *Aprobado por: Comandante de Base & Antigravity Aegis Command*
