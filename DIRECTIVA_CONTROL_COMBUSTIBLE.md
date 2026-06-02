@@ -42,9 +42,10 @@ Para evitar inconsistencias a lo largo del programa, todas las pantallas del mó
 ### 3.1 Unidad de Medida
 - Toda cuantificación de volumen de combustible (inventarios, capacidad, cuotas, solicitudes, transacciones y reportes) se registrará y visualizará estrictamente en **Litros (L)**.
 
-### 3.2 Registro de Inventario Inicial
-- **Control de Turno:** Al iniciar la semana o ciclo de guardia, el bombero debe registrar la medición manual de litros disponibles de cada tanque en la bomba.
-- El sistema bloqueará cualquier operación de despacho hasta que se registre la lectura inicial del ciclo.
+### 3.2 Registro de Inventario Inicial (Apertura del Día)
+- **Control Diario:** Al iniciar la jornada, el bombero o supervisor debe registrar la medición manual de litros disponibles de cada tanque activo.
+- **Coordinación Multi-Rol:** El sistema detecta dinámicamente si la apertura ya fue realizada por algún rol (Bombero o Supervisor) para ese día y tanque específico. Solo se bloquean y exigen declaraciones para los tanques activos que falten por aperturar hoy, previniendo cierres de turno redundantes o bloqueos innecesarios.
+- El sistema bloqueará cualquier operación de despacho para un tanque específico hasta que se registre su correspondiente lectura inicial de apertura del día.
 
 ### 3.3 Validación de Kilometraje y Alerta de Fraude
 - **Regla Básica:** El kilometraje ingresado (`kilometraje_actual`) debe ser estrictamente mayor que el kilometraje anterior (`ultimo_kilometraje`).
@@ -66,6 +67,10 @@ Para evitar inconsistencias a lo largo del programa, todas las pantallas del mó
 - **Notificación y Suministro Único:** Al ser aprobada la solicitud:
   - El bombero recibe una notificación push inmediata y la solicitud se traslada a la sección *Aprobadas para Surtir* en su bandeja táctica.
   - El suministro quedará habilitado de manera temporal y **única** vinculada a esa solicitud. Al finalizar la carga, la solicitud se marca como `consumida` en la base de datos y el vehículo vuelve a quedar bloqueado para cargas posteriores.
+
+### 3.6 Auditoría de Conductor en Suministro (Auditoría Obligatoria)
+- **Campo de Conductor:** Todo registro de abastecimiento en bomba exige obligatoriamente la captura del nombre completo del **Conductor / Oficial Responsable** del vehículo.
+- **Propósito:** Mantener la trazabilidad física y administrativa en caso de auditorías por discrepancias de kilometraje o consumo inusual. El nombre ingresado se asocia directamente a la fila de abastecimiento en base de datos.
 
 ## 4. ESPECIFICACIÓN DE MÓDULOS FRONTEND IMPLEMENTADOS
 
@@ -91,6 +96,8 @@ Para evitar inconsistencias a lo largo del programa, todas las pantallas del mó
 ### 4.4 Gestión de Tanques de Combustible (`GestionTanques.jsx`)
 - **CRUD de Tanques:** Permite al Comandante y Admin Base registrar tanques, editar su capacidad máxima y darlos de baja (soft-delete, solo si no tienen consumos en la semana en curso).
 - **Protección de Stock:** La `cantidad_actual` nunca es editable de forma directa. Solo se actualiza a través de las lecturas semanales del bombero y los descuentos automáticos al despachar combustible.
+- **Historial General vs Cierres (Tabs):** Integra un sistema de pestañas táctico para alternar entre el Historial General de abastecimientos y el Historial de Cierres Diarios.
+- **Reportes PDF de Cierre Históricos:** En la pestaña de Cierres Diarios, se puede consultar y descargar en tiempo real un PDF del cierre histórico seleccionado llamando a la API de consolidación de datos y volviendo a renderizar el reporte formal.
 
 ### 4.5 Monitor de Bomba y KPIs en Tiempo Real
 - **Dashboard del Comandante:** Integra 5 KPIs tácticos de combustible (Litros Surtidos, Cargas, Stock de Combustible en Tanques, Solicitudes Pendientes y Alertas de Fraude) y un componente `FuelMonitor` con polling de 30 segundos.
@@ -110,5 +117,5 @@ Para evitar inconsistencias a lo largo del programa, todas las pantallas del mó
 
 ---
 
-*Última actualización: 2026-06-02 (Integración del Planificador Semanal de Abastecimiento y corrección de indicadores de carga masiva en ParqueAutomotor v10.0)*
+*Última actualización: 2026-06-02 (Apertura diaria coordinada, auditoría obligatoria de conductor en abastecimientos e historial de cierres con descarga de reportes PDF históricos)*
 *Aprobado por: Comandante de Base & Antigravity Aegis Command*

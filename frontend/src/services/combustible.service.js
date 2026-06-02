@@ -206,5 +206,21 @@ export const combustibleService = {
     const { data } = await api.get('/combustible/dashboard-kpis-supervisor', { params });
     return data.data;
   },
+
+  /**
+   * Obtiene el historial de cierres diarios.
+   */
+  async obtenerHistorialCierres(skip = 0, limit = 10) {
+    const { data } = await api.get('/combustible/cierres', { params: { skip, limit } });
+    return data;
+  },
+
+  /**
+   * Obtiene la información histórica de un cierre para volver a generar el PDF.
+   */
+  async obtenerReporteCierreData(id) {
+    const { data } = await api.get(`/combustible/cierres/${id}/reporte-data`);
+    return data.data;
+  },
 };
 

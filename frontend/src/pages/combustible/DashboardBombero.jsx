@@ -33,6 +33,7 @@ export default function DashboardBombero() {
   const [kilometraje, setKilometraje] = useState('');
   const [litrosCargar, setLitrosCargar] = useState('');
   const [tanqueSeleccionado, setTanqueSeleccionado] = useState('');
+  const [conductor, setConductor] = useState('');
   const [fotoKilometraje, setFotoKilometraje] = useState(null);
   const [fotoKilometrajeUrl, setFotoKilometrajeUrl] = useState('');
   const [fotoMaquina, setFotoMaquina] = useState(null);
@@ -128,19 +129,25 @@ export default function DashboardBombero() {
     e.preventDefault();
     setCargandoLectura(true);
     try {
-      for (const [tanqueId, cant] of Object.entries(lecturasForm)) {
+      const tanquesPendientes = tanques.filter(t => !t.tiene_apertura_hoy);
+      for (const t of tanquesPendientes) {
+        const cant = lecturasForm[t.id];
         if (!cant || isNaN(cant) || parseFloat(cant) < 0) {
-          toast.error("Ingrese cantidades válidas en litros para todos los tanques");
+          toast.error(`Ingrese una cantidad válida en litros para el tanque ${t.nombre}`);
           setCargandoLectura(false);
           return;
         }
+      }
+
+      for (const t of tanquesPendientes) {
+        const cant = lecturasForm[t.id];
         await combustibleService.registrarLecturaInicial({
-          tanque_id: tanqueId,
+          tanque_id: t.id,
           cantidad_medida: parseFloat(cant),
-          observaciones: "Declaración inicial de inicio de turno/semana"
+          observaciones: "Declaración inicial de inicio de turno diario"
         });
       }
-      toast.success("Inventario inicial declarado con éxito. Bomba lista.");
+      toast.success("Apertura del día declarada con éxito. Bomba lista.");
       setTieneLecturaSemana(true);
       cargarDatosTanques();
     } catch (err) {
@@ -165,6 +172,7 @@ export default function DashboardBombero() {
     setFotoMaquinaUrl('');
     setKilometraje('');
     setLitrosCargar('');
+    setConductor('');
     
     try {
       const datos = await combustibleService.consultarVehiculo(placa);
@@ -272,29 +280,33 @@ export default function DashboardBombero() {
     if (!litrosCargar || isNaN(litrosCargar) || parseFloat(litrosCargar) <= 0) { toast.error("Ingrese litros válidos"); return; }
     if (!fotoKilometraje || !fotoMaquina) { toast.error("Debe capturar la foto del odómetro y del surtidor"); return; }
 
-    setCargandoSuministro(true);
-    try {
-      const odoB64 = await fileToBase64(fotoKilometraje);
-      const maqB64 = await fileToBase64(fotoMaquina);
+      if (!conductor.trim()) { toast.error("Debe ingresar el nombre del conductor"); return; }
 
-      const payload = {
-        placa: vehiculoEncontrado.placa,
-        tanque_id: tanqueSeleccionado,
-        kilometraje_actual: parseInt(kilometraje),
-        cantidad_abastecida: parseFloat(litrosCargar),
-        foto_kilometraje_url: odoB64,
-        foto_maquina_url: maqB64,
-        solicitud_aprobacion_id: solicitudVinculada ? solicitudVinculada.id : null,
-        datos_ia_ocr: { kilometraje_ia: parseInt(kilometraje) }
-      };
+      setCargandoSuministro(true);
+      try {
+        const odoB64 = await fileToBase64(fotoKilometraje);
+        const maqB64 = await fileToBase64(fotoMaquina);
 
-      const res = await combustibleService.registrarAbastecimiento(payload);
-      toast.success(res.message || "Suministro registrado con éxito");
-      
-      // Limpiar estados
-      setVehiculoEncontrado(null);
-      setPlacaBusqueda('');
-      setSolicitudVinculada(null);
+        const payload = {
+          placa: vehiculoEncontrado.placa,
+          tanque_id: tanqueSeleccionado,
+          kilometraje_actual: parseInt(kilometraje),
+          cantidad_abastecida: parseFloat(litrosCargar),
+          foto_kilometraje_url: odoB64,
+          foto_maquina_url: maqB64,
+          solicitud_aprobacion_id: solicitudVinculada ? solicitudVinculada.id : null,
+          datos_ia_ocr: { kilometraje_ia: parseInt(kilometraje) },
+          conductor: conductor.trim().toUpperCase()
+        };
+
+        const res = await combustibleService.registrarAbastecimiento(payload);
+        toast.success(res.message || "Suministro registrado con éxito");
+        
+        // Limpiar estados
+        setVehiculoEncontrado(null);
+        setPlacaBusqueda('');
+        setSolicitudVinculada(null);
+        setConductor('');
       
       cargarDatosTanques();
       cargarBandejaSolicitudes();
@@ -355,12 +367,12 @@ export default function DashboardBombero() {
           <div className="bg-warning/10 border-b border-warning/20 px-6 py-4 flex items-center gap-3">
             <AlertTriangle className="text-warning animate-pulse-slow" size={24} />
             <div>
-              <h2 className="text-sm font-black uppercase tracking-wider text-warning">Apertura de Ciclo Semanal</h2>
-              <p className="text-[10px] text-text-sec">Es obligatorio registrar la medición inicial de los tanques.</p>
+              <h2 className="text-sm font-black uppercase tracking-wider text-warning">Apertura del Día</h2>
+              <p className="text-[10px] text-text-sec">Es obligatorio registrar la medición inicial diaria de los tanques.</p>
             </div>
           </div>
           <form onSubmit={handleDeclararInventario} className="p-6 space-y-4">
-            {tanques.map(t => (
+            {tanques.filter(t => !t.tiene_apertura_hoy).map(t => (
               <div key={t.id} className="space-y-1.5">
                 <label className="text-[10px] font-black uppercase tracking-wider text-text-muted flex justify-between">
                   <span>{t.nombre} {t.tipo_combustible ? `(${t.tipo_combustible.toUpperCase()})` : ''}</span>
@@ -655,6 +667,19 @@ export default function DashboardBombero() {
                         />
                         <span className="text-[8px] text-text-muted">Último: {vehiculoEncontrado.ultimo_kilometraje} km</span>
                       </div>
+                    </div>
+
+                    {/* Conductor */}
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black uppercase tracking-widest text-text-muted">Conductor / Oficial Responsable *</label>
+                      <input
+                        type="text"
+                        required
+                        value={conductor}
+                        onChange={e => setConductor(e.target.value.toUpperCase())}
+                        className="w-full bg-bg-low border border-white/10 rounded-lg px-3 py-2 text-xs font-black text-text-main outline-none focus:border-success/50 uppercase"
+                        placeholder="Ej: MARCOS VALERO"
+                      />
                     </div>
 
                     {/* Fotos obligatorias de cámara */}

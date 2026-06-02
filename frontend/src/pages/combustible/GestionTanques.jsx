@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { 
   Flame, RefreshCw, PlusCircle, Edit3, Trash2, 
   CheckCircle, AlertTriangle, XCircle, Database, Droplet,
-  ClipboardList, ChevronLeft, ChevronRight
+  ClipboardList, ChevronLeft, ChevronRight, FileDown
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { toast } from 'react-hot-toast';
 import { combustibleService } from '../../services/combustible.service';
+import { generarReporteCierre } from '../../utils/fuelReportGenerator';
 
 export default function GestionTanques() {
   const [tanques, setTanques] = useState([]);
@@ -34,9 +35,13 @@ export default function GestionTanques() {
   const [confirmEliminar, setConfirmEliminar] = useState(null);
   const [eliminando, setEliminando] = useState(false);
 
-  // Historial General Paginado
+  // Historial General y de Cierres Paginado
+  const [tabActivo, setTabActivo] = useState('general'); // 'general' | 'cierres'
   const [historial, setHistorial] = useState([]);
   const [cargandoHistorial, setCargandoHistorial] = useState(true);
+  const [cierres, setCierres] = useState([]);
+  const [cargandoCierres, setCargandoCierres] = useState(false);
+  const [descargandoCierreId, setDescargandoCierreId] = useState(null);
   const [pagina, setPagina] = useState(0);
   const [totalHistorial, setTotalHistorial] = useState(0);
   const limit = 10;
@@ -46,8 +51,50 @@ export default function GestionTanques() {
   }, []);
 
   useEffect(() => {
-    cargarHistorial();
-  }, [pagina]);
+    if (tabActivo === 'general') {
+      cargarHistorial();
+    } else {
+      cargarCierres();
+    }
+  }, [pagina, tabActivo]);
+
+  const cambiarTab = (nuevoTab) => {
+    setTabActivo(nuevoTab);
+    setPagina(0);
+  };
+
+  const cargarCierres = async () => {
+    setCargandoCierres(true);
+    try {
+      const skip = pagina * limit;
+      const res = await combustibleService.obtenerHistorialCierres(skip, limit);
+      setCierres(res.data || []);
+      setTotalHistorial(res.total || 0);
+    } catch (e) {
+      console.error("Error al cargar historial de cierres:", e);
+      toast.error("No se pudo cargar el historial de cierres.");
+    } finally {
+      setCargandoCierres(false);
+    }
+  };
+
+  const handleDescargarCierre = async (lecturaId) => {
+    setDescargandoCierreId(lecturaId);
+    try {
+      const res = await combustibleService.obtenerReporteCierreData(lecturaId);
+      if (res) {
+        generarReporteCierre(res.kpis, res.modalLectura, res.formLectura, res.supervisor_nombre);
+        toast.success("Reporte de cierre PDF descargado.");
+      } else {
+        toast.error("No se encontraron datos para generar el reporte.");
+      }
+    } catch (e) {
+      console.error("Error al descargar reporte de cierre:", e);
+      toast.error("Error al generar el PDF del cierre.");
+    } finally {
+      setDescargandoCierreId(null);
+    }
+  };
 
   const cargarHistorial = async () => {
     setCargandoHistorial(true);
@@ -274,7 +321,7 @@ export default function GestionTanques() {
         </p>
       </div>
 
-      {/* Historial General Paginado */}
+      {/* Historial General Paginado con Tabs */}
       <div className="bg-bg-card border border-white/5 shadow-2xl rounded-2xl overflow-hidden mt-6">
         <div className="p-4 border-b border-white/5 flex flex-col md:flex-row justify-between md:items-center gap-4">
           <div className="flex items-center gap-3">
@@ -282,28 +329,56 @@ export default function GestionTanques() {
               <ClipboardList size={20} className="text-success" />
             </div>
             <div>
-              <h3 className="font-black text-text-main tracking-wide">Historial General</h3>
-              <p className="text-[10px] text-text-muted mt-0.5">Registro de todos los abastecimientos realizados en la base</p>
+              <h3 className="font-black text-text-main tracking-wide">
+                {tabActivo === 'general' ? 'Historial General' : 'Historial de Cierres Diarios'}
+              </h3>
+              <p className="text-[10px] text-text-muted mt-0.5">
+                {tabActivo === 'general' 
+                  ? 'Registro de todos los abastecimientos realizados en la base' 
+                  : 'Historial de lecturas de cierres diarios por tanque'}
+              </p>
             </div>
+          </div>
+
+          {/* Selector de Tabs */}
+          <div className="flex gap-1 bg-bg-low rounded-xl p-1 border border-white/5 md:mx-auto">
+            <button
+              onClick={() => cambiarTab('general')}
+              className={cn(
+                'px-4 h-8 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all',
+                tabActivo === 'general' ? 'bg-bg-card text-success border border-success/10' : 'text-text-muted hover:text-text-main'
+              )}
+            >
+              Abastecimientos
+            </button>
+            <button
+              onClick={() => cambiarTab('cierres')}
+              className={cn(
+                'px-4 h-8 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all',
+                tabActivo === 'cierres' ? 'bg-bg-card text-success border border-success/10' : 'text-text-muted hover:text-text-main'
+              )}
+            >
+              Cierres Diarios
+            </button>
           </div>
           
           <div className="flex items-center gap-2">
             <button 
-              disabled={pagina === 0 || cargandoHistorial}
+              disabled={pagina === 0 || (tabActivo === 'general' ? cargandoHistorial : cargandoCierres)}
               onClick={() => setPagina(p => p - 1)}
               className="w-10 h-10 rounded-xl border border-white/5 bg-bg-low flex items-center justify-center hover:bg-white/5 text-text-muted hover:text-text-main disabled:opacity-50 transition-all"
             >
               <ChevronLeft size={18} />
             </button>
             <div className="h-10 px-4 rounded-xl border border-white/5 bg-bg-low flex items-center justify-center text-xs font-black text-text-main font-mono">
-              {cargandoHistorial ? (
+              {cargandoHistorial || cargandoCierres ? (
                 <RefreshCw size={14} className="animate-spin text-text-muted" />
               ) : (
                 `${pagina + 1} / ${Math.max(1, Math.ceil(totalHistorial / limit))}`
               )}
             </div>
             <button 
-              disabled={(pagina + 1) * limit >= totalHistorial || cargandoHistorial}
+              disabled={(pagina + 1) * limit >= totalHistorial || (tabActivo === 'general' ? cargandoHistorial : cargandoCierres)}
               onClick={() => setPagina(p => p + 1)}
               className="w-10 h-10 rounded-xl border border-white/5 bg-bg-low flex items-center justify-center hover:bg-white/5 text-text-muted hover:text-text-main disabled:opacity-50 transition-all"
             >
@@ -313,60 +388,129 @@ export default function GestionTanques() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-white/5 bg-bg-low/30">
-                <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted">Fecha</th>
-                <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted">Vehículo</th>
-                <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted">Entidad</th>
-                <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted text-right">Litros</th>
-                <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted">Responsable</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {cargandoHistorial ? (
-                <tr>
-                  <td colSpan="5" className="px-4 py-8 text-center text-text-muted">
-                    <RefreshCw size={24} className="animate-spin mx-auto mb-2 opacity-50" />
-                    <p className="text-xs uppercase tracking-widest font-black">Cargando Historial...</p>
-                  </td>
+          {tabActivo === 'general' ? (
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-white/5 bg-bg-low/30">
+                  <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted">Fecha</th>
+                  <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted">Vehículo</th>
+                  <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted">Entidad</th>
+                  <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted text-right">Litros</th>
+                  <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted">Responsable</th>
                 </tr>
-              ) : historial.length === 0 ? (
-                <tr>
-                  <td colSpan="5" className="px-4 py-8 text-center text-text-muted text-xs uppercase tracking-widest font-black">
-                    No hay registros de abastecimiento.
-                  </td>
-                </tr>
-              ) : (
-                historial.map(h => (
-                  <tr key={h.id} className="hover:bg-white/5 transition-colors">
-                    <td className="px-4 py-3">
-                      <span className="text-xs font-mono text-text-sec">
-                        {new Date(h.fecha).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="text-xs font-black text-text-main tracking-wider">{h.placa}</p>
-                      <p className="text-[10px] text-text-muted truncate max-w-[150px]">{h.marca} {h.modelo}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-[10px] font-bold text-text-sec uppercase tracking-wider">{h.entidad}</span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <span className="text-sm font-black text-emerald-400 font-mono">
-                        {Number(h.litros).toFixed(1)} L
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-[10px] font-bold text-text-muted uppercase truncate max-w-[120px] block">
-                        {h.bombero}
-                      </span>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {cargandoHistorial ? (
+                  <tr>
+                    <td colSpan="5" className="px-4 py-8 text-center text-text-muted">
+                      <RefreshCw size={24} className="animate-spin mx-auto mb-2 opacity-50" />
+                      <p className="text-xs uppercase tracking-widest font-black">Cargando Historial...</p>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : historial.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="px-4 py-8 text-center text-text-muted text-xs uppercase tracking-widest font-black">
+                      No hay registros de abastecimiento.
+                    </td>
+                  </tr>
+                ) : (
+                  historial.map(h => (
+                    <tr key={h.id} className="hover:bg-white/5 transition-colors">
+                      <td className="px-4 py-3">
+                        <span className="text-xs font-mono text-text-sec">
+                          {new Date(h.fecha).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="text-xs font-black text-text-main tracking-wider">{h.placa}</p>
+                        <p className="text-[10px] text-text-muted truncate max-w-[150px]">{h.marca} {h.modelo}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-[10px] font-bold text-text-sec uppercase tracking-wider">{h.entidad}</span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="text-sm font-black text-emerald-400 font-mono">
+                          {Number(h.litros).toFixed(1)} L
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-[10px] font-bold text-text-muted uppercase truncate max-w-[120px] block">
+                          {h.bombero}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          ) : (
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-white/5 bg-bg-low/30">
+                  <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted">Fecha</th>
+                  <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted">Tanque</th>
+                  <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted text-right">Litros Cierre</th>
+                  <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted">Responsable</th>
+                  <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {cargandoCierres ? (
+                  <tr>
+                    <td colSpan="5" className="px-4 py-8 text-center text-text-muted">
+                      <RefreshCw size={24} className="animate-spin mx-auto mb-2 opacity-50" />
+                      <p className="text-xs uppercase tracking-widest font-black">Cargando Cierres...</p>
+                    </td>
+                  </tr>
+                ) : cierres.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="px-4 py-8 text-center text-text-muted text-xs uppercase tracking-widest font-black">
+                      No hay registros de cierres diarios.
+                    </td>
+                  </tr>
+                ) : (
+                  cierres.map(c => (
+                    <tr key={c.id} className="hover:bg-white/5 transition-colors">
+                      <td className="px-4 py-3">
+                        <span className="text-xs font-mono text-text-sec">
+                          {new Date(c.fecha).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs font-black text-text-main tracking-wide uppercase">
+                          {c.tanque_nombre}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="text-sm font-black text-amber-400 font-mono">
+                          {Number(c.cantidad_medida).toFixed(1)} L
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-[10px] font-bold text-text-muted uppercase truncate max-w-[150px] block">
+                          {c.bombero_nombre}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          disabled={descargandoCierreId !== null}
+                          onClick={() => handleDescargarCierre(c.id)}
+                          className="px-3 h-8 bg-success/10 border border-success/30 rounded-lg text-success hover:bg-success/20 active:scale-95 transition-all text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 mx-auto"
+                        >
+                          {descargandoCierreId === c.id ? (
+                            <RefreshCw size={12} className="animate-spin" />
+                          ) : (
+                            <FileDown size={12} />
+                          )}
+                          Reporte PDF
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 

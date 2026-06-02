@@ -42,6 +42,7 @@ class AbastecimientoRequest(BaseModel):
     foto_maquina_url: str
     datos_ia_ocr: Optional[Dict[str, Any]] = None
     solicitud_aprobacion_id: Optional[UUID] = None
+    conductor: Optional[str] = None
 
 class ResolverSolicitudRequest(BaseModel):
     estado: str # 'aprobada' | 'rechazada'
@@ -271,19 +272,25 @@ async def listar_tanques(
         # Verificar si ya hay lectura inicial declarada en la semana
         tiene_lectura_semana = await abastecimiento_service.verificar_lectura_inicial_semanal(db)
         
+        tanques_data = []
+        for t in tanques:
+            tiene_ap = await abastecimiento_service.verificar_apertura_dia(db, t.id)
+            tiene_ci = await abastecimiento_service.verificar_cierre_dia(db, t.id)
+            tanques_data.append({
+                "id": t.id,
+                "nombre": t.nombre,
+                "tipo_combustible": t.tipo_combustible.value,
+                "capacidad_maxima": t.capacidad_maxima,
+                "cantidad_actual": t.cantidad_actual,
+                "porcentaje": (t.cantidad_actual / t.capacidad_maxima) * 100 if t.capacidad_maxima > 0 else 0,
+                "tiene_apertura_hoy": tiene_ap,
+                "tiene_cierre_hoy": tiene_ci
+            })
+            
         return {
             "status": "success",
             "tiene_lectura_semana": tiene_lectura_semana,
-            "data": [
-                {
-                    "id": t.id,
-                    "nombre": t.nombre,
-                    "tipo_combustible": t.tipo_combustible.value,
-                    "capacidad_maxima": t.capacidad_maxima,
-                    "cantidad_actual": t.cantidad_actual,
-                    "porcentaje": (t.cantidad_actual / t.capacidad_maxima) * 100 if t.capacidad_maxima > 0 else 0
-                } for t in tanques
-            ]
+            "data": tanques_data
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -1194,3 +1201,173 @@ async def obtener_dashboard_kpis_supervisor(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al obtener KPIs del supervisor: {str(e)}")
+
+
+@router.get("/cierres")
+async def listar_cierres_historicos(
+    skip: int = Query(0),
+    limit: int = Query(10),
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = Depends(obtener_usuario_actual)
+):
+    """
+    Lista los cierres históricos (tipo_lectura == cierre_dia) con paginación.
+    Accesible para Supervisor de Bomberos y Comando.
+    """
+    if usuario.rol not in [RolTipo.SUPERVISOR_BOMBEROS, RolTipo.COMANDANTE, RolTipo.ADMIN_BASE]:
+        raise HTTPException(status_code=403, detail="Permisos insuficientes.")
+        
+    try:
+        from app.models.lectura_tanque import LecturaTanque
+        from app.models.enums import TipoLecturaTanque
+        from sqlalchemy import func
+        from sqlalchemy.orm import selectinload
+        
+        # Consulta para contar el total
+        q_count = select(func.count(LecturaTanque.id)).where(LecturaTanque.tipo_lectura == TipoLecturaTanque.cierre_dia)
+        res_count = await db.execute(q_count)
+        total = res_count.scalar() or 0
+        
+        # Consulta paginada con relaciones tanque y bombero
+        q_cierres = (
+            select(LecturaTanque)
+            .options(selectinload(LecturaTanque.tanque), selectinload(LecturaTanque.bombero))
+            .where(LecturaTanque.tipo_lectura == TipoLecturaTanque.cierre_dia)
+            .order_by(LecturaTanque.fecha.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        res_cierres = await db.execute(q_cierres)
+        cierres = res_cierres.scalars().all()
+        
+        return {
+            "status": "success",
+            "total": total,
+            "data": [
+                {
+                    "id": str(c.id),
+                    "fecha": c.fecha.isoformat(),
+                    "tanque_id": str(c.tanque_id),
+                    "tanque_nombre": c.tanque.nombre if c.tanque else "?",
+                    "tanque_tipo": c.tanque.tipo_combustible.value if c.tanque else "?",
+                    "cantidad_medida": c.cantidad_medida,
+                    "observaciones": c.observaciones,
+                    "responsable_nombre": f"{c.bombero.nombre} {c.bombero.apellido}" if c.bombero else "Sistema"
+                } for c in cierres
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al listar cierres: {str(e)}")
+
+
+@router.get("/cierres/{lectura_id}/reporte-data")
+async def obtener_datos_reporte_cierre_historico(
+    lectura_id: UUID,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = Depends(obtener_usuario_actual)
+):
+    """
+    Devuelve los datos operativos consolidados de ese día específico de cierre para reconstruir el reporte PDF.
+    """
+    if usuario.rol not in [RolTipo.SUPERVISOR_BOMBEROS, RolTipo.COMANDANTE, RolTipo.ADMIN_BASE]:
+        raise HTTPException(status_code=403, detail="Permisos insuficientes.")
+        
+    try:
+        from app.models.lectura_tanque import LecturaTanque
+        from app.models.abastecimiento import Abastecimiento
+        from app.models.vehiculo import Vehiculo
+        from sqlalchemy import func
+        from sqlalchemy.orm import selectinload
+        from datetime import datetime, time
+        
+        # 1. Obtener la lectura del cierre
+        query = select(LecturaTanque).options(
+            selectinload(LecturaTanque.tanque), 
+            selectinload(LecturaTanque.bombero)
+        ).where(LecturaTanque.id == lectura_id)
+        res = await db.execute(query)
+        lectura = res.scalar_one_or_none()
+        
+        if not lectura:
+            raise HTTPException(status_code=404, detail="Lectura de cierre no encontrada.")
+            
+        # 2. Rango del día correspondiente a esa lectura
+        fecha_cierre = lectura.fecha
+        inicio_dia = datetime.combine(fecha_cierre.date(), time.min)
+        fin_dia = datetime.combine(fecha_cierre.date(), time.max)
+        
+        # 3. Litros abastecidos en ese día para ese tanque específico
+        q_litros = select(func.coalesce(func.sum(Abastecimiento.cantidad_abastecida), 0.0)).where(
+            Abastecimiento.tanque_id == lectura.tanque_id,
+            Abastecimiento.fecha.between(inicio_dia, fin_dia)
+        )
+        litros_hoy = (await db.execute(q_litros)).scalar() or 0.0
+        
+        # Cargas realizadas en ese día para ese tanque específico
+        q_cargas = select(func.count(Abastecimiento.id)).where(
+            Abastecimiento.tanque_id == lectura.tanque_id,
+            Abastecimiento.fecha.between(inicio_dia, fin_dia)
+        )
+        cargas_hoy = (await db.execute(q_cargas)).scalar() or 0
+        
+        # Solicitudes pendientes de ese día (dummy o 0)
+        solicitudes_pendientes = 0
+        
+        # 4. Lista de abastecimientos de ese día para ese tanque específico
+        q_abast = (
+            select(Abastecimiento)
+            .options(
+                selectinload(Abastecimiento.vehiculo).selectinload(Vehiculo.entidad),
+                selectinload(Abastecimiento.bombero)
+            )
+            .where(
+                Abastecimiento.tanque_id == lectura.tanque_id,
+                Abastecimiento.fecha.between(inicio_dia, fin_dia)
+            )
+            .order_by(Abastecimiento.fecha.asc())
+        )
+        abast_hoy = (await db.execute(q_abast)).scalars().all()
+        
+        abast_data = [
+            {
+                "id": str(a.id),
+                "placa": a.vehiculo.placa if a.vehiculo else "?",
+                "marca": a.vehiculo.marca if a.vehiculo else "?",
+                "modelo": a.vehiculo.modelo if a.vehiculo else "?",
+                "entidad": a.vehiculo.entidad.nombre if a.vehiculo and getattr(a.vehiculo, 'entidad', None) else "SIN ENTIDAD",
+                "bombero": f"{a.bombero.nombre} {a.bombero.apellido}" if a.bombero else "?",
+                "litros": a.cantidad_abastecida,
+                "fecha": a.fecha.isoformat(),
+                "tiene_alerta": a.tiene_alerta
+            } for a in abast_hoy
+        ]
+        
+        # 5. Estructurar respuesta
+        return {
+            "status": "success",
+            "data": {
+                "kpis": {
+                    "litros_hoy": litros_hoy,
+                    "cargas_hoy": cargas_hoy,
+                    "solicitudes_pendientes": solicitudes_pendientes,
+                    "abastecimientos_hoy": abast_data
+                },
+                "modalLectura": {
+                    "tanque": {
+                        "id": str(lectura.tanque_id),
+                        "nombre": lectura.tanque.nombre if lectura.tanque else "?",
+                        "tipo_combustible": lectura.tanque.tipo_combustible.value if lectura.tanque else "?",
+                        "capacidad_maxima": lectura.tanque.capacidad_maxima if lectura.tanque else 0.0,
+                        "cantidad_actual": lectura.tanque.cantidad_actual if lectura.tanque else 0.0
+                    }
+                },
+                "formLectura": {
+                    "cantidad_medida": lectura.cantidad_medida,
+                    "observaciones": lectura.observaciones or ""
+                },
+                "supervisor_nombre": f"{lectura.bombero.nombre} {lectura.bombero.apellido}" if lectura.bombero else "Sistema",
+                "fecha_cierre": lectura.fecha.isoformat()
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener datos históricos del cierre: {str(e)}")

@@ -417,7 +417,8 @@ class AbastecimientoService:
             foto_maquina_url=datos["foto_maquina_url"],
             datos_ia_ocr=datos.get("datos_ia_ocr"),
             tiene_alerta=tiene_alerta,
-            solicitud_aprobacion_id=solicitud_id
+            solicitud_aprobacion_id=solicitud_id,
+            conductor=datos.get("conductor")
         )
         
         # 8. Actualizar kilometraje del vehículo
@@ -515,10 +516,35 @@ class AbastecimientoService:
 
     async def verificar_lectura_inicial_semanal(self, db: AsyncSession) -> bool:
         """
-        Legado: Verifica si hay apertura o lectura semanal registrada hoy.
-        Usado internamente para compatibilidad con el dashboard del Bombero.
+        Verifica si todos los tanques activos tienen una lectura de apertura_dia registrada hoy.
+        Retorna True si todos están aperturados hoy, False si falta alguno.
         """
-        return await self.verificar_apertura_dia(db)
+        try:
+            from app.models.tanque_combustible import TanqueCombustible
+            # Contar total de tanques activos
+            q_tanques = select(func.count(TanqueCombustible.id)).where(TanqueCombustible.activo == True)
+            res_t = await db.execute(q_tanques)
+            total_tanques = res_t.scalar() or 0
+            
+            if total_tanques == 0:
+                return True
+                
+            # Contar cuántos de esos tanques activos tienen lectura de apertura registrada hoy
+            inicio, fin = await self.obtener_rango_dia()
+            q_aperturas = select(func.count(func.distinct(LecturaTanque.tanque_id))).join(
+                TanqueCombustible, LecturaTanque.tanque_id == TanqueCombustible.id
+            ).where(
+                TanqueCombustible.activo == True,
+                LecturaTanque.tipo_lectura == TipoLecturaTanque.apertura_dia,
+                LecturaTanque.fecha.between(inicio, fin)
+            )
+            res_a = await db.execute(q_aperturas)
+            tanques_aperturados = res_a.scalar() or 0
+            
+            return tanques_aperturados >= total_tanques
+        except Exception as e:
+            logging.error(f"Error en verificar_lectura_inicial_semanal: {e}")
+            return False
 
     async def obtener_reporte_combustible(
         self,
