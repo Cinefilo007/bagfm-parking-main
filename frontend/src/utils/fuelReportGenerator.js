@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -62,7 +62,7 @@ export const generarReporteCierre = (kpis, modalLectura, formLectura, supervisor
     ['Solicitudes Excepcionales', `${kpis.solicitudes_pendientes || 0}`] // Se puede ajustar a resueltas si se tuviera
   ];
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: currentY,
     margin: { left: marginX },
     tableWidth: 100,
@@ -98,7 +98,7 @@ export const generarReporteCierre = (kpis, modalLectura, formLectura, supervisor
     ['Observaciones', formLectura.observaciones || 'Ninguna']
   ];
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: currentY,
     margin: { left: marginX },
     body: tanqueInfo,
@@ -137,7 +137,7 @@ export const generarReporteCierre = (kpis, modalLectura, formLectura, supervisor
       `${Number(a.litros).toFixed(1)} L`
     ]);
 
-    doc.autoTable({
+    autoTable(doc, {
       startY: currentY,
       margin: { left: marginX, right: marginX },
       head: [tableCols],
