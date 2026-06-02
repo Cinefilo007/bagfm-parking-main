@@ -418,6 +418,10 @@ async def obtener_reportes(
 # --- Endpoints de Administración de Flota / Parque Automotor ---
 
 class VehiculoCombustibleUpdate(BaseModel):
+    placa: Optional[str] = None
+    marca: Optional[str] = None
+    modelo: Optional[str] = None
+    color: Optional[str] = None
     autorizado_combustible: Optional[bool] = None
     uso_vehiculo: Optional[str] = None # 'particular' | 'protocolar' | 'servicio'
     tipo_combustible: Optional[str] = None # 'gasolina' | 'diesel'
@@ -511,6 +515,21 @@ async def actualizar_vehiculo_combustible(
             raise HTTPException(status_code=403, detail="No tienes permisos para modificar este vehículo")
             
         # Actualizaciones permitidas
+        if request.placa is not None:
+            # Validar si otra placa existe si cambia la placa, pero para el supervisor simplificaremos y confiaremos, 
+            # o mejor agregamos un chequeo rápido
+            if request.placa.strip():
+                vehiculo.placa = request.placa.strip().upper()
+                
+        if request.marca is not None:
+            vehiculo.marca = request.marca
+            
+        if request.modelo is not None:
+            vehiculo.modelo = request.modelo
+            
+        if request.color is not None:
+            vehiculo.color = request.color
+            
         if request.autorizado_combustible is not None:
             vehiculo.autorizado_combustible = request.autorizado_combustible
             

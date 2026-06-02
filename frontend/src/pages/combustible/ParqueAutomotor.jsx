@@ -34,6 +34,10 @@ export default function ParqueAutomotor() {
   const [modalVehiculo, setModalVehiculo] = useState(null);
   const [guardandoVehiculo, setGuardandoVehiculo] = useState(false);
   const [formVehiculo, setFormVehiculo] = useState({
+    placa: '',
+    marca: '',
+    modelo: '',
+    color: '',
     uso_vehiculo: '',
     tipo_combustible: '',
     capacidad_tanque: '',
@@ -148,6 +152,10 @@ export default function ParqueAutomotor() {
   const handleAbrirEditarVehiculo = (vehiculo) => {
     setModalVehiculo(vehiculo);
     setFormVehiculo({
+      placa: vehiculo.placa || '',
+      marca: vehiculo.marca || '',
+      modelo: vehiculo.modelo || '',
+      color: vehiculo.color || '',
       uso_vehiculo: vehiculo.uso_vehiculo,
       tipo_combustible: vehiculo.tipo_combustible,
       capacidad_tanque: vehiculo.capacidad_tanque || '0',
@@ -161,6 +169,10 @@ export default function ParqueAutomotor() {
     setGuardandoVehiculo(true);
     try {
       await combustibleService.actualizarVehiculoCombustible(modalVehiculo.id, {
+        placa: formVehiculo.placa.trim().toUpperCase(),
+        marca: formVehiculo.marca,
+        modelo: formVehiculo.modelo,
+        color: formVehiculo.color,
         uso_vehiculo: formVehiculo.uso_vehiculo,
         tipo_combustible: formVehiculo.tipo_combustible,
         capacidad_tanque: parseFloat(formVehiculo.capacidad_tanque) || 0,
@@ -667,7 +679,7 @@ export default function ParqueAutomotor() {
               </button>
             </div>
 
-            <form onSubmit={handleGuardarVehiculo} className="p-4 space-y-4">
+            <form onSubmit={handleGuardarVehiculo} className="p-4 space-y-4 max-h-[80vh] overflow-y-auto scrollbar-tactical">
               {/* Autorización rápida */}
               <div className="flex justify-between items-center bg-white/5 border border-bg-high/30 rounded-xl p-3">
                 <div>
@@ -685,6 +697,49 @@ export default function ParqueAutomotor() {
                     <ToggleLeft className="text-text-muted" size={32} />
                   )}
                 </button>
+              </div>
+
+              {/* Datos Básicos (Nuevos campos para edición) */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Placa</label>
+                  <input
+                    type="text"
+                    value={formVehiculo.placa}
+                    onChange={(e) => setFormVehiculo(prev => ({ ...prev, placa: e.target.value }))}
+                    className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main uppercase font-display font-black focus:outline-none focus:border-success transition-all"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Color</label>
+                  <input
+                    type="text"
+                    value={formVehiculo.color}
+                    onChange={(e) => setFormVehiculo(prev => ({ ...prev, color: e.target.value }))}
+                    className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Marca</label>
+                  <input
+                    type="text"
+                    value={formVehiculo.marca}
+                    onChange={(e) => setFormVehiculo(prev => ({ ...prev, marca: e.target.value }))}
+                    className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Modelo</label>
+                  <input
+                    type="text"
+                    value={formVehiculo.modelo}
+                    onChange={(e) => setFormVehiculo(prev => ({ ...prev, modelo: e.target.value }))}
+                    className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all"
+                  />
+                </div>
               </div>
 
               {/* Tipo de uso */}
