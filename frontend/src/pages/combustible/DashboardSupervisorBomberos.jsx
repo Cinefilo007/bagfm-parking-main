@@ -202,7 +202,7 @@ export default function DashboardSupervisorBomberos() {
     if (!formLectura.cantidad_medida) { toast.error('Ingrese la cantidad medida.'); return; }
     setGuardandoLectura(true);
     try {
-      await combustibleService.registrarLecturaDiaria({
+      const res = await combustibleService.registrarLecturaDiaria({
         tanque_id: modalLectura.tanque.id,
         cantidad_medida: parseFloat(formLectura.cantidad_medida),
         observaciones: formLectura.observaciones || null,
@@ -213,8 +213,10 @@ export default function DashboardSupervisorBomberos() {
       
       // Si es Cierre, generar el PDF
       if (modalLectura.tipo === 'cierre_dia') {
+        const lecturaId = res.id || (res.data && res.data.id);
+        const reporteData = await combustibleService.obtenerReporteCierreData(lecturaId);
         const supervisorNombre = `${user?.nombre || ''} ${user?.apellido || ''}`.trim();
-        generarReporteCierre(kpis, modalLectura, formLectura, supervisorNombre);
+        generarReporteCierre(reporteData.kpis, reporteData.modalLectura, reporteData.formLectura, supervisorNombre);
         toast.success('Reporte de cierre generado (PDF).');
       }
 

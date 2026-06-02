@@ -2,12 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { 
   Flame, RefreshCw, PlusCircle, Edit3, Trash2, 
   CheckCircle, AlertTriangle, XCircle, Database, Droplet,
-  ClipboardList, ChevronLeft, ChevronRight, FileDown
+  ClipboardList, ChevronLeft, ChevronRight, FileDown,
+  X, Camera, User
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { toast } from 'react-hot-toast';
 import { combustibleService } from '../../services/combustible.service';
 import { generarReporteCierre } from '../../utils/fuelReportGenerator';
+
+function formatTimeAgo(dateString) {
+  if (!dateString) return '--';
+  const d = new Date(dateString);
+  const s = Math.floor((new Date() - d) / 1000);
+  if (s < 60) return 'ahora';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `Hace ${m}m`;
+  const h = Math.floor(m / 60);
+  return h < 24 ? `Hace ${h}h` : `Hace ${Math.floor(h / 24)}d`;
+}
 
 export default function GestionTanques() {
   const [tanques, setTanques] = useState([]);
@@ -42,6 +54,7 @@ export default function GestionTanques() {
   const [cierres, setCierres] = useState([]);
   const [cargandoCierres, setCargandoCierres] = useState(false);
   const [descargandoCierreId, setDescargandoCierreId] = useState(null);
+  const [abastecimientoSeleccionado, setAbastecimientoSeleccionado] = useState(null);
   const [pagina, setPagina] = useState(0);
   const [totalHistorial, setTotalHistorial] = useState(0);
   const limit = 10;
@@ -415,7 +428,7 @@ export default function GestionTanques() {
                   </tr>
                 ) : (
                   historial.map(h => (
-                    <tr key={h.id} className="hover:bg-white/5 transition-colors">
+                    <tr key={h.id} onClick={() => setAbastecimientoSeleccionado(h)} className="hover:bg-white/5 transition-colors cursor-pointer">
                       <td className="px-4 py-3">
                         <span className="text-xs font-mono text-text-sec">
                           {new Date(h.fecha).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}
@@ -691,6 +704,61 @@ export default function GestionTanques() {
                   {eliminando ? 'Eliminando...' : 'Desactivar'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Abastecimiento Detalles */}
+      {abastecimientoSeleccionado && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-bg-card border border-white/10 rounded-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-white/5 flex justify-between items-center bg-bg-high/10">
+              <div>
+                <h3 className="text-sm font-black text-text-main font-display">DETALLES SUMINISTRO</h3>
+                <p className="text-[10px] text-text-muted">{abastecimientoSeleccionado.placa} · {formatTimeAgo(abastecimientoSeleccionado.fecha)}</p>
+              </div>
+              <button 
+                onClick={() => setAbastecimientoSeleccionado(null)}
+                className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-text-muted hover:text-white transition-all cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto scrollbar-tactical space-y-4">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-bg-low p-2.5 rounded-xl border border-white/5">
+                  <p className="text-[9px] font-black uppercase text-text-muted mb-1">Litros Surtidos</p>
+                  <p className="text-xl font-black font-display text-emerald-400">{Number(abastecimientoSeleccionado.litros).toFixed(1)} L</p>
+                </div>
+                <div className="bg-bg-low p-2.5 rounded-xl border border-white/5">
+                  <p className="text-[9px] font-black uppercase text-text-muted mb-1">Responsable</p>
+                  <p className="text-[11px] font-bold text-text-main flex items-center gap-1.5"><User size={12} className="text-text-muted" /> {abastecimientoSeleccionado.bombero}</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-[9px] font-black uppercase text-text-muted tracking-widest flex items-center gap-1.5"><Camera size={12}/> Evidencia Odómetro</p>
+                <div className="bg-bg-low rounded-xl border border-white/5 overflow-hidden aspect-video flex items-center justify-center">
+                  {abastecimientoSeleccionado.foto_odometro ? (
+                    <img src={abastecimientoSeleccionado.foto_odometro} alt="Odómetro" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-[10px] text-text-muted font-bold">Sin foto</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-[9px] font-black uppercase text-text-muted tracking-widest flex items-center gap-1.5"><Camera size={12}/> Evidencia Surtidor</p>
+                <div className="bg-bg-low rounded-xl border border-white/5 overflow-hidden aspect-video flex items-center justify-center">
+                  {abastecimientoSeleccionado.foto_surtidor ? (
+                    <img src={abastecimientoSeleccionado.foto_surtidor} alt="Surtidor" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-[10px] text-text-muted font-bold">Sin foto</span>
+                  )}
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
