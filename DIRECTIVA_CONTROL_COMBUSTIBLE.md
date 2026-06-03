@@ -104,6 +104,10 @@ Para evitar inconsistencias a lo largo del programa, todas las pantallas del mó
 - **Dashboard del Comandante:** Integra 5 KPIs tácticos de combustible (Litros Surtidos, Cargas, Stock de Combustible en Tanques, Solicitudes Pendientes y Alertas de Fraude) y un componente `FuelMonitor` con polling de 30 segundos.
 - **Pestañas del Monitor:** Tanques (niveles con barra de color), Flujo (feed de últimas 15 cargas), y Solicitudes (resumen de pendientes con botón de acción rápido).
 
+### 4.6 Panel del Bombero (`DashboardBombero.jsx`)
+- **Registro de Abastecimiento:** Flujo móvil-first optimizado para el bombero de turno. Exige declaración diaria obligatoria de apertura de tanques, captura del conductor responsable y fotos obligatorias.
+- **Sugerencias y Autocompletado de Placas:** Implementación de autocompletado en tiempo real a partir de 2 caracteres con un retardo (debounce) de 300ms para evitar sobrecarga. Muestra un listado flotante táctil (mínimo de 48px de altura por sugerencia) de hasta 5 coincidencias. Seleccionar una sugerencia rellena la placa y ejecuta la consulta del vehículo automáticamente.
+
 ---
 
 ## 5. ROLES Y PRIVILEGIOS DE ADMINISTRACIÓN DE PERSONAL DE COMBUSTIBLE
@@ -155,5 +159,5 @@ Las fotos del surtidor y del odómetro se almacenan como **Base64 en la columna 
 
 ---
 
-*Última actualización: 2026-06-03 (Mapeo seguro de objetos de error e interfaz responsiva contra desbordes en ParqueAutomotor)*
+*Última actualización: 2026-06-03 (Mapeo de errores, rejilla adaptativa en ParqueAutomotor y autocompletado de placas con debounce en DashboardBombero)*
 *Aprobado por: Comandante de Base & Antigravity Aegis Command*

@@ -24,6 +24,8 @@ export default function DashboardBombero() {
   const [placaNoEncontrada, setPlacaNoEncontrada] = useState(false);
   const [buscandoVehiculo, setBuscandoVehiculo] = useState(false);
   const [vehiculoEncontrado, setVehiculoEncontrado] = useState(null);
+  const [sugerenciasPlacas, setSugerenciasPlacas] = useState([]);
+  const debounceTimeoutRef = useRef(null);
   
   // Historial Bombero
   const [historialBombero, setHistorialBombero] = useState([]);
@@ -75,6 +77,11 @@ export default function DashboardBombero() {
     cargarDatosTanques();
     cargarBandejaSolicitudes();
     cargarHistorialBombero();
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
   }, []);
 
   const cargarHistorialBombero = async () => {
@@ -157,11 +164,12 @@ export default function DashboardBombero() {
     }
   };
 
-  const handleBuscarPlaca = async (e) => {
+  const handleBuscarPlaca = async (e, placaForzada = null) => {
     if (e) e.preventDefault();
-    const placa = placaBusqueda.trim().toUpperCase();
+    const placa = (placaForzada || placaBusqueda).trim().toUpperCase();
     if (!placa) { toast.error("Ingrese una placa válida"); return; }
     
+    setSugerenciasPlacas([]); // Limpiar sugerencias
     setBuscandoVehiculo(true);
     setVehiculoEncontrado(null);
     setPlacaNoEncontrada(false);
@@ -195,6 +203,33 @@ export default function DashboardBombero() {
     } finally {
       setBuscandoVehiculo(false);
     }
+  };
+
+  const buscarSugerencias = (val) => {
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    
+    const query = val.trim();
+    if (query.length < 2) {
+      setSugerenciasPlacas([]);
+      return;
+    }
+    
+    debounceTimeoutRef.current = setTimeout(async () => {
+      try {
+        const res = await combustibleService.getVehiculosParque({ placa: query });
+        setSugerenciasPlacas((res || []).slice(0, 5));
+      } catch (err) {
+        console.error("Error al obtener sugerencias de placas:", err);
+      }
+    }, 300);
+  };
+
+  const handleSeleccionarSugerencia = (placa) => {
+    setPlacaBusqueda(placa);
+    setSugerenciasPlacas([]);
+    handleBuscarPlaca(null, placa);
   };
 
   // Activa la carga masiva usando una solicitud aprobada de la bandeja
@@ -499,7 +534,11 @@ export default function DashboardBombero() {
                     type="text"
                     placeholder="AB123CD"
                     value={placaBusqueda}
-                    onChange={e => setPlacaBusqueda(e.target.value.toUpperCase())}
+                    onChange={e => {
+                      const val = e.target.value.toUpperCase();
+                      setPlacaBusqueda(val);
+                      buscarSugerencias(val);
+                    }}
                     className="flex-1 min-w-0 bg-bg-low border border-white/10 rounded-xl px-4 py-3 text-2xl font-black text-text-main uppercase tracking-widest focus:border-success/50 outline-none transition-all text-center"
                   />
                   <button
@@ -510,6 +549,32 @@ export default function DashboardBombero() {
                     {buscandoVehiculo ? <RefreshCw size={20} className="animate-spin" /> : <Car size={20} />}
                   </button>
                 </div>
+
+                {/* Sugerencias de placas */}
+                {sugerenciasPlacas.length > 0 && (
+                  <div className="mt-1 bg-bg-low border border-white/10 rounded-xl overflow-hidden divide-y divide-white/5 shadow-lg">
+                    {sugerenciasPlacas.map((v) => (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => handleSeleccionarSugerencia(v.placa)}
+                        className="w-full text-left px-4 py-3 text-xs hover:bg-white/5 transition-all flex justify-between items-center text-text-main active:bg-white/10 min-h-[48px]"
+                      >
+                        <div className="min-w-0">
+                          <span className="font-mono font-black text-sm text-success tracking-wider mr-2">{v.placa}</span>
+                          <span className="text-[10px] text-text-muted uppercase truncate">
+                            {v.marca} {v.modelo}
+                          </span>
+                        </div>
+                        {v.color && (
+                          <span className="text-[9px] text-text-muted uppercase font-bold bg-white/5 px-2 py-0.5 rounded">
+                            {v.color}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 
                 {/* Botón de solicitud directa para no registrados / emergencia */}
                 {placaNoEncontrada && (

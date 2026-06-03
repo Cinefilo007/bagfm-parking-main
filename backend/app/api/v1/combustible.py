@@ -445,7 +445,7 @@ async def listar_vehiculos_parque(
     Lista los vehículos registrados en la base con sus datos de combustible.
     Mando y supervisión ven todo; admin de entidad ve sólo su entidad.
     """
-    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE, RolTipo.SUPERVISOR, RolTipo.ADMIN_ENTIDAD, RolTipo.SUPERVISOR_BOMBEROS]:
+    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE, RolTipo.SUPERVISOR, RolTipo.ADMIN_ENTIDAD, RolTipo.SUPERVISOR_BOMBEROS, RolTipo.BOMBERO]:
         raise HTTPException(status_code=403, detail="Permisos insuficientes.")
         
     try:
