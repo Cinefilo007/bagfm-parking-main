@@ -372,22 +372,45 @@ class AbastecimientoService:
         res_prev = await db.execute(query_prev)
         abastecimiento_prev = res_prev.scalar_one_or_none()
         
+        distancia = 0
+        rendimiento = 0.0
+        
         if abastecimiento_prev and kilometraje_anterior > 0:
             distancia = kilometraje_actual - kilometraje_anterior
             litros_previos = abastecimiento_prev.cantidad_abastecida
             
             if litros_previos > 0:
                 rendimiento = distancia / litros_previos
-                # Alerta si el rendimiento es sospechosamente bajo
-                # Autos < 8 km/l, Camiones/Servicio < 3.5 km/l
-                limite_sospecha = 3.5 if vehiculo.uso_vehiculo == UsoVehiculo.servicio else 8.0
+                
+                # Consultar los últimos 10 abastecimientos para calcular el promedio histórico
+                stmt_hist = select(Abastecimiento).where(Abastecimiento.vehiculo_id == vehiculo.id).order_by(Abastecimiento.fecha.desc()).limit(10)
+                res_hist = await db.execute(stmt_hist)
+                hist_ab = res_hist.scalars().all()
+                
+                rendimientos_hist = []
+                for i in range(len(hist_ab) - 1):
+                    ab_act = hist_ab[i]
+                    ab_prev = hist_ab[i+1]
+                    d = ab_act.kilometraje_actual - ab_act.kilometraje_anterior
+                    l = ab_prev.cantidad_abastecida
+                    if d > 0 and l > 0:
+                        rendimientos_hist.append(d / l)
+                
+                # Si hay al menos 2 abastecimientos en el historial, usamos el promedio
+                if len(rendimientos_hist) >= 2:
+                    promedio_rendimiento = sum(rendimientos_hist) / len(rendimientos_hist)
+                else:
+                    promedio_rendimiento = 3.5 if vehiculo.uso_vehiculo == UsoVehiculo.servicio else 8.0
+                
+                limite_sospecha = promedio_rendimiento * 0.70
+                
                 if rendimiento < limite_sospecha:
                     tiene_alerta = True
                     # Disparar alerta push al comandante en segundo plano
                     try:
                         datos_alerta = {
                             "placa": vehiculo.placa,
-                            "motivo": f"Rendimiento muy bajo: {rendimiento:.2f} km/L (Distancia: {distancia} km, Carga Previa: {litros_previos} L)"
+                            "motivo": f"Sospecha de extracción: rendimiento de {rendimiento:.2f} km/L es inferior al 70% del esperado ({promedio_rendimiento:.2f} km/L)"
                         }
                         await notificacion_service.notificar_discrepancia_combustible(db, datos_alerta)
                     except Exception as e:
@@ -414,6 +437,8 @@ class AbastecimientoService:
             kilometraje_anterior=kilometraje_anterior,
             kilometraje_actual=kilometraje_actual,
             cantidad_abastecida=cantidad_abastecida,
+            distancia_recorrida=distancia,
+            rendimiento_tramo=rendimiento,
             foto_kilometraje_url=datos["foto_kilometraje_url"],
             foto_maquina_url=datos["foto_maquina_url"],
             datos_ia_ocr=datos.get("datos_ia_ocr"),
@@ -616,7 +641,9 @@ class AbastecimientoService:
             Abastecimiento.kilometraje_anterior,
             Abastecimiento.kilometraje_actual,
             Abastecimiento.cantidad_abastecida,
-            Abastecimiento.fecha
+            Abastecimiento.fecha,
+            Abastecimiento.distancia_recorrida,
+            Abastecimiento.rendimiento_tramo
         ).join(
             Vehiculo, Abastecimiento.vehiculo_id == Vehiculo.id
         ).join(
@@ -637,7 +664,9 @@ class AbastecimientoService:
                 "km_anterior": row[2],
                 "km_actual": row[3],
                 "litros": float(row[4]),
-                "fecha": row[5].isoformat()
+                "fecha": row[5].isoformat(),
+                "distancia_recorrida": row[6],
+                "rendimiento_tramo": row[7]
             } for row in res_alertas.all()
         ]
 

@@ -42,6 +42,7 @@ export default function DashboardBombero() {
   const [fotoMaquinaUrl, setFotoMaquinaUrl] = useState('');
   
   const [iaLoadOdo, setIaLoadOdo] = useState(false);
+  const [iaLoadSurtidor, setIaLoadSurtidor] = useState(false);
   const [subiendoFotoK, setSubiendoFotoK] = useState(false);
   const [subiendoFotoM, setSubiendoFotoM] = useState(false);
   const [cargandoSuministro, setCargandoSuministro] = useState(false);
@@ -188,6 +189,13 @@ export default function DashboardBombero() {
       if (datos.capacidad_tanque > 0) {
         setLitrosCargar(datos.capacidad_tanque); // sugerir tanque lleno
       }
+      // Seleccionar tanque automáticamente según el tipo de combustible del vehículo
+      if (datos.tipo_combustible && tanques.length > 0) {
+        const tanqueSugerido = tanques.find(t => t.tipo_combustible === datos.tipo_combustible);
+        if (tanqueSugerido) {
+          setTanqueSeleccionado(tanqueSugerido.id);
+        }
+      }
       if (!datos.autorizado) {
         toast.error("Vehículo NO autorizado permanentemente para combustible.");
       } else if (datos.cupo_entidad_excedido) {
@@ -243,6 +251,13 @@ export default function DashboardBombero() {
       setVehiculoEncontrado(datos);
       setSolicitudVinculada(sol);
       setLitrosCargar(sol.cantidad_solicitada);
+      // Seleccionar tanque automáticamente según el tipo de combustible del vehículo
+      if (datos.tipo_combustible && tanques.length > 0) {
+        const tanqueSugerido = tanques.find(t => t.tipo_combustible === datos.tipo_combustible);
+        if (tanqueSugerido) {
+          setTanqueSeleccionado(tanqueSugerido.id);
+        }
+      }
       setFotoKilometraje(null);
       setFotoKilometrajeUrl('');
       setFotoMaquina(null);
@@ -297,7 +312,33 @@ export default function DashboardBombero() {
       setSubiendoFotoM(true);
       setFotoMaquina(file);
       setFotoMaquinaUrl(URL.createObjectURL(file));
-      setSubiendoFotoM(false);
+      
+      // Intentar OCR de los litros del surtidor con IA
+      setIaLoadSurtidor(true);
+      try {
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          const base64 = reader.result.split(',')[1];
+          try {
+            const { data } = await alcabalaService.extraerDatosIA(base64, 'surtidor');
+            if (data && data.litros) {
+              setLitrosCargar(data.litros);
+              toast.success(`Litros detectados por IA: ${data.litros} L`);
+            } else {
+              toast.error("No se detectaron los litros por IA. Escríbalos manualmente.");
+            }
+          } catch {
+            toast.error("Fallo el OCR del surtidor. Ingrese los litros manualmente.");
+          } finally {
+            setIaLoadSurtidor(false);
+          }
+        };
+        reader.readAsDataURL(file);
+      } catch {
+        setIaLoadSurtidor(false);
+      } finally {
+        setSubiendoFotoM(false);
+      }
     }
   };
 
@@ -601,7 +642,12 @@ export default function DashboardBombero() {
                     <div key={a.id || i} className="bg-bg-low border border-white/5 rounded-xl p-3 flex justify-between items-center opacity-80 hover:opacity-100 transition-all">
                       <div>
                         <p className="text-sm font-black text-text-main font-display tracking-wide">{a.placa}</p>
-                        <p className="text-[9px] text-text-muted mt-0.5">{a.entidad} · {a.marca} {a.modelo}</p>
+                        <p className="text-[9px] text-text-muted mt-0.5">
+                          {a.entidad} · {a.marca} {a.modelo}
+                          {a.distancia_recorrida !== undefined && a.distancia_recorrida !== null && a.distancia_recorrida > 0 && (
+                            <span className="text-success/90 font-semibold font-display"> · {a.distancia_recorrida} km recorridos</span>
+                          )}
+                        </p>
                       </div>
                       <span className="text-[12px] font-black font-display text-emerald-400">
                         {Number(a.litros).toFixed(2)} L
@@ -819,6 +865,7 @@ export default function DashboardBombero() {
                           onChange={(e) => handleFotoChange(e, 'maquina')}
                           className="hidden" 
                         />
+                        {iaLoadSurtidor && <p className="text-[8px] text-success animate-pulse font-bold uppercase tracking-wider text-center mt-1">Leyendo con IA...</p>}
                       </div>
                     </div>
 
@@ -837,7 +884,7 @@ export default function DashboardBombero() {
                       </button>
                       <button
                         type="submit"
-                        disabled={cargandoSuministro || subiendoFotoK || subiendoFotoM || iaLoadOdo || !fotoKilometraje || !fotoMaquina}
+                        disabled={cargandoSuministro || subiendoFotoK || subiendoFotoM || iaLoadOdo || iaLoadSurtidor || !fotoKilometraje || !fotoMaquina}
                         className="flex-1 h-12 rounded-xl bg-success text-bg-app font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-50"
                       >
                         {cargandoSuministro ? <RefreshCw size={15} className="animate-spin" /> : <Flame size={15} />}

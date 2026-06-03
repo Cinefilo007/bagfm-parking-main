@@ -31,7 +31,7 @@ async def extraer_datos(
     """
     Endpoint táctico para extraer datos de documentos usando Gemini IA.
     """
-    if not request.image_base64 or request.tipo not in ['cedula', 'vehiculo']:
+    if not request.image_base64 or request.tipo not in ['cedula', 'vehiculo', 'odometro', 'surtidor']:
         raise HTTPException(status_code=400, detail="Faltan datos de imagen o tipo inválido")
 
     try:

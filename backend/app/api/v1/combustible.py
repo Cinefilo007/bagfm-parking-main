@@ -994,6 +994,8 @@ async def obtener_historial_abastecimientos(
                 "bombero": f"{a.bombero.nombre} {a.bombero.apellido}" if a.bombero else "?",
                 "tanque": a.tanque.nombre if a.tanque else "?",
                 "tiene_alerta": a.tiene_alerta,
+                "distancia_recorrida": a.distancia_recorrida,
+                "rendimiento_tramo": a.rendimiento_tramo,
                 "tiene_foto_odometro": bool(a.foto_kilometraje_url),
                 "tiene_foto_surtidor": bool(a.foto_maquina_url)
             } for a in abastecimientos
@@ -1047,6 +1049,8 @@ async def obtener_historial_bombero(
                 "entidad": a.vehiculo.entidad.nombre if a.vehiculo and getattr(a.vehiculo, 'entidad', None) else "SIN ENTIDAD",
                 "litros": a.cantidad_abastecida,
                 "tiene_alerta": a.tiene_alerta,
+                "distancia_recorrida": a.distancia_recorrida,
+                "rendimiento_tramo": a.rendimiento_tramo,
                 "tiene_foto_odometro": bool(a.foto_kilometraje_url),
                 "tiene_foto_surtidor": bool(a.foto_maquina_url)
             } for a in abastecimientos
@@ -1106,6 +1110,8 @@ async def obtener_detalle_abastecimiento(
                 "tanque": a.tanque.nombre if a.tanque else "?",
                 "litros": a.cantidad_abastecida,
                 "tiene_alerta": a.tiene_alerta,
+                "distancia_recorrida": a.distancia_recorrida,
+                "rendimiento_tramo": a.rendimiento_tramo,
                 "foto_odometro": a.foto_kilometraje_url,
                 "foto_surtidor": a.foto_maquina_url
             }

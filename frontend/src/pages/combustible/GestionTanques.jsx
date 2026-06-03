@@ -803,6 +803,29 @@ export default function GestionTanques() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-bg-low p-2.5 rounded-xl border border-white/5">
+                  <p className="text-[9px] font-black uppercase text-text-muted mb-1">Km Recorridos</p>
+                  <p className="text-sm font-black font-display text-text-main">
+                    {abastecimientoSeleccionado.distancia_recorrida !== undefined && abastecimientoSeleccionado.distancia_recorrida !== null && abastecimientoSeleccionado.distancia_recorrida > 0 ? (
+                      `${abastecimientoSeleccionado.distancia_recorrida} km`
+                    ) : (
+                      "N/A"
+                    )}
+                  </p>
+                </div>
+                <div className="bg-bg-low p-2.5 rounded-xl border border-white/5">
+                  <p className="text-[9px] font-black uppercase text-text-muted mb-1">Rendimiento Estimado</p>
+                  <p className="text-sm font-black font-display text-text-main">
+                    {abastecimientoSeleccionado.rendimiento_tramo !== undefined && abastecimientoSeleccionado.rendimiento_tramo !== null && abastecimientoSeleccionado.rendimiento_tramo > 0 ? (
+                      `${Number(abastecimientoSeleccionado.rendimiento_tramo).toFixed(2)} km/L`
+                    ) : (
+                      "N/A"
+                    )}
+                  </p>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <p className="text-[9px] font-black uppercase text-text-muted tracking-widest flex items-center gap-1.5"><Camera size={12}/> Evidencia Odómetro</p>
                 <div className="bg-bg-low rounded-xl border border-white/5 overflow-hidden aspect-video flex items-center justify-center">

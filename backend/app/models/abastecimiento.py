@@ -26,6 +26,8 @@ class Abastecimiento(Base):
     foto_maquina_url = Column(Text, nullable=False)
     datos_ia_ocr = Column(JSON, nullable=True)
     tiene_alerta = Column(Boolean, default=False, nullable=False)
+    distancia_recorrida = Column(Integer, nullable=True)
+    rendimiento_tramo = Column(Float, nullable=True)
     
     solicitud_aprobacion_id = Column(UUID(as_uuid=True), ForeignKey("solicitudes_combustible.id", ondelete="SET NULL"), nullable=True)
     conductor = Column(String(100), nullable=True)

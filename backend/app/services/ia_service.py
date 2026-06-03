@@ -73,6 +73,16 @@ class IAService:
                     "No incluyas texto adicional ni símbolos, solo el valor numérico entero. "
                     "Si no logras leer el odómetro o la imagen no es legible, devuelve el valor como 0."
                 )
+            elif tipo == 'surtidor':
+                prompt = (
+                    "Eres un sistema OCR de seguridad táctica para la bomba de combustible de BAGFM. "
+                    "Analiza esta imagen de la pantalla de visualización de un surtidor de combustible (dispensador). "
+                    "Extrae el valor numérico exacto de los litros surtidos que se muestra en la sección correspondiente a 'Litros' o 'Volume'. "
+                    "Devuelve estrictamente un objeto JSON con esta clave: "
+                    "{'litros': float}. "
+                    "No incluyas texto adicional ni símbolos, solo el valor numérico decimal. "
+                    "Si no logras leer los litros o la imagen no es legible, devuelve el valor como 0.0."
+                )
             else:
                 raise ValueError("Tipo de documento no soportado")
 
@@ -101,6 +111,8 @@ class IAService:
                 return {"nombre": "", "apellido": "", "cedula": ""}
             elif tipo == 'odometro':
                 return {"kilometraje": 0}
+            elif tipo == 'surtidor':
+                return {"litros": 0.0}
             return {"marca": "", "modelo": "", "placa": "", "color": ""}
 
 ia_service = IAService()

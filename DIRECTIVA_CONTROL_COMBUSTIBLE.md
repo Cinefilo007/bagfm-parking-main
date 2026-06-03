@@ -47,11 +47,15 @@ Para evitar inconsistencias a lo largo del programa, todas las pantallas del mó
 - **Coordinación Multi-Rol:** El sistema detecta dinámicamente si la apertura ya fue realizada por algún rol (Bombero o Supervisor) para ese día y tanque específico. Solo se bloquean y exigen declaraciones para los tanques activos que falten por aperturar hoy, previniendo cierres de turno redundantes o bloqueos innecesarios.
 - El sistema bloqueará cualquier operación de despacho para un tanque específico hasta que se registre su correspondiente lectura inicial de apertura del día.
 
-### 3.3 Validación de Kilometraje y Alerta de Fraude
+### 3.3 Validación de Kilometraje, Cálculo de Consumo y Alertas de Robo (Ordeño)
 - **Regla Básica:** El kilometraje ingresado (`kilometraje_actual`) debe ser estrictamente mayor que el kilometraje anterior (`ultimo_kilometraje`).
-- **Control de Rendimiento:** En cada suministro se calculará el rendimiento de la carga previa:
-  $$\text{Rendimiento} = \frac{\text{Kilometraje Actual} - \text{Kilometraje Anterior}}{\text{Litros Suministrados en Carga Previa}}$$
-- Si el rendimiento calculado es menor al estándar mínimo tolerado según el tipo y marca de vehículo (alertas de sospecha), el sistema registrará una **Alerta de Auditoría** y enviará una notificación push instantánea al Comandante de Base y Admin Base por sospecha de extracción de combustible ilegal (fraude).
+- **Cálculo de Recorrido y Consumo:** En cada suministro se calcularán y persistirán de forma obligatoria en la tabla `abastecimientos` las siguientes variables del tramo:
+  - **Kilómetros Recorridos:** $\text{Distancia} = \text{Kilometraje Actual} - \text{Kilometraje Anterior}$
+  - **Rendimiento Real del Tramo:** $\text{Rendimiento} = \frac{\text{Distancia}}{\text{Litros Suministrados en Carga Previa}}$
+- **Detección Dinámica de Fraude (Promedio Histórico):** Para evaluar si un vehículo presenta una caída inusual de combustible (ordeño de tanque), el sistema calcula el promedio de rendimiento histórico real del vehículo a partir de sus últimos 10 abastecimientos.
+  - El umbral de sospecha se establece en el **70% del promedio histórico del vehículo**.
+  - Si el rendimiento del tramo actual es inferior a este umbral, el sistema marcará automáticamente la transacción con una **Alerta de Auditoría** (`tiene_alerta = True`) y enviará una notificación push en tiempo real al Comandante de Base y Admin Base por sospecha de extracción/robo.
+  - **Tolerancia y Fallback:** Si el vehículo tiene menos de 2 abastecimientos previos y no cuenta con historial suficiente para promediar, se aplicará el límite por defecto de uso: 8.0 km/L para vehículos particulares y 3.5 km/L para vehículos de servicio. El umbral de sospecha en este caso también será el 70% de dicho estándar (5.6 km/L y 2.45 km/L respectivamente).
 
 ### 3.4 Límites Semanales por Entidad y Vehículo
 - **Límite de Entidad:** Cada entidad (civil o militar) tiene asignado un cupo de consumo máximo semanal en litros. Si se alcanza o excede este cupo, el suministro para toda su flota vehicular queda **trancado** de forma automática.
@@ -105,7 +109,10 @@ Para evitar inconsistencias a lo largo del programa, todas las pantallas del mó
 - **Pestañas del Monitor:** Tanques (niveles con barra de color), Flujo (feed de últimas 15 cargas), y Solicitudes (resumen de pendientes con botón de acción rápido).
 
 ### 4.6 Panel del Bombero (`DashboardBombero.jsx`)
-- **Registro de Abastecimiento:** Flujo móvil-first optimizado para el bombero de turno. Exige declaración diaria obligatoria de apertura de tanques, captura del conductor responsable y fotos obligatorias.
+- **Registro de Abastecimiento:** Flujo móvil-first optimizado para el bombero de turno. Exige declaración diaria obligatoria de apertura de tanques, captura del conductor responsable y fotos obligatorias del odómetro y del dispensador/surtidor.
+- **Autoselección de Tanque por Combustible:** Al cargar la ficha del vehículo en la interfaz, el sistema evalúa dinámicamente su propiedad `tipo_combustible` (por ejemplo, `gasolina` o `diesel`) y pre-selecciona automáticamente el tanque surtidor correspondiente en el menú desplegable para evitar suministros erróneos (por ejemplo, cargar gasolina en un vehículo diesel).
+- **Lectura Inteligente con IA (OCR):** Integra el motor de IA Gemini 2.5 Flash a través del endpoint `/ia/extraer-datos`. Al capturar la foto del odómetro (tipo `odometro`) o del dispensador (tipo `surtidor`), la aplicación procesa la imagen de forma asíncrona, mostrando un indicador de estado "Leyendo con IA..." y rellenando automáticamente el campo numérico respectivo con los valores reconocidos (litros en formato decimal y kilometraje en formato entero).
+- **Tolerancia a Fallos y Edición Manual:** En caso de que la lectura de la IA falle, devuelva un valor nulo/erróneo o tarde en responder, el flujo no se interrumpe en ningún momento. El bombero siempre puede modificar o ingresar manualmente tanto los litros cargados como el kilometraje actual.
 - **Sugerencias y Autocompletado de Placas:** Implementación de autocompletado en tiempo real a partir de 2 caracteres con un retardo (debounce) de 300ms para evitar sobrecarga. Muestra un listado flotante táctil (mínimo de 48px de altura por sugerencia) de hasta 5 coincidencias. Seleccionar una sugerencia rellena la placa y ejecuta la consulta del vehículo automáticamente.
 
 ---
@@ -159,5 +166,5 @@ Las fotos del surtidor y del odómetro se almacenan como **Base64 en la columna 
 
 ---
 
-*Última actualización: 2026-06-03 (Mapeo de errores, rejilla adaptativa en ParqueAutomotor y autocompletado de placas con debounce en DashboardBombero)*
+*Última actualización: 2026-06-03 (Mapeo de errores, rejilla adaptativa en ParqueAutomotor, autocompletado de placas con debounce, autoselección de tanque por combustible, integración OCR de IA para odómetro/surtidor, y lógica inteligente de rendimiento y alertas de robo de combustible)*
 *Aprobado por: Comandante de Base & Antigravity Aegis Command*

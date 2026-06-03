@@ -320,18 +320,26 @@ export default function ReporteCombustible() {
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2 text-center font-display text-[9px] py-1 bg-black/30 border border-bg-high/30 rounded">
+                      <div className="grid grid-cols-4 gap-1 text-center font-display text-[9px] py-1.5 bg-black/30 border border-bg-high/30 rounded">
                         <div>
-                          <span className="text-text-muted text-[7px] uppercase block font-sans">Odóm. Prev</span>
-                          <span className="text-text-main font-bold">{al.km_anterior} km</span>
+                          <span className="text-text-muted text-[6px] uppercase block font-sans">Recorrido</span>
+                          <span className="text-text-main font-bold">
+                            {al.distancia_recorrida !== undefined && al.distancia_recorrida !== null ? `${al.distancia_recorrida} km` : `${al.km_actual - al.km_anterior} km`}
+                          </span>
                         </div>
                         <div>
-                          <span className="text-text-muted text-[7px] uppercase block font-sans">Odóm. Act</span>
+                          <span className="text-text-muted text-[6px] uppercase block font-sans">Carga</span>
+                          <span className="text-text-main font-bold">{al.litros} L</span>
+                        </div>
+                        <div>
+                          <span className="text-text-muted text-[6px] uppercase block font-sans">Rendimiento</span>
+                          <span className="text-red-400 font-bold">
+                            {al.rendimiento_tramo ? `${Number(al.rendimiento_tramo).toFixed(2)} km/L` : 'N/A'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-text-muted text-[6px] uppercase block font-sans">Odómetro</span>
                           <span className="text-text-main font-bold">{al.km_actual} km</span>
-                        </div>
-                        <div>
-                          <span className="text-text-muted text-[7px] uppercase block font-sans">Litros</span>
-                          <span className="text-text-main font-bold text-danger">{al.litros} L</span>
                         </div>
                       </div>
 
@@ -342,7 +350,7 @@ export default function ReporteCombustible() {
                         {al.km_actual <= al.km_anterior ? (
                           <span className="text-red-400 font-bold uppercase">Odómetro inconsistente</span>
                         ) : (
-                          <span className="text-red-400/90 italic">Rendimiento muy bajo</span>
+                          <span className="text-red-400 font-bold uppercase tracking-wider">Desviación Consumo (&gt;30%)</span>
                         )}
                       </div>
                     </div>
