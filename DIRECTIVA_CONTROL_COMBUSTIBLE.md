@@ -75,7 +75,7 @@ Para evitar inconsistencias a lo largo del programa, todas las pantallas del mó
 ## 4. ESPECIFICACIÓN DE MÓDULOS FRONTEND IMPLEMENTADOS
 
 ### 4.1 Parque Automotor (`ParqueAutomotor.jsx`)
-- **Gestión de Flotas:** Visualización de todos los vehículos activos agrupados/filtrados por entidad con paginación y búsqueda por placa.
+- **Gestión de Flotas:** Visualización de todos los vehículos activos agrupados/filtrados por entidad con paginación y búsqueda por placa. El formulario de filtros utiliza una rejilla responsiva (`grid-cols-1` en móvil, `sm:grid-cols-2` en pantallas medianas y `xl:grid-cols-4` en pantallas grandes) y los elementos tienen un ancho adaptativo (`w-full` / `truncate`) para evitar desbordes visuales ante nombres de entidades extensos.
 - **Asignación de Combustible:** Toggle interactivo para habilitar/inhabilitar el suministro en bomba a vehículos particulares registrados, y campos para configurar límites y capacidades del tanque en litros.
 - **Planificador de Abastecimiento Semanal (Asignación vs Capacidad):** Panel táctico reactivo en la parte superior que consolida la suma total de las cuotas semanales de combustible asignadas a los vehículos activos y autorizados de gasolina y diésel, contrastándolas contra la capacidad de almacenamiento total de los tanques correspondientes. Emite una alerta visual en color rojo y animación de pulso en caso de sobreasignación (>100% de la capacidad).
 - **Límite Semanal de Entidad:** Panel integrado para ajustar el límite total de litros permitidos semanalmente por entidad civil/militar.
@@ -155,5 +155,5 @@ Las fotos del surtidor y del odómetro se almacenan como **Base64 en la columna 
 
 ---
 
-*Última actualización: 2026-06-03 (Mapeo seguro de objetos de error en la importación masiva de flota para evitar caídas)*
+*Última actualización: 2026-06-03 (Mapeo seguro de objetos de error e interfaz responsiva contra desbordes en ParqueAutomotor)*
 *Aprobado por: Comandante de Base & Antigravity Aegis Command*

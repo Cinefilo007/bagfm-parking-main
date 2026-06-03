@@ -456,8 +456,8 @@ export default function ParqueAutomotor() {
           <h3 className="text-[10px] font-black uppercase tracking-widest text-text-muted mb-3 flex items-center gap-1.5">
             <Search size={12} /> Búsqueda y Segmentación
           </h3>
-          <form onSubmit={handleBuscar} className="flex flex-col sm:flex-row gap-3">
-            <div className="flex-1 relative">
+          <form onSubmit={handleBuscar} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+            <div className="relative w-full">
               <input
                 type="text"
                 placeholder="BUSCAR POR PLACA..."
@@ -473,7 +473,7 @@ export default function ParqueAutomotor() {
             <select
               value={filtroEntidad}
               onChange={(e) => setFiltroEntidad(e.target.value)}
-              className="bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-bold"
+              className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-bold truncate"
             >
               <option value="">TODAS LAS ENTIDADES</option>
               {entidades.map(ent => (
@@ -484,7 +484,7 @@ export default function ParqueAutomotor() {
             <select
               value={filtroAutorizado}
               onChange={(e) => setFiltroAutorizado(e.target.value)}
-              className="bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-bold"
+              className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-bold"
             >
               <option value="autorizados">SÓLO AUTORIZADOS</option>
               <option value="inhabilitados">SÓLO INHABILITADOS</option>
@@ -493,7 +493,7 @@ export default function ParqueAutomotor() {
 
             <button
               type="submit"
-              className="h-11 px-5 rounded-xl bg-white/5 hover:bg-white/10 border border-bg-high/30 text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer"
+              className="w-full h-11 px-5 rounded-xl bg-white/5 hover:bg-white/10 border border-bg-high/30 text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer"
             >
               Filtrar
             </button>
