@@ -539,7 +539,7 @@ export default function DashboardBombero() {
                         <p className="text-[9px] text-text-muted mt-0.5">{a.entidad} · {a.marca} {a.modelo}</p>
                       </div>
                       <span className="text-[12px] font-black font-display text-emerald-400">
-                        {Number(a.litros).toFixed(1)} L
+                        {Number(a.litros).toFixed(2)} L
                       </span>
                     </div>
                   ))}

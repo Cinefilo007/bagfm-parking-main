@@ -58,7 +58,7 @@ export const generarReporteCierre = (kpis, modalLectura, formLectura, supervisor
   currentY += 10;
 
   const kpiData = [
-    ['Total Litros Surtidos', `${Number(kpis.litros_hoy || 0).toFixed(1)} L`],
+    ['Total Litros Surtidos', `${Number(kpis.litros_hoy || 0).toFixed(2)} L`],
     ['Vehículos Abastecidos', `${kpis.cargas_hoy || 0}`],
     ['Solicitudes Excepcionales', `${kpis.solicitudes_pendientes || 0}`]
   ];
@@ -94,8 +94,8 @@ export const generarReporteCierre = (kpis, modalLectura, formLectura, supervisor
     ['Tanque', tanque.nombre.toUpperCase()],
     ['Tipo Combustible', tanque.tipo_combustible.toUpperCase()],
     ['Capacidad Total', `${Number(tanque.capacidad_maxima).toFixed(1)} L`],
-    ['Lectura Medida (Cierre)', `${Number(formLectura.cantidad_medida).toFixed(1)} L`],
-    ['Nivel Porcentual', `${((Number(formLectura.cantidad_medida) / Number(tanque.capacidad_maxima)) * 100).toFixed(1)} %`],
+    ['Lectura Medida (Cierre)', `${Number(formLectura.cantidad_medida).toFixed(2)} L`],
+    ['Nivel Porcentual', `${((Number(formLectura.cantidad_medida) / Number(tanque.capacidad_maxima)) * 100).toFixed(2)} %`],
     ['Observaciones', formLectura.observaciones || 'Ninguna']
   ];
 
@@ -134,7 +134,7 @@ export const generarReporteCierre = (kpis, modalLectura, formLectura, supervisor
       a.placa,
       a.entidad || 'Tránsito / Externo',
       `${a.marca || ''} ${a.modelo || ''}`.trim(),
-      `${Number(a.litros).toFixed(1)} L`
+      `${Number(a.litros).toFixed(2)} L`
     ]);
 
     autoTable(doc, {
@@ -226,23 +226,23 @@ export const generarReporteCierreConFotos = (kpis, modalLectura, formLectura, su
   doc.text(dateStr, pageWidth - marginX, 22, { align: 'right' });
   doc.text(`Supervisor: ${supervisorNombre || 'N/A'}`, pageWidth - marginX, 30, { align: 'right' });
 
-  // Aviso de expiración de links (caja dinámica que no se desborda)
+  // Aviso de expiración de links (caja dinámica que no se desborda y usa texto estándar)
   currentY = 46;
-  const alertText = '⚠ Los enlaces para visualizar las fotos de evidencia son válidos por 72 horas desde la generación de este reporte. Posterior a este lapso, deberá descargar un nuevo reporte desde el sistema para renovar el acceso.';
+  const alertText = 'IMPORTANTE: Los enlaces para visualizar las fotos de evidencia son validos por 72 horas desde la generacion de este reporte. Posterior a este lapso, debera descargar un nuevo reporte desde el sistema para renovar el acceso.';
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'bold');
   
-  // Dividir el texto según el ancho disponible para evitar desbordes
-  const maxTextWidth = pageWidth - marginX * 2 - 8;
+  // Dividir el texto según el ancho disponible para evitar desbordes laterales
+  const maxTextWidth = pageWidth - marginX * 2 - 16;
   const textLines = doc.splitTextToSize(alertText, maxTextWidth);
-  const lineHeight = 3.8; // mm por línea
-  const alertHeight = textLines.length * lineHeight + 4; // altura dinámica con padding
+  const lineHeight = 4.0; // mm por línea
+  const alertHeight = textLines.length * lineHeight + 5; // altura dinámica con padding
 
   doc.setFillColor(254, 243, 199); // Amarillo suave
   doc.roundedRect(marginX, currentY, pageWidth - marginX * 2, alertHeight, 2, 2, 'F');
   
   doc.setTextColor(146, 64, 14); // Ámbar oscuro
-  let textY = currentY + 4;
+  let textY = currentY + 4.5;
   textLines.forEach((line) => {
     doc.text(line, pageWidth / 2, textY, { align: 'center' });
     textY += lineHeight;
@@ -265,7 +265,7 @@ export const generarReporteCierreConFotos = (kpis, modalLectura, formLectura, su
     margin: { left: marginX },
     tableWidth: 100,
     body: [
-      ['Total Litros Surtidos', `${Number(kpis.litros_hoy || 0).toFixed(1)} L`],
+      ['Total Litros Surtidos', `${Number(kpis.litros_hoy || 0).toFixed(2)} L`],
       ['Vehículos Abastecidos', `${kpis.cargas_hoy || 0}`],
     ],
     theme: 'plain',
@@ -294,8 +294,8 @@ export const generarReporteCierreConFotos = (kpis, modalLectura, formLectura, su
       ['Tanque', tanque.nombre.toUpperCase()],
       ['Tipo Combustible', tanque.tipo_combustible.toUpperCase()],
       ['Capacidad Total', `${Number(tanque.capacidad_maxima).toFixed(1)} L`],
-      ['Lectura Medida (Cierre)', `${Number(formLectura.cantidad_medida).toFixed(1)} L`],
-      ['Nivel Porcentual', `${((Number(formLectura.cantidad_medida) / Number(tanque.capacidad_maxima)) * 100).toFixed(1)} %`],
+      ['Lectura Medida (Cierre)', `${Number(formLectura.cantidad_medida).toFixed(2)} L`],
+      ['Nivel Porcentual', `${((Number(formLectura.cantidad_medida) / Number(tanque.capacidad_maxima)) * 100).toFixed(2)} %`],
       ['Observaciones', formLectura.observaciones || 'Ninguna']
     ],
     theme: 'grid',
@@ -322,15 +322,22 @@ export const generarReporteCierreConFotos = (kpis, modalLectura, formLectura, su
     doc.line(marginX, currentY + 2, marginX + 65, currentY + 2);
     currentY += 8;
 
-    const HEAD = [['Hora', 'Placa', 'Conductor', 'Entidad', 'Litros', 'Evidencia Surtidor']];
-    const ROWS = kpis.abastecimientos_hoy.map(a => [
-      format(new Date(a.fecha), 'HH:mm'),
-      a.placa || '?',
-      a.conductor || a.bombero || '?',
-      a.entidad || 'Tránsito / Externo',
-      `${Number(a.litros).toFixed(1)} L`,
-      a.tiene_foto ? 'Ver Foto (Clic)' : 'Sin foto'
-    ]);
+    const HEAD = [['Hora', 'Vehículo', 'Conductor', 'Entidad', 'Litros', 'Evidencia Surtidor']];
+    const ROWS = kpis.abastecimientos_hoy.map(a => {
+      const placa = a.placa || '?';
+      const marcaModelo = `${a.marca || ''} ${a.modelo || ''}`.trim();
+      const color = a.color ? ` (${a.color})` : '';
+      const vehiculoTexto = marcaModelo ? `${placa}\n${marcaModelo}${color}` : placa;
+
+      return [
+        format(new Date(a.fecha), 'HH:mm'),
+        vehiculoTexto,
+        a.conductor || a.bombero || '?',
+        a.entidad || 'Tránsito / Externo',
+        `${Number(a.litros).toFixed(2)} L`,
+        a.tiene_foto ? 'Ver Foto (Clic)' : 'Sin foto'
+      ];
+    });
 
     // Guardar la posición Y del inicio de la tabla para calcular dónde poner los links
     const tableStartY = currentY;
@@ -352,11 +359,11 @@ export const generarReporteCierreConFotos = (kpis, modalLectura, formLectura, su
       alternateRowStyles: { fillColor: colors.lightGray },
       columnStyles: {
         0: { cellWidth: 15 },  // Hora
-        1: { cellWidth: 25 },  // Placa
+        1: { cellWidth: 32 },  // Vehículo (placa, marca, modelo, color)
         2: { },                // Conductor (dinámico)
         3: { },                // Entidad (dinámico)
         4: { cellWidth: 20, halign: 'right' }, // Litros
-        5: { cellWidth: 35, textColor: colors.link, fontStyle: 'bold' } // Link
+        5: { cellWidth: 32, textColor: colors.link, fontStyle: 'bold' } // Link
       },
       // Hook para capturar coordenadas de las celdas de foto
       didDrawCell: (hookData) => {

@@ -1470,6 +1470,32 @@ async def servir_foto_abastecimiento(
             mime_type = "image/jpeg"  # Fallback seguro
 
         imagen_bytes = base64.b64decode(b64_data)
+
+        # --- OPTIMIZACIÓN DE IMAGEN AL VUELO ---
+        try:
+            from PIL import Image
+            import io
+            
+            # Cargar imagen en Pillow
+            img = Image.open(io.BytesIO(imagen_bytes))
+            
+            # Convertir a RGB (necesario para guardar como JPEG)
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+                
+            # Escalar a un ancho/alto máximo razonable para pantallas (p.ej. 1024px)
+            max_res = 1024
+            if img.width > max_res or img.height > max_res:
+                img.thumbnail((max_res, max_res), Image.Resampling.LANCZOS)
+                
+            # Guardar comprimida al 70% de calidad en un buffer
+            buffer = io.BytesIO()
+            img.save(buffer, format="JPEG", quality=70, optimize=True)
+            imagen_bytes = buffer.getvalue()
+            mime_type = "image/jpeg"  # Servir como jpeg optimizado
+        except Exception as e_pil:
+            # Fallback seguro: si falla PIL por cualquier motivo, servir los bytes originales
+            print(f">>> [FOTO AUDITORÍA] Falló optimización PIL: {e_pil}")
     except Exception:
         raise HTTPException(
             status_code=500,
@@ -1570,6 +1596,7 @@ async def obtener_datos_reporte_cierre_con_fotos(
                 "placa": a.vehiculo.placa if a.vehiculo else "?",
                 "marca": a.vehiculo.marca if a.vehiculo else "?",
                 "modelo": a.vehiculo.modelo if a.vehiculo else "?",
+                "color": a.vehiculo.color if a.vehiculo else "",
                 "entidad": a.vehiculo.entidad.nombre if a.vehiculo and getattr(a.vehiculo, 'entidad', None) else "SIN ENTIDAD",
                 "bombero": f"{a.bombero.nombre} {a.bombero.apellido}" if a.bombero else "?",
                 "conductor": a.conductor or "",

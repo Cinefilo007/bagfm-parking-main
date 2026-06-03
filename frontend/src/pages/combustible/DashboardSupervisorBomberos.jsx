@@ -273,8 +273,8 @@ export default function DashboardSupervisorBomberos() {
                 <div className="flex items-center gap-1.5 text-emerald-400"><Droplet size={14} /><span className="text-[9px] font-black uppercase tracking-widest text-text-muted">Abastecido</span></div>
               </div>
               <div className="flex justify-between items-end">
-                <div><span className="text-xl font-display font-black text-emerald-400">{kpis.litros_hoy.toLocaleString('es-ES', { maximumFractionDigits: 1 })} <span className="text-[10px] text-text-muted">L / DÍA</span></span></div>
-                <div className="text-right"><span className="text-sm font-display font-bold text-text-sec">{kpis.litros_semana?.toLocaleString('es-ES', { maximumFractionDigits: 1 }) || 0} <span className="text-[8px] text-text-muted">L / SEM</span></span></div>
+                <div><span className="text-xl font-display font-black text-emerald-400">{kpis.litros_hoy.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[10px] text-text-muted">L / DÍA</span></span></div>
+                <div className="text-right"><span className="text-sm font-display font-bold text-text-sec">{kpis.litros_semana?.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || 0} <span className="text-[8px] text-text-muted">L / SEM</span></span></div>
               </div>
             </div>
             
@@ -289,7 +289,7 @@ export default function DashboardSupervisorBomberos() {
             </div>
 
             <KpiCard icon={Bell} label="Solicitudes Pendientes" value={kpis.solicitudes_pendientes} color={kpis.solicitudes_pendientes > 0 ? 'text-red-400' : 'text-text-muted'} />
-            <KpiCard icon={TrendingUp} label="Stock Total" value={kpis.stock_total.toLocaleString('es-ES', { maximumFractionDigits: 1 })} unit="L" color="text-amber-400" />
+            <KpiCard icon={TrendingUp} label="Stock Total" value={kpis.stock_total.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} unit="L" color="text-amber-400" />
           </div>
         )}
         {cargando && (
@@ -377,7 +377,7 @@ export default function DashboardSupervisorBomberos() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-black text-emerald-400 font-display">{Number(a.litros).toFixed(1)} L</p>
+                      <p className="text-sm font-black text-emerald-400 font-display">{Number(a.litros).toFixed(2)} L</p>
                       <p className="text-[9px] text-text-muted font-mono">Hace {formatTiempo(a.fecha)}</p>
                     </div>
                   </div>

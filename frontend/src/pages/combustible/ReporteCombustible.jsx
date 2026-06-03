@@ -177,7 +177,7 @@ export default function ReporteCombustible() {
               <div className="space-y-1">
                 <span className="text-[8px] font-black text-text-muted uppercase tracking-widest block">Litros Surtidos</span>
                 <span className="text-3xl font-black font-display text-success tracking-wide">
-                  {reporte.total_litros.toLocaleString('es-ES', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                  {reporte.total_litros.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
                 <span className="text-[8px] text-text-muted block uppercase">Medida de volumen real</span>
               </div>
@@ -206,7 +206,7 @@ export default function ReporteCombustible() {
                 <div>
                   <span className="text-[8px] font-black text-text-muted uppercase tracking-widest block">Gasolina Surtida</span>
                   <span className="text-xl font-bold font-display text-text-main block">
-                    {(reporte.consumo_por_combustible?.gasolina || 0).toLocaleString('es-ES', { maximumFractionDigits: 1 })} L
+                    {(reporte.consumo_por_combustible?.gasolina || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L
                   </span>
                 </div>
                 <span className="text-[9px] font-black font-display text-emerald-400">
@@ -228,7 +228,7 @@ export default function ReporteCombustible() {
                 <div>
                   <span className="text-[8px] font-black text-text-muted uppercase tracking-widest block">Diésel Surtido</span>
                   <span className="text-xl font-bold font-display text-text-main block">
-                    {(reporte.consumo_por_combustible?.diesel || 0).toLocaleString('es-ES', { maximumFractionDigits: 1 })} L
+                    {(reporte.consumo_por_combustible?.diesel || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L
                   </span>
                 </div>
                 <span className="text-[9px] font-black font-display text-blue-400">
@@ -267,7 +267,7 @@ export default function ReporteCombustible() {
                         <div className="flex justify-between items-center text-xs">
                           <span className="font-bold text-text-main uppercase truncate max-w-[280px]">{row.entidad}</span>
                           <span className="font-display text-text-sec">
-                            <span className="font-black text-text-main">{row.litros.toFixed(1)} L</span> ({row.cargas} cargas)
+                            <span className="font-black text-text-main">{row.litros.toFixed(2)} L</span> ({row.cargas} cargas)
                           </span>
                         </div>
                         <div className="flex items-center gap-3">

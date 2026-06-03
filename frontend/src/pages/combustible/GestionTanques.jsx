@@ -468,7 +468,7 @@ export default function GestionTanques() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <span className="text-sm font-black text-emerald-400 font-mono">
-                          {Number(h.litros).toFixed(1)} L
+                          {Number(h.litros).toFixed(2)} L
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -770,7 +770,7 @@ export default function GestionTanques() {
               <div className="grid grid-cols-2 gap-2">
                 <div className="bg-bg-low p-2.5 rounded-xl border border-white/5">
                   <p className="text-[9px] font-black uppercase text-text-muted mb-1">Litros Surtidos</p>
-                  <p className="text-xl font-black font-display text-emerald-400">{Number(abastecimientoSeleccionado.litros).toFixed(1)} L</p>
+                  <p className="text-xl font-black font-display text-emerald-400">{Number(abastecimientoSeleccionado.litros).toFixed(2)} L</p>
                 </div>
                 <div className="bg-bg-low p-2.5 rounded-xl border border-white/5">
                   <p className="text-[9px] font-black uppercase text-text-muted mb-1">Responsable</p>
