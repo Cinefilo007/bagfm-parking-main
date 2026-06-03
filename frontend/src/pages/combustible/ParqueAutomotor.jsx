@@ -933,7 +933,13 @@ export default function ParqueAutomotor() {
                       </p>
                       <ul className="text-[9px] text-red-400/90 font-mono space-y-1 max-h-[120px] overflow-y-auto scrollbar-tactical bg-black/30 p-2 rounded border border-red-500/10">
                         {resumenImportacion.errores.map((err, idx) => (
-                          <li key={idx} className="border-b border-white/5 pb-1 last:border-0 last:pb-0">{err}</li>
+                          <li key={idx} className="border-b border-white/5 pb-1 last:border-0 last:pb-0">
+                            {typeof err === 'object' && err !== null ? (
+                              <span>Fila {err.fila}: {err.error}</span>
+                            ) : (
+                              <span>{String(err)}</span>
+                            )}
+                          </li>
                         ))}
                       </ul>
                     </div>

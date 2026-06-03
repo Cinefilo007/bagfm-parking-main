@@ -79,7 +79,7 @@ Para evitar inconsistencias a lo largo del programa, todas las pantallas del mó
 - **Asignación de Combustible:** Toggle interactivo para habilitar/inhabilitar el suministro en bomba a vehículos particulares registrados, y campos para configurar límites y capacidades del tanque en litros.
 - **Planificador de Abastecimiento Semanal (Asignación vs Capacidad):** Panel táctico reactivo en la parte superior que consolida la suma total de las cuotas semanales de combustible asignadas a los vehículos activos y autorizados de gasolina y diésel, contrastándolas contra la capacidad de almacenamiento total de los tanques correspondientes. Emite una alerta visual en color rojo y animación de pulso en caso de sobreasignación (>100% de la capacidad).
 - **Límite Semanal de Entidad:** Panel integrado para ajustar el límite total de litros permitidos semanalmente por entidad civil/militar.
-- **Importación Masiva:** Procesamiento de flotas a través de plantillas Excel (`.xlsx`) con un resumen de filas procesadas en tiempo real. Se mapean correctamente las respuestas de éxito y actualización del backend (`total`, `exitosos` y `actualizados`) en los indicadores visuales `Leídos`, `Creados` y `Actualizados`. Incluye bitácora de errores en tiempo real y descarga de la plantilla oficial.
+- **Importación Masiva:** Procesamiento de flotas a través de plantillas Excel (`.xlsx`) con un resumen de filas procesadas en tiempo real. Se mapean correctamente las respuestas de éxito y actualización del backend (`total`, `exitosos` y `actualizados`) en los indicadores visuales `Leídos`, `Creados` y `Actualizados`. Incluye bitácora de errores en tiempo real (renderizados de forma segura extrayendo las propiedades `fila` y `error` para prevenir caídas de React al recibir objetos) y descarga de la plantilla oficial.
 
 ### 4.2 Cola de Aprobaciones (`ColaAprobacionesCombustible.jsx`)
 - **Resolución Remota Asíncrona:** Panel que refresca automáticamente cada 15 segundos y lista las solicitudes de emergencia pendientes.
@@ -155,5 +155,5 @@ Las fotos del surtidor y del odómetro se almacenan como **Base64 en la columna 
 
 ---
 
-*Última actualización: 2026-06-02 (Evidencia fotográfica en reportes de cierre mediante links JWT de 72h)*
+*Última actualización: 2026-06-03 (Mapeo seguro de objetos de error en la importación masiva de flota para evitar caídas)*
 *Aprobado por: Comandante de Base & Antigravity Aegis Command*
