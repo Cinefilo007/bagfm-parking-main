@@ -56,6 +56,7 @@ export default function GestionTanques() {
   const [descargandoCierreId, setDescargandoCierreId] = useState(null);
   const [descargandoConFotosId, setDescargandoConFotosId] = useState(null);
   const [abastecimientoSeleccionado, setAbastecimientoSeleccionado] = useState(null);
+  const [cargandoDetalleId, setCargandoDetalleId] = useState(null);
   const [pagina, setPagina] = useState(0);
   const [totalHistorial, setTotalHistorial] = useState(0);
   const limit = 10;
@@ -145,6 +146,19 @@ export default function GestionTanques() {
       console.error("Error al cargar historial:", e);
     } finally {
       setCargandoHistorial(false);
+    }
+  };
+
+  const handleVerDetalleAbastecimiento = async (id) => {
+    setCargandoDetalleId(id);
+    try {
+      const detalle = await combustibleService.obtenerDetalleAbastecimiento(id);
+      setAbastecimientoSeleccionado(detalle);
+    } catch (e) {
+      console.error("Error al cargar el detalle del abastecimiento:", e);
+      toast.error("No se pudo obtener el detalle de la recarga.");
+    } finally {
+      setCargandoDetalleId(null);
     }
   };
 
@@ -453,7 +467,14 @@ export default function GestionTanques() {
                   </tr>
                 ) : (
                   historial.map(h => (
-                    <tr key={h.id} onClick={() => setAbastecimientoSeleccionado(h)} className="hover:bg-white/5 transition-colors cursor-pointer">
+                    <tr 
+                      key={h.id} 
+                      onClick={() => !cargandoDetalleId && handleVerDetalleAbastecimiento(h.id)} 
+                      className={cn(
+                        "hover:bg-white/5 transition-colors cursor-pointer",
+                        cargandoDetalleId === h.id && "bg-white/5 animate-pulse"
+                      )}
+                    >
                       <td className="px-4 py-3">
                         <span className="text-xs font-mono text-text-sec">
                           {new Date(h.fecha).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}
@@ -471,10 +492,14 @@ export default function GestionTanques() {
                           {Number(h.litros).toFixed(2)} L
                         </span>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="text-[10px] font-bold text-text-muted uppercase truncate max-w-[120px] block">
-                          {h.bombero}
-                        </span>
+                      <td className="px-4 py-3 text-center">
+                        {cargandoDetalleId === h.id ? (
+                          <RefreshCw size={12} className="animate-spin text-emerald-400 inline-block" />
+                        ) : (
+                          <span className="text-[10px] font-bold text-text-muted uppercase truncate max-w-[120px] block text-left">
+                            {h.bombero}
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))

@@ -231,4 +231,12 @@ export const combustibleService = {
     const { data } = await api.get(`/combustible/cierres/${id}/reporte-con-fotos`);
     return data.data;
   },
+
+  /**
+   * Obtiene el detalle completo de un abastecimiento por su ID (incluye fotos base64)
+   */
+  async obtenerDetalleAbastecimiento(id) {
+    const { data } = await api.get(`/combustible/abastecimientos/${id}`);
+    return data.data;
+  },
 };

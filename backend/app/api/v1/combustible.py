@@ -994,8 +994,8 @@ async def obtener_historial_abastecimientos(
                 "bombero": f"{a.bombero.nombre} {a.bombero.apellido}" if a.bombero else "?",
                 "tanque": a.tanque.nombre if a.tanque else "?",
                 "tiene_alerta": a.tiene_alerta,
-                "foto_odometro": a.foto_kilometraje_url,
-                "foto_surtidor": a.foto_maquina_url
+                "tiene_foto_odometro": bool(a.foto_kilometraje_url),
+                "tiene_foto_surtidor": bool(a.foto_maquina_url)
             } for a in abastecimientos
         ]
         
@@ -1047,8 +1047,8 @@ async def obtener_historial_bombero(
                 "entidad": a.vehiculo.entidad.nombre if a.vehiculo and getattr(a.vehiculo, 'entidad', None) else "SIN ENTIDAD",
                 "litros": a.cantidad_abastecida,
                 "tiene_alerta": a.tiene_alerta,
-                "foto_odometro": a.foto_kilometraje_url,
-                "foto_surtidor": a.foto_maquina_url
+                "tiene_foto_odometro": bool(a.foto_kilometraje_url),
+                "tiene_foto_surtidor": bool(a.foto_maquina_url)
             } for a in abastecimientos
         ]
         
@@ -1058,6 +1058,62 @@ async def obtener_historial_bombero(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error obteniendo historial: {str(e)}")
+
+@router.get("/abastecimientos/{abastecimiento_id}")
+async def obtener_detalle_abastecimiento(
+    abastecimiento_id: UUID,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = Depends(obtener_usuario_actual)
+):
+    """
+    Obtiene el detalle completo de un abastecimiento por su ID, incluyendo las fotos en Base64.
+    """
+    if usuario.rol not in [RolTipo.COMANDANTE, RolTipo.ADMIN_BASE, RolTipo.SUPERVISOR, RolTipo.ADMIN_ENTIDAD, RolTipo.SUPERVISOR_BOMBEROS]:
+        raise HTTPException(status_code=403, detail="Permisos insuficientes.")
+        
+    try:
+        from app.models.abastecimiento import Abastecimiento
+        from app.models.vehiculo import Vehiculo
+        from sqlalchemy.orm import selectinload
+        
+        stmt = select(Abastecimiento).options(
+            selectinload(Abastecimiento.vehiculo).selectinload(Vehiculo.entidad),
+            selectinload(Abastecimiento.bombero),
+            selectinload(Abastecimiento.tanque)
+        ).where(Abastecimiento.id == abastecimiento_id)
+        
+        res = await db.execute(stmt)
+        a = res.scalar_one_or_none()
+        
+        if not a:
+            raise HTTPException(status_code=404, detail="Abastecimiento no encontrado.")
+            
+        # Admin Entidad solo ve abastecimientos de su entidad
+        if usuario.rol == RolTipo.ADMIN_ENTIDAD and a.vehiculo and a.vehiculo.entidad_id != usuario.entidad_id:
+            raise HTTPException(status_code=403, detail="No tiene permisos para ver este registro.")
+            
+        return {
+            "status": "success",
+            "data": {
+                "id": str(a.id),
+                "fecha": a.fecha.isoformat(),
+                "placa": a.vehiculo.placa if a.vehiculo else "?",
+                "marca": a.vehiculo.marca if a.vehiculo else "?",
+                "modelo": a.vehiculo.modelo if a.vehiculo else "?",
+                "color": a.vehiculo.color if a.vehiculo else "",
+                "entidad": a.vehiculo.entidad.nombre if a.vehiculo and getattr(a.vehiculo, 'entidad', None) else "SIN ENTIDAD",
+                "bombero": f"{a.bombero.nombre} {a.bombero.apellido}" if a.bombero else "?",
+                "tanque": a.tanque.nombre if a.tanque else "?",
+                "litros": a.cantidad_abastecida,
+                "tiene_alerta": a.tiene_alerta,
+                "foto_odometro": a.foto_kilometraje_url,
+                "foto_surtidor": a.foto_maquina_url
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error obteniendo detalle: {str(e)}")
 
 # --- Endpoints de Apertura y Cierre Diario de Tanques ---
 
@@ -1473,11 +1529,14 @@ async def servir_foto_abastecimiento(
 
         # --- OPTIMIZACIÓN DE IMAGEN AL VUELO ---
         try:
-            from PIL import Image
+            from PIL import Image, ImageOps
             import io
             
             # Cargar imagen en Pillow
             img = Image.open(io.BytesIO(imagen_bytes))
+            
+            # Corregir orientación EXIF para conservar la rotación original
+            img = ImageOps.exif_transpose(img)
             
             # Convertir a RGB (necesario para guardar como JPEG)
             if img.mode != "RGB":

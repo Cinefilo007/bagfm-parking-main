@@ -96,7 +96,8 @@ Para evitar inconsistencias a lo largo del programa, todas las pantallas del mó
 ### 4.4 Gestión de Tanques de Combustible (`GestionTanques.jsx`)
 - **CRUD de Tanques:** Permite al Comandante y Admin Base registrar tanques, editar su capacidad máxima y darlos de baja (soft-delete, solo si no tienen consumos en la semana en curso).
 - **Protección de Stock:** La `cantidad_actual` nunca es editable de forma directa. Solo se actualiza a través de las lecturas semanales del bombero y los descuentos automáticos al despachar combustible.
-- **Historial General vs Cierres (Tabs):** Integra un sistema de pestañas táctico para alternar entre el Historial General de abastecimientos y el Historial de Cierres Diarios.
+- **Historial General vs Cierres (Tabs):** Integra un sistema de pestañas para alternar entre el Historial General de abastecimientos y el Historial de Cierres Diarios.
+  - **Optimización por Carga Perezosa (Lazy Loading):** Para garantizar tiempos de respuesta ultra-rápidos e impedir la transferencia de megabytes de datos innecesarios a través de la red, los listados de historial omiten las imágenes base64 de su payload JSON. Cuando el usuario hace clic sobre una fila, el frontend consulta un endpoint de detalle dedicado (`GET /abastecimientos/{id}`) para descargar las imágenes correspondientes a ese registro en específico, mostrando un indicador de carga reactivo.
 - **Reportes PDF de Cierre Históricos:** En la pestaña de Cierres Diarios, se puede consultar y descargar en tiempo real un PDF del cierre histórico seleccionado llamando a la API de consolidación de datos y volviendo a renderizar el reporte formal.
 
 ### 4.5 Monitor de Bomba y KPIs en Tiempo Real
