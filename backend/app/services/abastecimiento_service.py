@@ -5,6 +5,7 @@ Maneja la lógica de negocio para la bomba de combustible, validaciones, solicit
 import uuid
 import logging
 from datetime import datetime, timedelta, time
+from zoneinfo import ZoneInfo
 from typing import List, Optional, Dict, Any
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,14 +28,14 @@ class AbastecimientoService:
         """
         if fecha_str:
             try:
-                hoy = datetime.fromisoformat(fecha_str.replace("Z", "+00:00"))
+                hoy = datetime.fromisoformat(fecha_str.replace("Z", "+00:00")).astimezone(ZoneInfo("America/Caracas"))
             except ValueError:
-                hoy = datetime.now()
+                hoy = datetime.now(ZoneInfo("America/Caracas"))
         else:
-            hoy = datetime.now()
+            hoy = datetime.now(ZoneInfo("America/Caracas"))
         lunes = hoy - timedelta(days=hoy.weekday())
-        inicio = datetime.combine(lunes.date(), time.min)
-        fin = datetime.combine(hoy.date(), time.max)
+        inicio = datetime.combine(lunes.date(), time.min).replace(tzinfo=ZoneInfo("America/Caracas"))
+        fin = datetime.combine(hoy.date(), time.max).replace(tzinfo=ZoneInfo("America/Caracas"))
         return inicio, fin
 
     async def obtener_rango_dia(self, fecha_str: Optional[str] = None) -> tuple:
@@ -43,13 +44,13 @@ class AbastecimientoService:
         """
         if fecha_str:
             try:
-                hoy = datetime.fromisoformat(fecha_str.replace("Z", "+00:00"))
+                hoy = datetime.fromisoformat(fecha_str.replace("Z", "+00:00")).astimezone(ZoneInfo("America/Caracas"))
             except ValueError:
-                hoy = datetime.now()
+                hoy = datetime.now(ZoneInfo("America/Caracas"))
         else:
-            hoy = datetime.now()
-        inicio = datetime.combine(hoy.date(), time.min)
-        fin = datetime.combine(hoy.date(), time.max)
+            hoy = datetime.now(ZoneInfo("America/Caracas"))
+        inicio = datetime.combine(hoy.date(), time.min).replace(tzinfo=ZoneInfo("America/Caracas"))
+        fin = datetime.combine(hoy.date(), time.max).replace(tzinfo=ZoneInfo("America/Caracas"))
         return inicio, fin
 
     async def obtener_entidad_transito(self, db: AsyncSession) -> EntidadCivil:
@@ -233,7 +234,7 @@ class AbastecimientoService:
             
         solicitud.estado = estado
         solicitud.aprobado_por_id = aprobado_por_id
-        solicitud.fecha_aprobacion = datetime.now()
+        solicitud.fecha_aprobacion = datetime.now(ZoneInfo("America/Caracas"))
         
         if estado == EstadoSolicitudCombustible.aprobada:
             # Caso 1: Vehículo no registrado

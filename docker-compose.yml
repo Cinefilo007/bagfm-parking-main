@@ -9,6 +9,7 @@ services:
       - ./backend/.env
     environment:
       - PORT=8000
+      - TZ=America/Caracas
     volumes:
       - ./backend:/app
       - /app/venv  # No montar el venv local en el contenedor
@@ -24,4 +25,5 @@ services:
       - backend
     environment:
       - VITE_API_URL=http://localhost:8000
+      - TZ=America/Caracas
     restart: unless-stopped

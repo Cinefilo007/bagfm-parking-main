@@ -117,5 +117,10 @@ Para evitar inconsistencias a lo largo del programa, todas las pantallas del mó
 
 ---
 
-*Última actualización: 2026-06-02 (Apertura diaria coordinada, auditoría obligatoria de conductor en abastecimientos e historial de cierres con descarga de reportes PDF históricos)*
+## 6. CONFIGURACIÓN TÉCNICA Y ZONA HORARIA
+Para asegurar la exactitud de los reportes, KPIs y los procesos de apertura/cierre diarios de los tanques de combustible, el sistema está configurado forzosamente para evaluar los cortes de fecha a la media noche (12:00 AM) de la hora local de **Venezuela (`America/Caracas`)**. No se utilizarán los horarios UTC del servidor de base de datos para cálculos de negocio (Ver detalles técnicos en `DIRECTIVA_ZONA_HORARIA.md`).
+
+---
+
+*Última actualización: 2026-06-02 (Alineación estricta de Zona Horaria para cortes y cierres diarios en el módulo de combustible)*
 *Aprobado por: Comandante de Base & Antigravity Aegis Command*

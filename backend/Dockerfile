@@ -4,6 +4,7 @@ FROM python:3.11-slim
 # Evitar que Python genere archivos .pyc y habilitar modo sin buffer para logs
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
+ENV TZ="America/Caracas"
 
 # Establecer directorio de trabajo
 WORKDIR /app
