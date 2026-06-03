@@ -40,15 +40,15 @@ class Configuracion(BaseSettings):
     vapid_email: str = "admin@bagfm.mil.ve"
 
     # CORS
-    cors_origins: str = "https://bagfm-frontend-production.up.railway.app"
+    cors_origins: str = "https://bagfm.app,https://www.bagfm.app,https://bagfm-frontend-production.up.railway.app"
     
     # Inteligencia Artificial
     gemini_api_key: str = ""
 
     # WebAuthn / Biometría
-    webauthn_rp_id: str = "bagfm-frontend-production.up.railway.app"
+    webauthn_rp_id: str = "bagfm.app"
     webauthn_rp_name: str = "BAGFM - Sistema Táctico"
-    webauthn_origin: str = "https://bagfm-frontend-production.up.railway.app"
+    webauthn_origin: str = "https://bagfm.app"
 
     # Correos
     resend_api_key: str = ""

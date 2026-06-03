@@ -52,6 +52,8 @@ Una vez configurados los dominios, DEBES actualizar las variables de entorno en 
 - `VITE_API_URL`: Cambiar a `https://api.bagfm.app`
 
 ### 5.2. En el Backend:
-- `CORS_ALLOWED_ORIGINS`: Incluir `https://bagfm.app` y `https://www.bagfm.app`
+- `CORS_ORIGINS`: Incluir `https://bagfm.app` y `https://www.bagfm.app` (pueden separarse por comas, e.g., `https://bagfm.app,https://www.bagfm.app`).
+- `WEBAUTHN_RP_ID`: Cambiar a `bagfm.app` (en desarrollo local debe ser `localhost`).
+- `WEBAUTHN_ORIGIN`: Cambiar a `https://bagfm.app` (en desarrollo local debe ser `http://localhost:5173`).
 - `RESEND_API_KEY`: Ingresar la llave generada en Resend.
 - `MAIL_FROM`: `no-reply@bagfm.app` o `notificaciones@bagfm.app`
