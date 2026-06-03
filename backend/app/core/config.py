@@ -30,6 +30,10 @@ class Configuracion(BaseSettings):
     jwt_algoritmo: str = "HS256"
     jwt_expiracion_minutos: int = 480  # 8 horas
 
+    # URL pública del backend (usada para generar links absolutos en PDFs y correos)
+    # En desarrollo se sobreescribe a http://localhost:8000
+    backend_url: str = "https://api.bagfm.app"
+
     # VAPID Push (opcional en fase 1)
     vapid_public_key: str = ""
     vapid_private_key: str = ""
@@ -63,6 +67,14 @@ class Configuracion(BaseSettings):
     def frontend_url(self) -> str:
         """Retorna la URL base del frontend para enlaces en correos."""
         return self.cors_lista[0] if self.cors_lista else "http://localhost:5173"
+
+    @property
+    def backend_url_base(self) -> str:
+        # Construir URL base del backend para los links de foto
+        # En desarrollo se sobreescribe a localhost, en producción usa la variable de config
+        if self.app_env == "development":
+            return "http://localhost:8000"
+        return self.backend_url.rstrip("/")
 
 
 @lru_cache

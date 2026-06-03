@@ -1555,11 +1555,9 @@ async def obtener_datos_reporte_cierre_con_fotos(
         )
         abast_hoy = (await db.execute(q_abast)).scalars().all()
 
-        # Construir URL base del backend para los links
-        backend_url = _config.cors_lista[0].replace("-frontend", "-backend") if "-frontend" in _config.cors_lista[0] else "https://bagfm.app"
-        # En desarrollo se usa la URL local
-        if _config.app_env == "development":
-            backend_url = "http://localhost:8000"
+        # URL base del backend: usa la variable de configuración centralizada.
+        # Desarrollo: http://localhost:8000  |  Producción: https://bagfm.app
+        backend_url = _config.backend_url_base
 
         abast_data = []
         for a in abast_hoy:

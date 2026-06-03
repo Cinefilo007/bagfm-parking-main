@@ -127,14 +127,16 @@ Para asegurar la exactitud de los reportes, KPIs y los procesos de apertura/cier
 ### 7.1 Arquitectura
 Las fotos del surtidor y del odómetro se almacenan como **Base64 en la columna `foto_maquina_url`** de la tabla `abastecimientos`. Para incluirlas en el reporte de cierre sin exponer el sistema ni hacer el PDF interminable, se implementa la **Opción D: hipervínculos firmados de corta duración (72 horas)**.
 
-### 7.2 Flujo de Funcionamiento
+### 7.2 Flujo de Funcionamiento y Estándar del PDF
 1. El Supervisor hace clic en **"PDF + Fotos"** en la tabla de cierres diarios.
 2. El frontend llama a `GET /api/v1/combustible/cierres/{id}/reporte-con-fotos`.
 3. El backend genera un **JWT firmado de 72h** por cada abastecimiento del día (usando la misma `SECRET_KEY` del sistema).
-4. El PDF incluye una columna **"Evidencia Surtidor"** con un link clickeable por fila.
-5. Al hacer click, el auditor es dirigido a `GET /api/v1/combustible/foto/{uuid}?token=JWT`.
-6. El backend valida el token, decodifica el Base64 y devuelve la imagen directamente.
-7. Después de 72 horas, el link expira automáticamente. Se debe descargar un nuevo PDF para obtener links frescos.
+4. El PDF generado unifica el título a **"REPORTE DE CIERRE DIARIO"** (evitando redundancias) y formatea la alerta de expiración del enlace de forma dinámica mediante `splitTextToSize` para ajustarse a los márgenes y evitar desbordes horizontales o verticales.
+5. La tabla de abastecimientos se ajusta al **100% del ancho útil** del documento (182mm libres de un A4 respetando 14mm de margen izquierdo y derecho) mediante columnas auto-ajustables para el conductor y la entidad.
+6. La columna **"Evidencia Surtidor"** incluye la etiqueta explícita **"Ver Foto (Clic)"** en azul y negrita, evitando caracteres especiales (como flechas) que rompan la codificación de fuentes estándar (Helvetica/WinAnsi) de jsPDF.
+7. Al hacer clic, el auditor es dirigido a `GET /api/v1/combustible/foto/{uuid}?token=JWT`.
+8. El backend valida el token, decodifica el Base64 y devuelve la imagen directamente.
+9. Después de 72 horas, el link expira automáticamente. Se debe descargar un nuevo PDF para obtener links frescos.
 
 ### 7.3 Seguridad del Endpoint de Foto
 - **No requiere sesión:** El link funciona para auditores externos sin cuenta en el sistema.

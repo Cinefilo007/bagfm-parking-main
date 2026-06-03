@@ -218,7 +218,7 @@ export const generarReporteCierreConFotos = (kpis, modalLectura, formLectura, su
   doc.setTextColor(...colors.primary);
   doc.setFontSize(12);
   doc.setFont('helvetica', 'normal');
-  doc.text('REPORTE DE CIERRE DIARIO — CON EVIDENCIA FOTOGRÁFICA', marginX, 30);
+  doc.text('REPORTE DE CIERRE DIARIO', marginX, 30);
 
   doc.setTextColor(200, 200, 200);
   doc.setFontSize(10);
@@ -226,20 +226,29 @@ export const generarReporteCierreConFotos = (kpis, modalLectura, formLectura, su
   doc.text(dateStr, pageWidth - marginX, 22, { align: 'right' });
   doc.text(`Supervisor: ${supervisorNombre || 'N/A'}`, pageWidth - marginX, 30, { align: 'right' });
 
-  // Aviso de expiración de links
+  // Aviso de expiración de links (caja dinámica que no se desborda)
   currentY = 46;
-  doc.setFillColor(254, 243, 199); // Amarillo suave
-  doc.roundedRect(marginX, currentY, pageWidth - marginX * 2, 10, 2, 2, 'F');
-  doc.setTextColor(146, 64, 14); // Ámbar oscuro
+  const alertText = '⚠ Los enlaces para visualizar las fotos de evidencia son válidos por 72 horas desde la generación de este reporte. Posterior a este lapso, deberá descargar un nuevo reporte desde el sistema para renovar el acceso.';
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'bold');
-  doc.text(
-    '⚠  Los enlaces "Ver foto" son válidos por 72 horas desde la generación de este reporte. Después de ese período, solicite un nuevo reporte.',
-    pageWidth / 2,
-    currentY + 6.5,
-    { align: 'center', maxWidth: pageWidth - marginX * 2 - 4 }
-  );
-  currentY = 62;
+  
+  // Dividir el texto según el ancho disponible para evitar desbordes
+  const maxTextWidth = pageWidth - marginX * 2 - 8;
+  const textLines = doc.splitTextToSize(alertText, maxTextWidth);
+  const lineHeight = 3.8; // mm por línea
+  const alertHeight = textLines.length * lineHeight + 4; // altura dinámica con padding
+
+  doc.setFillColor(254, 243, 199); // Amarillo suave
+  doc.roundedRect(marginX, currentY, pageWidth - marginX * 2, alertHeight, 2, 2, 'F');
+  
+  doc.setTextColor(146, 64, 14); // Ámbar oscuro
+  let textY = currentY + 4;
+  textLines.forEach((line) => {
+    doc.text(line, pageWidth / 2, textY, { align: 'center' });
+    textY += lineHeight;
+  });
+  
+  currentY = currentY + alertHeight + 6; // actualizar currentY dinámicamente
 
   // --- KPIs ---
   doc.setTextColor(...colors.dark);
@@ -309,8 +318,8 @@ export const generarReporteCierreConFotos = (kpis, modalLectura, formLectura, su
     doc.setTextColor(...colors.dark);
     doc.setFontSize(13);
     doc.setFont('helvetica', 'bold');
-    doc.text('REGISTRO DE ABASTECIMIENTOS — EVIDENCIA FOTOGRÁFICA', marginX, currentY);
-    doc.line(marginX, currentY + 2, marginX + 110, currentY + 2);
+    doc.text('REGISTRO DE ABASTECIMIENTOS', marginX, currentY);
+    doc.line(marginX, currentY + 2, marginX + 65, currentY + 2);
     currentY += 8;
 
     const HEAD = [['Hora', 'Placa', 'Conductor', 'Entidad', 'Litros', 'Evidencia Surtidor']];
@@ -320,7 +329,7 @@ export const generarReporteCierreConFotos = (kpis, modalLectura, formLectura, su
       a.conductor || a.bombero || '?',
       a.entidad || 'Tránsito / Externo',
       `${Number(a.litros).toFixed(1)} L`,
-      a.tiene_foto ? 'Ver foto →' : 'Sin foto'
+      a.tiene_foto ? 'Ver Foto (Clic)' : 'Sin foto'
     ]);
 
     // Guardar la posición Y del inicio de la tabla para calcular dónde poner los links
@@ -342,12 +351,12 @@ export const generarReporteCierreConFotos = (kpis, modalLectura, formLectura, su
       styles: { fontSize: 8, cellPadding: 3 },
       alternateRowStyles: { fillColor: colors.lightGray },
       columnStyles: {
-        0: { cellWidth: 14 },  // Hora
-        1: { cellWidth: 22 },  // Placa
-        2: { cellWidth: 38 },  // Conductor
-        3: { cellWidth: 45 },  // Entidad
-        4: { cellWidth: 18, halign: 'right' }, // Litros
-        5: { cellWidth: 28, textColor: colors.link, fontStyle: 'bold' } // Link
+        0: { cellWidth: 15 },  // Hora
+        1: { cellWidth: 25 },  // Placa
+        2: { },                // Conductor (dinámico)
+        3: { },                // Entidad (dinámico)
+        4: { cellWidth: 20, halign: 'right' }, // Litros
+        5: { cellWidth: 35, textColor: colors.link, fontStyle: 'bold' } // Link
       },
       // Hook para capturar coordenadas de las celdas de foto
       didDrawCell: (hookData) => {
