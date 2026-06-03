@@ -122,5 +122,35 @@ Para asegurar la exactitud de los reportes, KPIs y los procesos de apertura/cier
 
 ---
 
-*Última actualización: 2026-06-02 (Alineación estricta de Zona Horaria para cortes y cierres diarios en el módulo de combustible)*
+## 7. EVIDENCIA FOTOGRÁFICA EN REPORTES DE CIERRE (OPCIÓN D — JWT 72h)
+
+### 7.1 Arquitectura
+Las fotos del surtidor y del odómetro se almacenan como **Base64 en la columna `foto_maquina_url`** de la tabla `abastecimientos`. Para incluirlas en el reporte de cierre sin exponer el sistema ni hacer el PDF interminable, se implementa la **Opción D: hipervínculos firmados de corta duración (72 horas)**.
+
+### 7.2 Flujo de Funcionamiento
+1. El Supervisor hace clic en **"PDF + Fotos"** en la tabla de cierres diarios.
+2. El frontend llama a `GET /api/v1/combustible/cierres/{id}/reporte-con-fotos`.
+3. El backend genera un **JWT firmado de 72h** por cada abastecimiento del día (usando la misma `SECRET_KEY` del sistema).
+4. El PDF incluye una columna **"Evidencia Surtidor"** con un link clickeable por fila.
+5. Al hacer click, el auditor es dirigido a `GET /api/v1/combustible/foto/{uuid}?token=JWT`.
+6. El backend valida el token, decodifica el Base64 y devuelve la imagen directamente.
+7. Después de 72 horas, el link expira automáticamente. Se debe descargar un nuevo PDF para obtener links frescos.
+
+### 7.3 Seguridad del Endpoint de Foto
+- **No requiere sesión:** El link funciona para auditores externos sin cuenta en el sistema.
+- **Scope específico:** El campo `proposito=foto_auditoria` en el payload JWT evita que tokens de sesión normales sean reutilizados.
+- **Un token por foto:** Cada abastecimiento tiene su propio token vinculado a su UUID.
+- **Cabeceras de seguridad:** La respuesta incluye `Cache-Control: no-store` y `X-Content-Type-Options: nosniff`.
+- **Sin exposición del sistema:** El único endpoint nuevo es de solo-lectura para imágenes específicas.
+
+### 7.4 Archivos Modificados
+- `backend/app/core/security.py` → Funciones `crear_token_foto()` y `validar_token_foto()`
+- `backend/app/api/v1/combustible.py` → Endpoints `GET /foto/{id}` y `GET /cierres/{id}/reporte-con-fotos`
+- `frontend/src/utils/fuelReportGenerator.js` → Nueva función `generarReporteCierreConFotos()`
+- `frontend/src/services/combustible.service.js` → Método `obtenerReporteCierreConFotos()`
+- `frontend/src/pages/combustible/GestionTanques.jsx` → Botón "PDF + Fotos" en la tabla de cierres
+
+---
+
+*Última actualización: 2026-06-02 (Evidencia fotográfica en reportes de cierre mediante links JWT de 72h)*
 *Aprobado por: Comandante de Base & Antigravity Aegis Command*

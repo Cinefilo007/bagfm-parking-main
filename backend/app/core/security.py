@@ -70,3 +70,42 @@ def crear_token_evento(solicitud_id: str, expira_at: datetime) -> str:
         "exp": expira_at
     }
     return jwt.encode(payload, config.jwt_secret, algorithm=config.jwt_algoritmo)
+
+
+def crear_token_foto(abastecimiento_id: str, tipo: str = "surtidor", horas: int = 72) -> str:
+    """
+    Crea un JWT de corta duración (72h por defecto) para acceso de solo lectura
+    a la foto de un abastecimiento específico sin requerir sesión activa.
+
+    El token incluye un campo 'proposito' = 'foto_auditoria' que evita
+    que tokens de sesión normales sean usados para acceder a fotos.
+
+    Args:
+        abastecimiento_id: UUID del registro en la tabla abastecimientos.
+        tipo: 'surtidor' o 'odometro'.
+        horas: Horas de validez del token (default 72h).
+    """
+    expira = datetime.now(timezone.utc) + timedelta(hours=horas)
+    payload = {
+        "sub": abastecimiento_id,
+        "tipo_foto": tipo,
+        "proposito": "foto_auditoria",
+        "exp": expira
+    }
+    return jwt.encode(payload, config.jwt_secret, algorithm=config.jwt_algoritmo)
+
+
+def validar_token_foto(token: str) -> dict:
+    """
+    Valida un token de foto y retorna su payload.
+    Verifica que el campo 'proposito' sea 'foto_auditoria' para evitar
+    que tokens de sesión normales sean reutilizados para ver fotos.
+
+    Raises:
+        JWTError: Token expirado o firma inválida.
+        ValueError: Token con propósito incorrecto.
+    """
+    payload = jwt.decode(token, config.jwt_secret, algorithms=[config.jwt_algoritmo])
+    if payload.get("proposito") != "foto_auditoria":
+        raise ValueError("Token no autorizado para acceso a foto de auditoría")
+    return payload

@@ -222,5 +222,13 @@ export const combustibleService = {
     const { data } = await api.get(`/combustible/cierres/${id}/reporte-data`);
     return data.data;
   },
-};
 
+  /**
+   * Obtiene datos de cierre enriquecidos con URLs firmadas (JWT 72h) de foto de surtidor
+   * por cada abastecimiento del día. Usado para generar el PDF con hipervínculos de auditoría.
+   */
+  async obtenerReporteCierreConFotos(id) {
+    const { data } = await api.get(`/combustible/cierres/${id}/reporte-con-fotos`);
+    return data.data;
+  },
+};

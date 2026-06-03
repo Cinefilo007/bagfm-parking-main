@@ -8,7 +8,7 @@ import {
 import { cn } from '../../lib/utils';
 import { toast } from 'react-hot-toast';
 import { combustibleService } from '../../services/combustible.service';
-import { generarReporteCierre } from '../../utils/fuelReportGenerator';
+import { generarReporteCierre, generarReporteCierreConFotos } from '../../utils/fuelReportGenerator';
 
 function formatTimeAgo(dateString) {
   if (!dateString) return '--';
@@ -54,6 +54,7 @@ export default function GestionTanques() {
   const [cierres, setCierres] = useState([]);
   const [cargandoCierres, setCargandoCierres] = useState(false);
   const [descargandoCierreId, setDescargandoCierreId] = useState(null);
+  const [descargandoConFotosId, setDescargandoConFotosId] = useState(null);
   const [abastecimientoSeleccionado, setAbastecimientoSeleccionado] = useState(null);
   const [pagina, setPagina] = useState(0);
   const [totalHistorial, setTotalHistorial] = useState(0);
@@ -106,6 +107,30 @@ export default function GestionTanques() {
       toast.error("Error al generar el PDF del cierre.");
     } finally {
       setDescargandoCierreId(null);
+    }
+  };
+
+  const handleDescargarCierreConFotos = async (lecturaId) => {
+    setDescargandoConFotosId(lecturaId);
+    try {
+      const res = await combustibleService.obtenerReporteCierreConFotos(lecturaId);
+      if (res) {
+        generarReporteCierreConFotos(
+          res.kpis,
+          res.modalLectura,
+          res.formLectura,
+          res.supervisor_nombre,
+          res.fecha_cierre
+        );
+        toast.success("Reporte con evidencia fotográfica descargado. Los links son válidos por 72h.");
+      } else {
+        toast.error("No se encontraron datos para generar el reporte.");
+      }
+    } catch (e) {
+      console.error("Error al descargar reporte con fotos:", e);
+      toast.error("Error al generar el PDF con fotos.");
+    } finally {
+      setDescargandoConFotosId(null);
     }
   };
 
@@ -505,18 +530,34 @@ export default function GestionTanques() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <button
-                          disabled={descargandoCierreId !== null}
-                          onClick={() => handleDescargarCierre(c.id)}
-                          className="px-3 h-8 bg-success/10 border border-success/30 rounded-lg text-success hover:bg-success/20 active:scale-95 transition-all text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 mx-auto"
-                        >
-                          {descargandoCierreId === c.id ? (
-                            <RefreshCw size={12} className="animate-spin" />
-                          ) : (
-                            <FileDown size={12} />
-                          )}
-                          Reporte PDF
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            disabled={descargandoCierreId !== null || descargandoConFotosId !== null}
+                            onClick={() => handleDescargarCierre(c.id)}
+                            className="px-3 h-8 bg-success/10 border border-success/30 rounded-lg text-success hover:bg-success/20 active:scale-95 transition-all text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5"
+                            title="Reporte PDF sin fotos"
+                          >
+                            {descargandoCierreId === c.id ? (
+                              <RefreshCw size={12} className="animate-spin" />
+                            ) : (
+                              <FileDown size={12} />
+                            )}
+                            PDF
+                          </button>
+                          <button
+                            disabled={descargandoCierreId !== null || descargandoConFotosId !== null}
+                            onClick={() => handleDescargarCierreConFotos(c.id)}
+                            className="px-3 h-8 bg-blue-500/10 border border-blue-500/30 rounded-lg text-blue-400 hover:bg-blue-500/20 active:scale-95 transition-all text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5"
+                            title="Reporte PDF con links de foto (72h)"
+                          >
+                            {descargandoConFotosId === c.id ? (
+                              <RefreshCw size={12} className="animate-spin" />
+                            ) : (
+                              <Camera size={12} />
+                            )}
+                            PDF + Fotos
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))

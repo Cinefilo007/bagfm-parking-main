@@ -7,12 +7,16 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 import uuid
+import base64
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from jose import JWTError
 
 from app.core.database import obtener_db
 from app.core.dependencias import obtener_usuario_actual
+from app.core.security import crear_token_foto, validar_token_foto
+from app.core.config import obtener_config
 from app.models.usuario import Usuario
 from app.models.enums import RolTipo, EstadoSolicitudCombustible, TipoLecturaTanque
 from app.models.tanque_combustible import TanqueCombustible
@@ -21,6 +25,7 @@ from app.services.import_combustible_service import import_combustible_service
 from app.services.template_service import template_service
 
 router = APIRouter()
+_config = obtener_config()
 
 # --- Esquemas Pydantic ---
 class SolicitudCombustibleRequest(BaseModel):
@@ -1390,3 +1395,221 @@ async def obtener_datos_reporte_cierre_historico(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al obtener datos históricos del cierre: {str(e)}")
+
+
+# ---------------------------------------------------------------------------
+# ENDPOINT PÚBLICO: FOTO DE AUDITORÍA CON TOKEN JWT (Opción D)
+# ---------------------------------------------------------------------------
+
+@router.get("/foto/{abastecimiento_id}")
+async def servir_foto_abastecimiento(
+    abastecimiento_id: UUID,
+    token: str = Query(..., description="Token JWT de auditoría (72h)"),
+    db: AsyncSession = Depends(obtener_db)
+):
+    """
+    Endpoint público que sirve la foto del surtidor (o del odómetro) de un
+    abastecimiento validando un JWT de corta duración (72h).
+
+    NO requiere sesión activa en el sistema. El link se incluye en los PDFs
+    de cierre diario para que auditores externos puedan ver la evidencia
+    fotográfica sin necesidad de tener una cuenta.
+
+    El token verifica:
+      - Firma criptográfica válida (misma SECRET_KEY del sistema)
+      - Que el campo 'proposito' sea 'foto_auditoria' (evita reutilizar tokens de sesión)
+      - Que no haya expirado (default 72 horas)
+      - Que el UUID del abastecimiento del token coincida con el de la URL
+    """
+    # 1. Validar el token JWT
+    try:
+        payload = validar_token_foto(token)
+    except JWTError:
+        raise HTTPException(
+            status_code=401,
+            detail="El enlace de foto ha expirado o es inválido. Descargue un nuevo reporte PDF."
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=403, detail=str(ve))
+
+    # 2. Verificar que el abastecimiento del token coincide con el de la URL
+    token_sub = payload.get("sub", "")
+    if token_sub != str(abastecimiento_id):
+        raise HTTPException(
+            status_code=403,
+            detail="Token no corresponde a este abastecimiento."
+        )
+
+    tipo_foto = payload.get("tipo_foto", "surtidor")
+
+    # 3. Obtener el registro del abastecimiento
+    from app.models.abastecimiento import Abastecimiento
+    query = select(Abastecimiento).where(Abastecimiento.id == abastecimiento_id)
+    res = await db.execute(query)
+    abast = res.scalar_one_or_none()
+
+    if not abast:
+        raise HTTPException(status_code=404, detail="Abastecimiento no encontrado.")
+
+    # 4. Seleccionar la foto correcta
+    foto_b64 = abast.foto_maquina_url if tipo_foto == "surtidor" else abast.foto_kilometraje_url
+
+    if not foto_b64:
+        raise HTTPException(status_code=404, detail="Foto no disponible para este registro.")
+
+    # 5. Decodificar Base64 y devolver como imagen
+    try:
+        # La foto puede estar almacenada como Data URI (data:image/jpeg;base64,...)
+        # o como Base64 puro
+        if foto_b64.startswith("data:"):
+            # Extraer el tipo MIME y el contenido Base64
+            header, b64_data = foto_b64.split(",", 1)
+            mime_type = header.split(";")[0].replace("data:", "")
+        else:
+            b64_data = foto_b64
+            mime_type = "image/jpeg"  # Fallback seguro
+
+        imagen_bytes = base64.b64decode(b64_data)
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="No se pudo procesar la imagen almacenada."
+        )
+
+    # 6. Devolver la imagen con cabeceras de seguridad
+    return Response(
+        content=imagen_bytes,
+        media_type=mime_type,
+        headers={
+            # No cachear: cada acceso debe validar el token
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Disposition": f'inline; filename="foto_{tipo_foto}_{abastecimiento_id}.jpg"'
+        }
+    )
+
+
+@router.get("/cierres/{lectura_id}/reporte-con-fotos")
+async def obtener_datos_reporte_cierre_con_fotos(
+    lectura_id: UUID,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = Depends(obtener_usuario_actual)
+):
+    """
+    Igual que /cierres/{id}/reporte-data pero enriquecido con URLs firmadas (JWT 72h)
+    para cada foto de surtidor por abastecimiento del día.
+    Usado por el frontend para generar el PDF de cierre con hipervínculos de auditoría.
+    """
+    if usuario.rol not in [RolTipo.SUPERVISOR_BOMBEROS, RolTipo.COMANDANTE, RolTipo.ADMIN_BASE]:
+        raise HTTPException(status_code=403, detail="Permisos insuficientes.")
+
+    try:
+        from app.models.lectura_tanque import LecturaTanque
+        from app.models.abastecimiento import Abastecimiento
+        from app.models.vehiculo import Vehiculo
+        from sqlalchemy import func
+        from sqlalchemy.orm import selectinload
+        from datetime import datetime, time
+
+        # 1. Obtener la lectura del cierre
+        query = select(LecturaTanque).options(
+            selectinload(LecturaTanque.tanque),
+            selectinload(LecturaTanque.bombero)
+        ).where(LecturaTanque.id == lectura_id)
+        res = await db.execute(query)
+        lectura = res.scalar_one_or_none()
+
+        if not lectura:
+            raise HTTPException(status_code=404, detail="Lectura de cierre no encontrada.")
+
+        # 2. Rango del día correspondiente
+        fecha_cierre = lectura.fecha
+        inicio_dia = datetime.combine(fecha_cierre.date(), time.min)
+        fin_dia = datetime.combine(fecha_cierre.date(), time.max)
+
+        # 3. Litros y cargas de ese día/tanque
+        q_litros = select(func.coalesce(func.sum(Abastecimiento.cantidad_abastecida), 0.0)).where(
+            Abastecimiento.tanque_id == lectura.tanque_id,
+            Abastecimiento.fecha.between(inicio_dia, fin_dia)
+        )
+        litros_hoy = (await db.execute(q_litros)).scalar() or 0.0
+
+        q_cargas = select(func.count(Abastecimiento.id)).where(
+            Abastecimiento.tanque_id == lectura.tanque_id,
+            Abastecimiento.fecha.between(inicio_dia, fin_dia)
+        )
+        cargas_hoy = (await db.execute(q_cargas)).scalar() or 0
+
+        # 4. Lista de abastecimientos con tokens de foto
+        q_abast = (
+            select(Abastecimiento)
+            .options(
+                selectinload(Abastecimiento.vehiculo).selectinload(Vehiculo.entidad),
+                selectinload(Abastecimiento.bombero)
+            )
+            .where(
+                Abastecimiento.tanque_id == lectura.tanque_id,
+                Abastecimiento.fecha.between(inicio_dia, fin_dia)
+            )
+            .order_by(Abastecimiento.fecha.asc())
+        )
+        abast_hoy = (await db.execute(q_abast)).scalars().all()
+
+        # Construir URL base del backend para los links
+        backend_url = _config.cors_lista[0].replace("-frontend", "-backend") if "-frontend" in _config.cors_lista[0] else "https://bagfm.app"
+        # En desarrollo se usa la URL local
+        if _config.app_env == "development":
+            backend_url = "http://localhost:8000"
+
+        abast_data = []
+        for a in abast_hoy:
+            # Generar token de 72h para la foto del surtidor de este abastecimiento
+            token_surtidor = crear_token_foto(str(a.id), tipo="surtidor", horas=72)
+            url_foto = f"{backend_url}/api/v1/combustible/foto/{a.id}?token={token_surtidor}"
+
+            abast_data.append({
+                "id": str(a.id),
+                "placa": a.vehiculo.placa if a.vehiculo else "?",
+                "marca": a.vehiculo.marca if a.vehiculo else "?",
+                "modelo": a.vehiculo.modelo if a.vehiculo else "?",
+                "entidad": a.vehiculo.entidad.nombre if a.vehiculo and getattr(a.vehiculo, 'entidad', None) else "SIN ENTIDAD",
+                "bombero": f"{a.bombero.nombre} {a.bombero.apellido}" if a.bombero else "?",
+                "conductor": a.conductor or "",
+                "litros": a.cantidad_abastecida,
+                "fecha": a.fecha.isoformat(),
+                "tiene_alerta": a.tiene_alerta,
+                "url_foto_surtidor": url_foto,      # Link firmado de 72h
+                "tiene_foto": bool(a.foto_maquina_url)
+            })
+
+        # 5. Respuesta enriquecida
+        return {
+            "status": "success",
+            "data": {
+                "kpis": {
+                    "litros_hoy": litros_hoy,
+                    "cargas_hoy": cargas_hoy,
+                    "solicitudes_pendientes": 0,
+                    "abastecimientos_hoy": abast_data
+                },
+                "modalLectura": {
+                    "tanque": {
+                        "id": str(lectura.tanque_id),
+                        "nombre": lectura.tanque.nombre if lectura.tanque else "?",
+                        "tipo_combustible": lectura.tanque.tipo_combustible.value if lectura.tanque else "?",
+                        "capacidad_maxima": lectura.tanque.capacidad_maxima if lectura.tanque else 0.0,
+                        "cantidad_actual": lectura.tanque.cantidad_actual if lectura.tanque else 0.0
+                    }
+                },
+                "formLectura": {
+                    "cantidad_medida": lectura.cantidad_medida,
+                    "observaciones": lectura.observaciones or ""
+                },
+                "supervisor_nombre": f"{lectura.bombero.nombre} {lectura.bombero.apellido}" if lectura.bombero else "Sistema",
+                "fecha_cierre": lectura.fecha.isoformat()
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al generar reporte con fotos: {str(e)}")
