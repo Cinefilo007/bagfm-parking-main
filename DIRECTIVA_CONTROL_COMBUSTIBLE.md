@@ -113,6 +113,7 @@ Para evitar inconsistencias a lo largo del programa, todas las pantallas del mó
 - **Autoselección de Tanque por Combustible:** Al cargar la ficha del vehículo en la interfaz, el sistema evalúa dinámicamente su propiedad `tipo_combustible` (por ejemplo, `gasolina` o `diesel`) y pre-selecciona automáticamente el tanque surtidor correspondiente en el menú desplegable para evitar suministros erróneos (por ejemplo, cargar gasolina en un vehículo diesel).
 - **Lectura Inteligente con IA (OCR):** Integra el motor de IA Gemini 2.5 Flash a través del endpoint `/ia/extraer-datos`. Al capturar la foto del odómetro (tipo `odometro`) o del dispensador (tipo `surtidor`), la aplicación procesa la imagen de forma asíncrona, mostrando un indicador de estado "Leyendo con IA..." y rellenando automáticamente el campo numérico respectivo con los valores reconocidos (litros en formato decimal y kilometraje en formato entero).
 - **Tolerancia a Fallos y Edición Manual:** En caso de que la lectura de la IA falle, devuelva un valor nulo/erróneo o tarde en responder, el flujo no se interrumpe en ningún momento. El bombero siempre puede modificar o ingresar manualmente tanto los litros cargados como el kilometraje actual.
+- **Navegación Fluida del Buscador (Acceso Denegado):** Se incluye un botón de "Volver" táctil (con área interactiva de 48px de altura) en la interfaz de "Acceso Denegado a Combustible". Esto le permite al bombero cancelar el flujo y regresar al buscador de placas en un solo toque, eliminando la necesidad de recargar la página del navegador ante vehículos bloqueados o no autorizados.
 - **Sugerencias y Autocompletado de Placas:** Implementación de autocompletado en tiempo real a partir de 2 caracteres con un retardo (debounce) de 300ms para evitar sobrecarga. Muestra un listado flotante táctil (mínimo de 48px de altura por sugerencia) de hasta 5 coincidencias. Seleccionar una sugerencia rellena la placa y ejecuta la consulta del vehículo automáticamente.
 
 ---
@@ -166,5 +167,5 @@ Las fotos del surtidor y del odómetro se almacenan como **Base64 en la columna 
 
 ---
 
-*Última actualización: 2026-06-03 (Mapeo de errores, rejilla adaptativa en ParqueAutomotor, autocompletado de placas con debounce, autoselección de tanque por combustible, integración OCR de IA para odómetro/surtidor, y lógica inteligente de rendimiento y alertas de robo de combustible)*
+*Última actualización: 2026-06-03 (Mapeo de errores, rejilla adaptativa en ParqueAutomotor, autocompletado de placas con debounce, autoselección de tanque por combustible, integración OCR de IA para odómetro/surtidor, lógica inteligente de rendimiento/robos, y botón Volver para restablecer el buscador sin refrescar la página)*
 *Aprobado por: Comandante de Base & Antigravity Aegis Command*

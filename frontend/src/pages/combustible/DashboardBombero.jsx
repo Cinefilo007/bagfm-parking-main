@@ -710,19 +710,33 @@ export default function DashboardBombero() {
                       <h4 className="text-xs font-black uppercase text-danger">Acceso Denegado a Combustible</h4>
                       <p className="text-[9px] text-text-sec mt-1">Este vehículo o su entidad no tienen cupo o autorización activa en el sistema.</p>
                     </div>
-                    <button
-                      onClick={() => {
-                        setFormSolicitud({
-                          ...formSolicitud,
-                          placa: vehiculoEncontrado.placa,
-                          cantidad_solicitada: vehiculoEncontrado.capacidad_tanque || 30
-                        });
-                        setModalSolicitud(true);
-                      }}
-                      className="w-full h-10 rounded-xl bg-danger text-white text-[10px] font-black uppercase tracking-widest hover:bg-danger-deep transition-all"
-                    >
-                      Solicitar Aprobación de Emergencia
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVehiculoEncontrado(null);
+                          setPlacaBusqueda('');
+                          setSolicitudVinculada(null);
+                        }}
+                        className="w-1/3 h-12 bg-white/5 border border-white/10 rounded-xl text-text-sec text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all flex items-center justify-center cursor-pointer"
+                      >
+                        Volver
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormSolicitud({
+                            ...formSolicitud,
+                            placa: vehiculoEncontrado.placa,
+                            cantidad_solicitada: vehiculoEncontrado.capacidad_tanque || 30
+                          });
+                          setModalSolicitud(true);
+                        }}
+                        className="flex-1 h-12 rounded-xl bg-danger text-white text-[10px] font-black uppercase tracking-widest hover:bg-danger/90 transition-all flex items-center justify-center cursor-pointer"
+                      >
+                        Solicitar Aprobación
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   // FORMULARIO DE ABASTECIMIENTO ACTIVO (AUTORIZADO O BYPASS APROBADO)
