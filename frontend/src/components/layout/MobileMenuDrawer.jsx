@@ -36,17 +36,21 @@ export const MobileMenuDrawer = ({ isOpen, onClose }) => {
       { to: '/comando/infracciones', label: 'Infracciones', icon: AlertTriangle, color: 'text-danger' },
       { to: '/comando/personal', label: 'Gestión Personal', icon: UserCog, color: 'text-primary' },
       { to: '/comando/carnets', label: 'Editor de Carnets', icon: Palette, color: 'text-indigo-400' },
+      { to: '/parque-automotor', label: 'Parque Automotor', icon: CarIcon, color: 'text-emerald-400' },
+      { to: '/combustible/tanques', label: 'Tanques Combustible', icon: Flame, color: 'text-amber-400' },
     );
   } else if (user?.rol === 'SUPERVISOR') {
     extendedNavItems.push(
       { to: '/comando/personal', label: 'Fuerza de Tareas', icon: UserCog, color: 'text-primary' },
       { to: '/comando/eventos', label: 'Eventos Masivos', icon: CalendarRange, color: 'text-orange-400' },
       { to: '/comando/carnets', label: 'Editor de Carnets', icon: Palette, color: 'text-indigo-400' },
+      { to: '/parque-automotor', label: 'Parque Automotor', icon: CarIcon, color: 'text-emerald-400' },
     );
   } else if (user?.rol === 'ADMIN_ENTIDAD') {
     extendedNavItems.push(
       { to: '/entidad/personal', label: 'Personal Interno', icon: UserCog, color: 'text-primary' },
       { to: '/entidad/carnets', label: 'Editor de Carnets', icon: Palette, color: 'text-indigo-400' },
+      { to: '/parque-automotor', label: 'Parque Automotor', icon: CarIcon, color: 'text-emerald-400' },
     );
   } else if (user?.rol === 'SUPERVISOR_PARQUEROS') {
     extendedNavItems.push(
@@ -56,6 +60,8 @@ export const MobileMenuDrawer = ({ isOpen, onClose }) => {
   } else if (user?.rol === 'SUPERVISOR_BOMBEROS') {
     extendedNavItems.push(
       { to: '/combustible/aprobaciones', label: 'Buzón Aprob.', icon: Bell, color: 'text-red-400' },
+      { to: '/parque-automotor', label: 'Parque Automotor', icon: CarIcon, color: 'text-emerald-400' },
+      { to: '/combustible/tanques', label: 'Tanques Combustible', icon: Sunrise, color: 'text-amber-400' },
     );
   }
 

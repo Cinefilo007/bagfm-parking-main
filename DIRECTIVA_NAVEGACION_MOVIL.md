@@ -25,5 +25,15 @@ Garantizar que todas las funcionalidades críticas del sistema sean accesibles d
     - Borde: `white/5` o `bg-high/20`.
     - Efectos: Micro-animación de escala (`active:scale-95`) al pulsar.
 
+## 5. MÓDULOS DE COMBUSTIBLE EN DISPOSITIVOS MÓVILES
+- **Parque Automotor**:
+    - **Ubicación**: Enlace directo a `/parque-automotor`.
+    - **Roles autorizados**: `COMANDANTE`, `ADMIN_BASE`, `SUPERVISOR`, `ADMIN_ENTIDAD` y `SUPERVISOR_BOMBEROS`.
+    - **Icono**: `CarIcon` (`Car`) con color `text-emerald-400`.
+- **Tanques Combustible**:
+    - **Ubicación**: Enlace directo a `/combustible/tanques`.
+    - **Roles autorizados**: `COMANDANTE`, `ADMIN_BASE` y `SUPERVISOR_BOMBEROS`.
+    - **Icono**: `Flame` (o `Sunrise` para el rol de bombero supervisor) con color `text-amber-400`.
+
 ---
-*Ultima actualización: 2026-05-06 (Creación de estándar para navegación extendida)*
+*Ultima actualización: 2026-06-04 (Incorporación de módulos de combustible Aegis Fuel al Centro de Control Móvil)*
