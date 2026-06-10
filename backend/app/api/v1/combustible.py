@@ -49,6 +49,21 @@ class AbastecimientoRequest(BaseModel):
     solicitud_aprobacion_id: Optional[UUID] = None
     conductor: Optional[str] = None
 
+class AbastecimientoExcepcionalRequest(BaseModel):
+    placa: str = Field(..., max_length=20)
+    tanque_id: UUID
+    kilometraje_actual: int
+    cantidad_abastecida: float
+    conductor: str
+    fecha_registro: datetime
+    foto_kilometraje_url: Optional[str] = None
+    foto_maquina_url: Optional[str] = None
+
+class EditarLitrajeRequest(BaseModel):
+    cantidad_abastecida: float
+    kilometraje_actual: Optional[int] = None
+    conductor: Optional[str] = None
+
 class ResolverSolicitudRequest(BaseModel):
     estado: str # 'aprobada' | 'rechazada'
     entidad_id: Optional[UUID] = None
@@ -94,6 +109,62 @@ async def registrar_abastecimiento(
         )
         await db.commit()
         return {"status": "success", "message": "Abastecimiento registrado con éxito", "id": abastecimiento.id}
+    except ValueError as ve:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error en servidor: {str(e)}")
+
+@router.post("/abastecer-excepcional")
+async def registrar_abastecimiento_excepcional(
+    request: AbastecimientoExcepcionalRequest,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = Depends(obtener_usuario_actual)
+):
+    """
+    Registra un abastecimiento excepcional retroactivo (solo Administrador de Base o Comandante).
+    """
+    if usuario.rol not in [RolTipo.ADMIN_BASE, RolTipo.COMANDANTE]:
+        raise HTTPException(status_code=403, detail="Permisos insuficientes. Se requiere rol de administración.")
+        
+    try:
+        abastecimiento = await abastecimiento_service.registrar_abastecimiento_excepcional(
+            db, usuario.id, request.model_dump()
+        )
+        await db.commit()
+        return {"status": "success", "message": "Abastecimiento excepcional registrado con éxito", "id": abastecimiento.id}
+    except ValueError as ve:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error en servidor: {str(e)}")
+
+@router.patch("/abastecimientos/{abastecimiento_id}/editar-litraje")
+async def editar_abastecimiento_litraje(
+    abastecimiento_id: UUID,
+    request: EditarLitrajeRequest,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = Depends(obtener_usuario_actual)
+):
+    """
+    Edita la cantidad abastecida (litros), odómetro o conductor de una recarga de combustible existente.
+    Reajusta automáticamente el inventario del tanque (solo Administrador de Base o Comandante).
+    """
+    if usuario.rol not in [RolTipo.ADMIN_BASE, RolTipo.COMANDANTE]:
+        raise HTTPException(status_code=403, detail="Permisos insuficientes. Se requiere rol de administración.")
+        
+    try:
+        abastecimiento = await abastecimiento_service.editar_abastecimiento_litraje(
+            db, 
+            abastecimiento_id, 
+            request.cantidad_abastecida, 
+            request.kilometraje_actual,
+            request.conductor
+        )
+        await db.commit()
+        return {"status": "success", "message": "Registro de abastecimiento actualizado con éxito"}
     except ValueError as ve:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(ve))

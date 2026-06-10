@@ -3,12 +3,13 @@ import {
   Flame, RefreshCw, PlusCircle, Edit3, Trash2, 
   CheckCircle, AlertTriangle, XCircle, Database, Droplet,
   ClipboardList, ChevronLeft, ChevronRight, FileDown,
-  X, Camera, User
+  X, Camera, User, Plus
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { toast } from 'react-hot-toast';
 import { combustibleService } from '../../services/combustible.service';
 import { generarReporteCierre, generarReporteCierreConFotos } from '../../utils/fuelReportGenerator';
+import { useAuthStore } from '../../store/auth.store';
 
 function formatTimeAgo(dateString) {
   if (!dateString) return '--';
@@ -22,6 +23,9 @@ function formatTimeAgo(dateString) {
 }
 
 export default function GestionTanques() {
+  const { user } = useAuthStore();
+  const esAdmin = user?.rol === 'ADMIN_BASE' || user?.rol === 'COMANDANTE';
+
   const [tanques, setTanques] = useState([]);
   const [cargando, setCargando] = useState(true);
 
@@ -34,6 +38,25 @@ export default function GestionTanques() {
     cantidad_actual: ''
   });
   const [creando, setCreando] = useState(false);
+
+  // Modal Abastecimiento Excepcional
+  const [modalExcepcional, setModalExcepcional] = useState(null); // Guardará el cierre actual (c)
+  const [formExcepcional, setFormExcepcional] = useState({
+    placa: '',
+    kilometraje_actual: '',
+    cantidad_abastecida: '',
+    conductor: ''
+  });
+  const [guardandoExcepcional, setGuardandoExcepcional] = useState(false);
+
+  // Estados de Edición de Registro
+  const [editandoRegistro, setEditandoRegistro] = useState(false);
+  const [formEditarRegistro, setFormEditarRegistro] = useState({
+    cantidad_abastecida: '',
+    kilometraje_actual: '',
+    conductor: ''
+  });
+  const [guardandoEdicion, setGuardandoEdicion] = useState(false);
 
   // Modal Editar Tanque
   const [modalEditar, setModalEditar] = useState(null);
@@ -238,6 +261,69 @@ export default function GestionTanques() {
       toast.error(err.response?.data?.detail || "Error al desactivar el tanque.");
     } finally {
       setEliminando(false);
+    }
+  };
+
+  const handleCrearExcepcional = async (e) => {
+    e.preventDefault();
+    if (!formExcepcional.placa.trim() || !formExcepcional.cantidad_abastecida || !formExcepcional.kilometraje_actual || !formExcepcional.conductor.trim()) {
+      toast.error("Complete todos los campos obligatorios.");
+      return;
+    }
+    setGuardandoExcepcional(true);
+    try {
+      await combustibleService.registrarAbastecimientoExcepcional({
+        placa: formExcepcional.placa.trim().toUpperCase(),
+        tanque_id: modalExcepcional.tanque_id,
+        kilometraje_actual: parseInt(formExcepcional.kilometraje_actual),
+        cantidad_abastecida: parseFloat(formExcepcional.cantidad_abastecida),
+        conductor: formExcepcional.conductor.trim().toUpperCase(),
+        fecha_registro: modalExcepcional.fecha // Vincular a la fecha del cierre
+      });
+      toast.success("Suministro excepcional registrado con éxito.");
+      setModalExcepcional(null);
+      setFormExcepcional({ placa: '', kilometraje_actual: '', cantidad_abastecida: '', conductor: '' });
+      cargarTanques();
+      if (tabActivo === 'general') cargarHistorial();
+      else cargarCierres();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Error al registrar suministro excepcional.");
+    } finally {
+      setGuardandoExcepcional(false);
+    }
+  };
+
+  const handleIniciarEdicionRegistro = (ab) => {
+    setFormEditarRegistro({
+      cantidad_abastecida: ab.litros,
+      kilometraje_actual: ab.km_actual !== undefined ? ab.km_actual : ab.kilometraje_actual,
+      conductor: ab.conductor || ''
+    });
+    setEditandoRegistro(true);
+  };
+
+  const handleGuardarEdicionRegistro = async (e) => {
+    e.preventDefault();
+    if (!formEditarRegistro.cantidad_abastecida || !formEditarRegistro.kilometraje_actual || !formEditarRegistro.conductor.trim()) {
+      toast.error("Complete todos los campos obligatorios.");
+      return;
+    }
+    setGuardandoEdicion(true);
+    try {
+      await combustibleService.editarAbastecimientoLitraje(abastecimientoSeleccionado.id, {
+        cantidad_abastecida: parseFloat(formEditarRegistro.cantidad_abastecida),
+        kilometraje_actual: parseInt(formEditarRegistro.kilometraje_actual),
+        conductor: formEditarRegistro.conductor.trim().toUpperCase()
+      });
+      toast.success("Registro de suministro actualizado.");
+      setEditandoRegistro(false);
+      setAbastecimientoSeleccionado(null); // Cerrar modal para forzar refresco
+      cargarTanques();
+      cargarHistorial();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Error al actualizar registro.");
+    } finally {
+      setGuardandoEdicion(false);
     }
   };
 
@@ -556,6 +642,16 @@ export default function GestionTanques() {
                       </td>
                       <td className="px-4 py-3 text-center">
                         <div className="flex items-center justify-center gap-2">
+                          {esAdmin && (
+                            <button
+                              onClick={() => setModalExcepcional(c)}
+                              className="px-3 h-8 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-400 hover:bg-emerald-500/20 active:scale-95 transition-all text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5"
+                              title="Añadir Abastecimiento Excepcional"
+                            >
+                              <Plus size={12} />
+                              Carga
+                            </button>
+                          )}
                           <button
                             disabled={descargandoCierreId !== null || descargandoConFotosId !== null}
                             onClick={() => handleDescargarCierre(c.id)}
@@ -781,74 +877,252 @@ export default function GestionTanques() {
           <div className="bg-bg-card border border-white/10 rounded-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
             <div className="p-4 border-b border-white/5 flex justify-between items-center bg-bg-high/10">
               <div>
-                <h3 className="text-sm font-black text-text-main font-display">DETALLES SUMINISTRO</h3>
+                <h3 className="text-sm font-black text-text-main font-display">
+                  {editandoRegistro ? 'EDITAR SUMINISTRO' : 'DETALLES SUMINISTRO'}
+                </h3>
                 <p className="text-[10px] text-text-muted">{abastecimientoSeleccionado.placa} · {formatTimeAgo(abastecimientoSeleccionado.fecha)}</p>
               </div>
               <button 
-                onClick={() => setAbastecimientoSeleccionado(null)}
+                onClick={() => { setAbastecimientoSeleccionado(null); setEditandoRegistro(false); }}
                 className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-text-muted hover:text-white transition-all cursor-pointer"
               >
                 <X size={16} />
               </button>
             </div>
-            <div className="p-4 overflow-y-auto scrollbar-tactical space-y-4">
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-bg-low p-2.5 rounded-xl border border-white/5">
-                  <p className="text-[9px] font-black uppercase text-text-muted mb-1">Litros Surtidos</p>
-                  <p className="text-xl font-black font-display text-emerald-400">{Number(abastecimientoSeleccionado.litros).toFixed(2)} L</p>
+            
+            {editandoRegistro ? (
+              <form onSubmit={handleGuardarEdicionRegistro} className="p-4 space-y-4 overflow-y-auto scrollbar-tactical">
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black uppercase tracking-widest text-text-muted">Litros Surtidos *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={formEditarRegistro.cantidad_abastecida}
+                    onChange={e => setFormEditarRegistro({ ...formEditarRegistro, cantidad_abastecida: e.target.value })}
+                    className="w-full bg-bg-low border border-white/10 rounded-lg px-3 py-2 text-xs font-black text-text-main outline-none focus:border-success/50"
+                    placeholder="0.00"
+                  />
                 </div>
-                <div className="bg-bg-low p-2.5 rounded-xl border border-white/5">
-                  <p className="text-[9px] font-black uppercase text-text-muted mb-1">Responsable</p>
-                  <p className="text-[11px] font-bold text-text-main flex items-center gap-1.5"><User size={12} className="text-text-muted" /> {abastecimientoSeleccionado.bombero}</p>
+                
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black uppercase tracking-widest text-text-muted">Kilometraje Actual *</label>
+                  <input
+                    type="number"
+                    required
+                    value={formEditarRegistro.kilometraje_actual}
+                    onChange={e => setFormEditarRegistro({ ...formEditarRegistro, kilometraje_actual: e.target.value })}
+                    className="w-full bg-bg-low border border-white/10 rounded-lg px-3 py-2 text-xs font-black text-text-main outline-none focus:border-success/50"
+                    placeholder="0"
+                  />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-bg-low p-2.5 rounded-xl border border-white/5">
-                  <p className="text-[9px] font-black uppercase text-text-muted mb-1">Km Recorridos</p>
-                  <p className="text-sm font-black font-display text-text-main">
-                    {abastecimientoSeleccionado.distancia_recorrida !== undefined && abastecimientoSeleccionado.distancia_recorrida !== null && abastecimientoSeleccionado.distancia_recorrida > 0 ? (
-                      `${abastecimientoSeleccionado.distancia_recorrida} km`
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black uppercase tracking-widest text-text-muted">Conductor *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formEditarRegistro.conductor}
+                    onChange={e => setFormEditarRegistro({ ...formEditarRegistro, conductor: e.target.value.toUpperCase() })}
+                    className="w-full bg-bg-low border border-white/10 rounded-lg px-3 py-2 text-xs font-black text-text-main outline-none focus:border-success/50 uppercase"
+                    placeholder="Nombre del Conductor"
+                  />
+                </div>
+
+                <div className="pt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditandoRegistro(false)}
+                    className="w-1/3 h-10 bg-white/5 border border-white/10 rounded-xl text-text-muted text-[10px] font-black uppercase tracking-widest"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={guardandoEdicion}
+                    className="flex-1 h-10 rounded-xl bg-success text-bg-app font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  >
+                    {guardandoEdicion ? <RefreshCw size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+                    Guardar
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="p-4 overflow-y-auto scrollbar-tactical space-y-4">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-bg-low p-2.5 rounded-xl border border-white/5">
+                    <p className="text-[9px] font-black uppercase text-text-muted mb-1">Litros Surtidos</p>
+                    <p className="text-xl font-black font-display text-emerald-400">{Number(abastecimientoSeleccionado.litros).toFixed(2)} L</p>
+                  </div>
+                  <div className="bg-bg-low p-2.5 rounded-xl border border-white/5">
+                    <p className="text-[9px] font-black uppercase text-text-muted mb-1">Responsable</p>
+                    <p className="text-[11px] font-bold text-text-main flex items-center gap-1.5"><User size={12} className="text-text-muted" /> {abastecimientoSeleccionado.bombero}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-bg-low p-2.5 rounded-xl border border-white/5">
+                    <p className="text-[9px] font-black uppercase text-text-muted mb-1">Km Recorridos</p>
+                    <p className="text-sm font-black font-display text-text-main">
+                      {abastecimientoSeleccionado.distancia_recorrida !== undefined && abastecimientoSeleccionado.distancia_recorrida !== null && abastecimientoSeleccionado.distancia_recorrida > 0 ? (
+                        `${abastecimientoSeleccionado.distancia_recorrida} km`
+                      ) : (
+                        "N/A"
+                      )}
+                    </p>
+                  </div>
+                  <div className="bg-bg-low p-2.5 rounded-xl border border-white/5">
+                    <p className="text-[9px] font-black uppercase text-text-muted mb-1">Rendimiento Estimado</p>
+                    <p className="text-sm font-black font-display text-text-main">
+                      {abastecimientoSeleccionado.rendimiento_tramo !== undefined && abastecimientoSeleccionado.rendimiento_tramo !== null && abastecimientoSeleccionado.rendimiento_tramo > 0 ? (
+                        `${Number(abastecimientoSeleccionado.rendimiento_tramo).toFixed(2)} km/L`
+                      ) : (
+                        "N/A"
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {abastecimientoSeleccionado.conductor && (
+                  <div className="bg-bg-low p-2.5 rounded-xl border border-white/5">
+                    <p className="text-[9px] font-black uppercase text-text-muted mb-1">Conductor / Responsable</p>
+                    <p className="text-xs font-bold text-text-main uppercase">{abastecimientoSeleccionado.conductor}</p>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <p className="text-[9px] font-black uppercase text-text-muted tracking-widest flex items-center gap-1.5"><Camera size={12}/> Evidencia Odómetro</p>
+                  <div className="bg-bg-low rounded-xl border border-white/5 overflow-hidden aspect-video flex items-center justify-center">
+                    {abastecimientoSeleccionado.foto_odometro ? (
+                      <img src={abastecimientoSeleccionado.foto_odometro} alt="Odómetro" className="w-full h-full object-cover" />
                     ) : (
-                      "N/A"
+                      <span className="text-[10px] text-text-muted font-bold">Sin foto</span>
                     )}
-                  </p>
+                  </div>
                 </div>
-                <div className="bg-bg-low p-2.5 rounded-xl border border-white/5">
-                  <p className="text-[9px] font-black uppercase text-text-muted mb-1">Rendimiento Estimado</p>
-                  <p className="text-sm font-black font-display text-text-main">
-                    {abastecimientoSeleccionado.rendimiento_tramo !== undefined && abastecimientoSeleccionado.rendimiento_tramo !== null && abastecimientoSeleccionado.rendimiento_tramo > 0 ? (
-                      `${Number(abastecimientoSeleccionado.rendimiento_tramo).toFixed(2)} km/L`
+
+                <div className="space-y-2">
+                  <p className="text-[9px] font-black uppercase text-text-muted tracking-widest flex items-center gap-1.5"><Camera size={12}/> Evidencia Surtidor</p>
+                  <div className="bg-bg-low rounded-xl border border-white/5 overflow-hidden aspect-video flex items-center justify-center">
+                    {abastecimientoSeleccionado.foto_surtidor ? (
+                      <img src={abastecimientoSeleccionado.foto_surtidor} alt="Surtidor" className="w-full h-full object-cover" />
                     ) : (
-                      "N/A"
+                      <span className="text-[10px] text-text-muted font-bold">Sin foto</span>
                     )}
-                  </p>
+                  </div>
+                </div>
+
+                {esAdmin && (
+                  <div className="pt-2">
+                    <button
+                      onClick={() => handleIniciarEdicionRegistro(abastecimientoSeleccionado)}
+                      className="w-full h-11 bg-primary/10 border border-primary/30 rounded-xl text-primary font-black text-xs uppercase tracking-widest flex items-center justify-center gap-1.5 hover:bg-primary/20 active:scale-95 transition-all cursor-pointer"
+                    >
+                      <Edit3 size={14} />
+                      Editar Registro
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL ABASTECIMIENTO EXCEPCIONAL --- */}
+      {modalExcepcional && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-bg-card border border-bg-high/50 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
+            <div className="p-4 border-b border-bg-high/20 flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-5 rounded-full bg-emerald-500 animate-pulse" />
+                <div>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-text-main font-mono">Abastecimiento Excepcional</h3>
+                  <p className="text-[9px] text-text-muted uppercase tracking-wider">Tanque: {modalExcepcional.tanque_nombre}</p>
                 </div>
               </div>
-
-              <div className="space-y-2">
-                <p className="text-[9px] font-black uppercase text-text-muted tracking-widest flex items-center gap-1.5"><Camera size={12}/> Evidencia Odómetro</p>
-                <div className="bg-bg-low rounded-xl border border-white/5 overflow-hidden aspect-video flex items-center justify-center">
-                  {abastecimientoSeleccionado.foto_odometro ? (
-                    <img src={abastecimientoSeleccionado.foto_odometro} alt="Odómetro" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-[10px] text-text-muted font-bold">Sin foto</span>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-[9px] font-black uppercase text-text-muted tracking-widest flex items-center gap-1.5"><Camera size={12}/> Evidencia Surtidor</p>
-                <div className="bg-bg-low rounded-xl border border-white/5 overflow-hidden aspect-video flex items-center justify-center">
-                  {abastecimientoSeleccionado.foto_surtidor ? (
-                    <img src={abastecimientoSeleccionado.foto_surtidor} alt="Surtidor" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-[10px] text-text-muted font-bold">Sin foto</span>
-                  )}
-                </div>
-              </div>
-
+              <button onClick={() => setModalExcepcional(null)} className="text-text-muted hover:text-text-main cursor-pointer">
+                <XCircle size={20} />
+              </button>
             </div>
+            <form onSubmit={handleCrearExcepcional} className="p-5 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Placa del Vehículo *</label>
+                <input
+                  type="text"
+                  value={formExcepcional.placa}
+                  onChange={(e) => setFormExcepcional(p => ({ ...p, placa: e.target.value.toUpperCase() }))}
+                  placeholder="AB123CD"
+                  className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-bold uppercase tracking-wider text-center"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Litros Cargar (L) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.1"
+                    value={formExcepcional.cantidad_abastecida}
+                    onChange={(e) => setFormExcepcional(p => ({ ...p, cantidad_abastecida: e.target.value }))}
+                    placeholder="0.00"
+                    className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-display font-bold"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Odómetro (km) *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={formExcepcional.kilometraje_actual}
+                    onChange={(e) => setFormExcepcional(p => ({ ...p, kilometraje_actual: e.target.value }))}
+                    placeholder="0"
+                    className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-display font-bold"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Conductor / Oficial Responsable *</label>
+                <input
+                  type="text"
+                  value={formExcepcional.conductor}
+                  onChange={(e) => setFormExcepcional(p => ({ ...p, conductor: e.target.value.toUpperCase() }))}
+                  placeholder="MARCOS VALERO"
+                  className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-bold uppercase"
+                  required
+                />
+              </div>
+
+              <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3 flex items-start gap-2 text-emerald-400">
+                <CheckCircle size={14} className="shrink-0 mt-0.5" />
+                <p className="text-[9px] leading-relaxed">
+                  Este abastecimiento se registrará de forma retroactiva con fecha <strong className="font-mono text-white">{new Date(modalExcepcional.fecha).toLocaleDateString('es-ES', { dateStyle: 'long' })}</strong>. Se descontará del tanque automáticamente.
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setModalExcepcional(null)}
+                  className="flex-1 h-11 rounded-xl bg-white/5 border border-bg-high/30 text-text-muted font-black text-[10px] uppercase tracking-widest hover:bg-white/10 transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={guardandoExcepcional}
+                  className="flex-1 h-11 rounded-xl bg-gradient-to-r from-success to-emerald-600 text-bg-app font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5 hover:brightness-110 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                >
+                  {guardandoExcepcional ? <RefreshCw size={12} className="animate-spin" /> : <Plus size={12} />}
+                  Guardar
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

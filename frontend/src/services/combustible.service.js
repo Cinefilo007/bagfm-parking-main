@@ -239,4 +239,20 @@ export const combustibleService = {
     const { data } = await api.get(`/combustible/abastecimientos/${id}`);
     return data.data;
   },
+
+  /**
+   * Registra un abastecimiento excepcional retroactivo vinculándolo a la fecha de un cierre.
+   */
+  async registrarAbastecimientoExcepcional(datos) {
+    const { data } = await api.post('/combustible/abastecer-excepcional', datos);
+    return data;
+  },
+
+  /**
+   * Edita la cantidad abastecida (litros) y otros datos de un suministro existente.
+   */
+  async editarAbastecimientoLitraje(id, datos) {
+    const { data } = await api.patch(`/combustible/abastecimientos/${id}/editar-litraje`, datos);
+    return data;
+  },
 };

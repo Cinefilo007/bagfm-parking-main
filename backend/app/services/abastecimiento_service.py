@@ -678,4 +678,182 @@ class AbastecimientoService:
             "alertas_sospechosas": alertas
         }
 
+    async def registrar_abastecimiento_excepcional(
+        self,
+        db: AsyncSession,
+        usuario_id: uuid.UUID,
+        datos: Dict[str, Any]
+    ) -> Abastecimiento:
+        """
+        Registra un abastecimiento excepcional retroactivo vinculándolo a la fecha indicada.
+        Descuenta inventario y actualiza odómetro con lógica retroactiva.
+        """
+        placa = datos["placa"].strip().upper()
+        tanque_id = uuid.UUID(str(datos["tanque_id"]))
+        kilometraje_actual = int(datos["kilometraje_actual"])
+        cantidad_abastecida = float(datos["cantidad_abastecida"])
+        conductor = datos["conductor"].strip().upper()
+        fecha_registro = datos["fecha_registro"]
+        
+        # 1. Obtener o crear vehículo
+        query_v = select(Vehiculo).where(Vehiculo.placa == placa, Vehiculo.activo == True)
+        res_v = await db.execute(query_v)
+        vehiculo = res_v.scalar_one_or_none()
+        
+        if not vehiculo:
+            # Crear vehículo automáticamente bajo entidad Tránsito / Externo
+            entidad_ext = await self.obtener_entidad_transito(db)
+            vehiculo = Vehiculo(
+                id=uuid.uuid4(),
+                placa=placa,
+                marca=datos.get("marca_manual") or "S/M",
+                modelo=datos.get("modelo_manual") or "S/M",
+                color=datos.get("color_manual") or "S/C",
+                tipo="sedan",
+                entidad_id=entidad_ext.id,
+                uso_vehiculo=UsoVehiculo.servicio,
+                autorizado_combustible=False,
+                capacidad_tanque=50.0,
+                asignacion_combustible_semanal=0.0,
+                ultimo_kilometraje=kilometraje_actual,
+                activo=True
+            )
+            db.add(vehiculo)
+            await db.flush()
+            
+        # 2. Obtener kilometraje anterior del vehículo en esa fecha retroactiva
+        # Buscamos el último abastecimiento del vehículo cuya fecha sea menor o igual a fecha_registro
+        query_prev = select(Abastecimiento).where(
+            Abastecimiento.vehiculo_id == vehiculo.id,
+            Abastecimiento.fecha <= fecha_registro
+        ).order_by(Abastecimiento.fecha.desc()).limit(1)
+        res_prev = await db.execute(query_prev)
+        abastecimiento_prev = res_prev.scalar_one_or_none()
+        
+        kilometraje_anterior = abastecimiento_prev.kilometraje_actual if abastecimiento_prev else 0
+        distancia = 0
+        rendimiento = 0.0
+        
+        if kilometraje_anterior > 0:
+            distancia = kilometraje_actual - kilometraje_anterior
+            litros_previos = abastecimiento_prev.cantidad_abastecida
+            if litros_previos > 0 and distancia > 0:
+                rendimiento = distancia / litros_previos
+
+        # 3. Descontar litros del inventario del tanque
+        query_t = select(TanqueCombustible).where(TanqueCombustible.id == tanque_id, TanqueCombustible.activo == True)
+        res_t = await db.execute(query_t)
+        tanque = res_t.scalar_one_or_none()
+        
+        if not tanque:
+            raise ValueError("Tanque de combustible no encontrado o inactivo.")
+        if tanque.cantidad_actual < cantidad_abastecida:
+            raise ValueError(f"Inventario insuficiente en el tanque ({tanque.cantidad_actual:.1f} L disponibles).")
+            
+        tanque.cantidad_actual -= cantidad_abastecida
+        
+        # 4. Fotos opcionales (marcador de posición si no se envían)
+        foto_k = datos.get("foto_kilometraje_url") or "placeholder_excepcional"
+        foto_m = datos.get("foto_maquina_url") or "placeholder_excepcional"
+
+        # 5. Crear el registro de abastecimiento
+        abastecimiento = Abastecimiento(
+            id=uuid.uuid4(),
+            vehiculo_id=vehiculo.id,
+            bombero_id=usuario_id,
+            tanque_id=tanque_id,
+            kilometraje_anterior=kilometraje_anterior,
+            kilometraje_actual=kilometraje_actual,
+            cantidad_abastecida=cantidad_abastecida,
+            distancia_recorrida=distancia,
+            rendimiento_tramo=rendimiento,
+            foto_kilometraje_url=foto_k,
+            foto_maquina_url=foto_m,
+            tiene_alerta=False,
+            conductor=conductor,
+            fecha=fecha_registro
+        )
+        
+        # 6. Actualizar kilometraje del vehículo solo si el nuevo es mayor que su kilometraje actual registrado
+        if kilometraje_actual > vehiculo.ultimo_kilometraje:
+            vehiculo.ultimo_kilometraje = kilometraje_actual
+            
+        db.add(abastecimiento)
+        await db.flush()
+        
+        return abastecimiento
+
+    async def editar_abastecimiento_litraje(
+        self,
+        db: AsyncSession,
+        abastecimiento_id: uuid.UUID,
+        nuevo_litraje: float,
+        nuevo_kilometraje: Optional[int] = None,
+        nuevo_conductor: Optional[str] = None
+    ) -> Abastecimiento:
+        """
+        Edita un abastecimiento existente, reajustando el inventario del tanque de combustible.
+        """
+        # 1. Obtener el abastecimiento
+        query_ab = select(Abastecimiento).where(Abastecimiento.id == abastecimiento_id)
+        res_ab = await db.execute(query_ab)
+        abastecimiento = res_ab.scalar_one_or_none()
+        
+        if not abastecimiento:
+            raise ValueError("Abastecimiento no encontrado")
+            
+        # 2. Reajustar inventario del tanque
+        query_t = select(TanqueCombustible).where(TanqueCombustible.id == abastecimiento.tanque_id)
+        res_t = await db.execute(query_t)
+        tanque = res_t.scalar_one_or_none()
+        
+        if not tanque:
+            raise ValueError("Tanque asociado no encontrado")
+            
+        diferencia = nuevo_litraje - abastecimiento.cantidad_abastecida
+        
+        if diferencia != 0:
+            if diferencia > 0 and tanque.cantidad_actual < diferencia:
+                raise ValueError(f"Inventario insuficiente en el tanque para realizar este ajuste ({tanque.cantidad_actual:.1f} L disponibles, requiere {diferencia:.1f} L adicionales).")
+            tanque.cantidad_actual -= diferencia
+            abastecimiento.cantidad_abastecida = nuevo_litraje
+
+        # 3. Editar kilometraje y recalcular distancia si aplica
+        if nuevo_kilometraje is not None and nuevo_kilometraje != abastecimiento.kilometraje_actual:
+            abastecimiento.kilometraje_actual = nuevo_kilometraje
+            # Si el kilometraje cambió, recalculamos la distancia del tramo actual
+            abastecimiento.distancia_recorrida = nuevo_kilometraje - abastecimiento.kilometraje_anterior
+            
+            # Recalcular rendimiento del tramo si es válido
+            query_prev = select(Abastecimiento).where(
+                Abastecimiento.vehiculo_id == abastecimiento.vehiculo_id,
+                Abastecimiento.fecha < abastecimiento.fecha
+            ).order_by(Abastecimiento.fecha.desc()).limit(1)
+            res_prev = await db.execute(query_prev)
+            abastecimiento_prev = res_prev.scalar_one_or_none()
+            if abastecimiento_prev and abastecimiento_prev.cantidad_abastecida > 0 and abastecimiento.distancia_recorrida > 0:
+                abastecimiento.rendimiento_tramo = abastecimiento.distancia_recorrida / abastecimiento_prev.cantidad_abastecida
+            
+            # Si es el abastecimiento más reciente del vehículo, actualizamos su último odómetro
+            query_v = select(Vehiculo).where(Vehiculo.id == abastecimiento.vehiculo_id)
+            res_v = await db.execute(query_v)
+            vehiculo = res_v.scalar_one_or_none()
+            if vehiculo:
+                # Comprobar si no hay abastecimientos posteriores
+                query_post = select(func.count(Abastecimiento.id)).where(
+                    Abastecimiento.vehiculo_id == vehiculo.id,
+                    Abastecimiento.fecha > abastecimiento.fecha
+                )
+                res_post = await db.execute(query_post)
+                cuenta_post = res_post.scalar() or 0
+                if cuenta_post == 0:
+                    vehiculo.ultimo_kilometraje = nuevo_kilometraje
+                    
+        # 4. Editar conductor
+        if nuevo_conductor is not None:
+            abastecimiento.conductor = nuevo_conductor.strip().upper()
+            
+        await db.flush()
+        return abastecimiento
+
 abastecimiento_service = AbastecimientoService()

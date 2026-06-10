@@ -9,8 +9,12 @@ import { cn } from '../../lib/utils';
 import { toast } from 'react-hot-toast';
 import { combustibleService } from '../../services/combustible.service';
 import { entidadService } from '../../services/entidad.service';
+import { useAuthStore } from '../../store/auth.store';
 
 export default function ParqueAutomotor() {
+  const { user } = useAuthStore();
+  const esAdmin = user?.rol === 'ADMIN_BASE' || user?.rol === 'COMANDANTE';
+
   const [vehiculos, setVehiculos] = useState([]);
   const [entidades, setEntidades] = useState([]);
   const [cargandoVehiculos, setCargandoVehiculos] = useState(true);
@@ -42,7 +46,8 @@ export default function ParqueAutomotor() {
     tipo_combustible: '',
     capacidad_tanque: '',
     asignacion_combustible_semanal: '',
-    autorizado_combustible: false
+    autorizado_combustible: false,
+    entidad_id: ''
   });
 
   // Modal Carga Masiva Excel
@@ -160,7 +165,8 @@ export default function ParqueAutomotor() {
       tipo_combustible: vehiculo.tipo_combustible,
       capacidad_tanque: vehiculo.capacidad_tanque || '0',
       asignacion_combustible_semanal: vehiculo.asignacion_combustible_semanal || '0',
-      autorizado_combustible: vehiculo.autorizado_combustible
+      autorizado_combustible: vehiculo.autorizado_combustible,
+      entidad_id: vehiculo.entidad_id || ''
     });
   };
 
@@ -168,7 +174,7 @@ export default function ParqueAutomotor() {
     e.preventDefault();
     setGuardandoVehiculo(true);
     try {
-      await combustibleService.actualizarVehiculoCombustible(modalVehiculo.id, {
+      const payload = {
         placa: formVehiculo.placa.trim().toUpperCase(),
         marca: formVehiculo.marca,
         modelo: formVehiculo.modelo,
@@ -178,7 +184,13 @@ export default function ParqueAutomotor() {
         capacidad_tanque: parseFloat(formVehiculo.capacidad_tanque) || 0,
         asignacion_combustible_semanal: parseFloat(formVehiculo.asignacion_combustible_semanal) || 0,
         autorizado_combustible: formVehiculo.autorizado_combustible
-      });
+      };
+
+      if (esAdmin) {
+        payload.entidad_id = formVehiculo.entidad_id || null;
+      }
+
+      await combustibleService.actualizarVehiculoCombustible(modalVehiculo.id, payload);
       toast.success("Parámetros del vehículo actualizados correctamente.");
       setModalVehiculo(null);
       cargarVehiculos();
@@ -768,6 +780,23 @@ export default function ParqueAutomotor() {
                   <option value="diesel">Diésel</option>
                 </select>
               </div>
+
+              {/* Entidad Asociada (Solo Administradores) */}
+              {esAdmin && (
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Entidad Asociada</label>
+                  <select
+                    value={formVehiculo.entidad_id}
+                    onChange={(e) => setFormVehiculo(prev => ({ ...prev, entidad_id: e.target.value }))}
+                    className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-success transition-all font-bold uppercase"
+                  >
+                    <option value="">-- SIN ENTIDAD / EXTERNO --</option>
+                    {entidades.map(ent => (
+                      <option key={ent.id} value={ent.id}>{ent.nombre.toUpperCase()}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Litros Tanque y Límite Semanal */}
               <div className="grid grid-cols-2 gap-3">

@@ -80,7 +80,7 @@ Para evitar inconsistencias a lo largo del programa, todas las pantallas del mó
 
 ### 4.1 Parque Automotor (`ParqueAutomotor.jsx`)
 - **Gestión de Flotas:** Visualización de todos los vehículos activos agrupados/filtrados por entidad con paginación y búsqueda por placa. El formulario de filtros utiliza una rejilla responsiva (`grid-cols-1` en móvil, `sm:grid-cols-2` en pantallas medianas y `xl:grid-cols-4` en pantallas grandes) y los elementos tienen un ancho adaptativo (`w-full` / `truncate`) para evitar desbordes visuales ante nombres de entidades extensos.
-- **Asignación de Combustible:** Toggle interactivo para habilitar/inhabilitar el suministro en bomba a vehículos particulares registrados, y campos para configurar límites y capacidades del tanque en litros.
+- **Asignación de Combustible y Cambio de Entidad:** Toggle interactivo para habilitar/inhabilitar el suministro en bomba a vehículos particulares registrados, y campos para configurar límites y capacidades del tanque en litros. Adicionalmente, los usuarios con rol de administrador (`ADMIN_BASE` y `COMANDANTE`) disponen de un selector de entidad en el modal de edición de vehículos para reasignar su pertenencia civil/militar (el historial previo no se altera para conservar la contabilidad contable pasada).
 - **Planificador de Abastecimiento Semanal (Asignación vs Capacidad):** Panel táctico reactivo en la parte superior que consolida la suma total de las cuotas semanales de combustible asignadas a los vehículos activos y autorizados de gasolina y diésel, contrastándolas contra la capacidad de almacenamiento total de los tanques correspondientes. Emite una alerta visual en color rojo y animación de pulso en caso de sobreasignación (>100% de la capacidad).
 - **Límite Semanal de Entidad:** Panel integrado para ajustar el límite total de litros permitidos semanalmente por entidad civil/militar.
 - **Importación Masiva:** Procesamiento de flotas a través de plantillas Excel (`.xlsx`) con un resumen de filas procesadas en tiempo real. Se mapean correctamente las respuestas de éxito y actualización del backend (`total`, `exitosos` y `actualizados`) en los indicadores visuales `Leídos`, `Creados` y `Actualizados`. Incluye bitácora de errores en tiempo real (renderizados de forma segura extrayendo las propiedades `fila` y `error` para prevenir caídas de React al recibir objetos) y descarga de la plantilla oficial.
@@ -128,6 +128,13 @@ Para evitar inconsistencias a lo largo del programa, todas las pantallas del mó
 ### 5.2 Acceso al Menú del Parque Automotor y Tanques
 - **Barra de Navegación (Sidebar):** Los roles de Comandante y Administrador de Base tienen visible de forma fija el acceso al módulo "Parque Automotor" y "Tanques Combustible" desde la barra de navegación lateral para la administración, carga de flotas e inventario.
 
+### 5.3 Abastecimientos Excepcionales y Edición de Litraje (Auditoría de Administrador)
+- **Carga Excepcional:** Los roles de `ADMIN_BASE` y `COMANDANTE` pueden registrar abastecimientos excepcionales retroactivos. Estos registros se vinculan a la fecha del cierre diario seleccionado desde la pestaña de Cierres Diarios en el módulo de Tanques.
+- **Bypass de Restricciones:** El registro excepcional elude las restricciones convencionales de cierre de día. Si el vehículo no se encuentra registrado en el censo, se creará automáticamente bajo la entidad `"Tránsito / Externo"`. Las fotos de evidencia del odómetro y del surtidor son opcionales.
+- **Edición de Registros:** Los administradores pueden editar la cantidad abastecida (litros), kilometraje y conductor de un abastecimiento existente desde el modal de Detalles Suministro en la pestaña de Abastecimientos.
+- **Modificación de Entidades en Caliente:** Los administradores pueden alterar la entidad asignada a cualquier vehículo del Parque Automotor desde su modal de edición individual para corregir censos defectuosos. Esto afecta solo a los consumos y cuotas futuras del vehículo; los suministros pasados conservan su entidad de despacho original para no alterar reportes históricos.
+- **Consistencia de Inventario:** Cualquier inserción excepcional o modificación de litraje reajusta de forma inmediata el nivel del tanque de combustible correspondiente en caliente (restando en inserciones y calculando la diferencia neta en ediciones).
+
 ---
 
 ## 6. CONFIGURACIÓN TÉCNICA Y ZONA HORARIA
@@ -167,5 +174,5 @@ Las fotos del surtidor y del odómetro se almacenan como **Base64 en la columna 
 
 ---
 
-*Última actualización: 2026-06-03 (Mapeo de errores, rejilla adaptativa en ParqueAutomotor, autocompletado de placas con debounce, autoselección de tanque por combustible, integración OCR de IA para odómetro/surtidor, lógica inteligente de rendimiento/robos, y botón Volver para restablecer el buscador sin refrescar la página)*
+*Última actualización: 2026-06-10 (Registro de abastecimientos excepcionales retroactivos vinculados a cierres y edición de litrajes con reajuste automático de stock por Administrador de Base y Comandante)*
 *Aprobado por: Comandante de Base & Antigravity Aegis Command*
