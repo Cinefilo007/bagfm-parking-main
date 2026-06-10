@@ -48,6 +48,10 @@ export default function GestionTanques() {
     conductor: ''
   });
   const [guardandoExcepcional, setGuardandoExcepcional] = useState(false);
+  const [fotoOdometroExcep, setFotoOdometroExcep] = useState(null);
+  const [fotoSurtidorExcep, setFotoSurtidorExcep] = useState(null);
+  const [previewOdoExcep, setPreviewOdoExcep] = useState('');
+  const [previewSurtidorExcep, setPreviewSurtidorExcep] = useState('');
 
   // Estados de Edición de Registro
   const [editandoRegistro, setEditandoRegistro] = useState(false);
@@ -264,6 +268,22 @@ export default function GestionTanques() {
     }
   };
 
+  const fileToBase64 = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+  });
+
+  const cerrarModalExcepcional = () => {
+    setModalExcepcional(null);
+    setFormExcepcional({ placa: '', kilometraje_actual: '', cantidad_abastecida: '', conductor: '' });
+    setFotoOdometroExcep(null);
+    setFotoSurtidorExcep(null);
+    setPreviewOdoExcep('');
+    setPreviewSurtidorExcep('');
+  };
+
   const handleCrearExcepcional = async (e) => {
     e.preventDefault();
     if (!formExcepcional.placa.trim() || !formExcepcional.cantidad_abastecida || !formExcepcional.kilometraje_actual || !formExcepcional.conductor.trim()) {
@@ -272,17 +292,28 @@ export default function GestionTanques() {
     }
     setGuardandoExcepcional(true);
     try {
+      let fotoKBase64 = null;
+      let fotoMBase64 = null;
+
+      if (fotoOdometroExcep) {
+        fotoKBase64 = await fileToBase64(fotoOdometroExcep);
+      }
+      if (fotoSurtidorExcep) {
+        fotoMBase64 = await fileToBase64(fotoSurtidorExcep);
+      }
+
       await combustibleService.registrarAbastecimientoExcepcional({
         placa: formExcepcional.placa.trim().toUpperCase(),
         tanque_id: modalExcepcional.tanque_id,
         kilometraje_actual: parseInt(formExcepcional.kilometraje_actual),
         cantidad_abastecida: parseFloat(formExcepcional.cantidad_abastecida),
         conductor: formExcepcional.conductor.trim().toUpperCase(),
-        fecha_registro: modalExcepcional.fecha // Vincular a la fecha del cierre
+        fecha_registro: modalExcepcional.fecha, // Vincular a la fecha del cierre
+        foto_kilometraje_url: fotoKBase64,
+        foto_maquina_url: fotoMBase64
       });
       toast.success("Suministro excepcional registrado con éxito.");
-      setModalExcepcional(null);
-      setFormExcepcional({ placa: '', kilometraje_actual: '', cantidad_abastecida: '', conductor: '' });
+      cerrarModalExcepcional();
       cargarTanques();
       if (tabActivo === 'general') cargarHistorial();
       else cargarCierres();
@@ -1041,7 +1072,7 @@ export default function GestionTanques() {
                   <p className="text-[9px] text-text-muted uppercase tracking-wider">Tanque: {modalExcepcional.tanque_nombre}</p>
                 </div>
               </div>
-              <button onClick={() => setModalExcepcional(null)} className="text-text-muted hover:text-text-main cursor-pointer">
+              <button onClick={cerrarModalExcepcional} className="text-text-muted hover:text-text-main cursor-pointer">
                 <XCircle size={20} />
               </button>
             </div>
@@ -1098,6 +1129,83 @@ export default function GestionTanques() {
                 />
               </div>
 
+              {/* Fotos de Evidencia (Opcionales) */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase text-text-muted tracking-widest flex items-center gap-1">
+                    <Camera size={10} /> Foto Odómetro
+                  </label>
+                  <div className="relative border border-dashed border-bg-high/30 rounded-xl bg-white/5 p-2 flex flex-col items-center justify-center text-center aspect-video overflow-hidden">
+                    {previewOdoExcep ? (
+                      <div className="relative w-full h-full">
+                        <img src={previewOdoExcep} alt="Vista previa odómetro" className="w-full h-full object-cover rounded-lg" />
+                        <button
+                          type="button"
+                          onClick={() => { setFotoOdometroExcep(null); setPreviewOdoExcep(''); }}
+                          className="absolute top-1 right-1 bg-black/70 text-white p-1 rounded-full hover:bg-black/90 cursor-pointer flex items-center justify-center w-4 h-4"
+                        >
+                          <X size={8} />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <Camera size={16} className="text-text-muted mb-1" />
+                        <span className="text-[8px] font-bold text-text-muted uppercase">Subir Foto</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                              setFotoOdometroExcep(file);
+                              setPreviewOdoExcep(URL.createObjectURL(file));
+                            }
+                          }}
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                        />
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase text-text-muted tracking-widest flex items-center gap-1">
+                    <Camera size={10} /> Foto Surtidor
+                  </label>
+                  <div className="relative border border-dashed border-bg-high/30 rounded-xl bg-white/5 p-2 flex flex-col items-center justify-center text-center aspect-video overflow-hidden">
+                    {previewSurtidorExcep ? (
+                      <div className="relative w-full h-full">
+                        <img src={previewSurtidorExcep} alt="Vista previa surtidor" className="w-full h-full object-cover rounded-lg" />
+                        <button
+                          type="button"
+                          onClick={() => { setFotoSurtidorExcep(null); setPreviewSurtidorExcep(''); }}
+                          className="absolute top-1 right-1 bg-black/70 text-white p-1 rounded-full hover:bg-black/90 cursor-pointer flex items-center justify-center w-4 h-4"
+                        >
+                          <X size={8} />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <Camera size={16} className="text-text-muted mb-1" />
+                        <span className="text-[8px] font-bold text-text-muted uppercase">Subir Foto</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                              setFotoSurtidorExcep(file);
+                              setPreviewSurtidorExcep(URL.createObjectURL(file));
+                            }
+                          }}
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                        />
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3 flex items-start gap-2 text-emerald-400">
                 <CheckCircle size={14} className="shrink-0 mt-0.5" />
                 <p className="text-[9px] leading-relaxed">
@@ -1108,7 +1216,7 @@ export default function GestionTanques() {
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setModalExcepcional(null)}
+                  onClick={cerrarModalExcepcional}
                   className="flex-1 h-11 rounded-xl bg-white/5 border border-bg-high/30 text-text-muted font-black text-[10px] uppercase tracking-widest hover:bg-white/10 transition-all cursor-pointer"
                 >
                   Cancelar
