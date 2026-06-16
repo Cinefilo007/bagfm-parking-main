@@ -60,12 +60,13 @@ export const alcabalaService = {
    * Envía una imagen para extracción de datos vía IA.
    * @param {string} imageBase64 Imagen en base64.
    * @param {string} tipo 'cedula' o 'vehiculo'.
+   * @param {object} config Configuración opcional de axios (ej. signal).
    */
-  async extraerDatosIA(imageBase64, tipo) {
+  async extraerDatosIA(imageBase64, tipo, config = {}) {
     const { data } = await api.post('/ia/extraer-datos', {
       image_base64: imageBase64,
       tipo: tipo
-    });
+    }, config);
     return data;
   },
 

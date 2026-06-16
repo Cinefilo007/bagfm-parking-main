@@ -73,6 +73,8 @@ export default function DashboardBombero() {
   // Refs para inputs de cámara forzada
   const fileOdoRef = useRef(null);
   const fileMaquinaRef = useRef(null);
+  const abortControllerOdoRef = useRef(null);
+  const abortControllerSurtidorRef = useRef(null);
 
   useEffect(() => {
     cargarDatosTanques();
@@ -285,18 +287,21 @@ export default function DashboardBombero() {
       // Intentar OCR con IA en paralelo
       setIaLoadOdo(true);
       try {
+        if (abortControllerOdoRef.current) abortControllerOdoRef.current.abort();
+        abortControllerOdoRef.current = new AbortController();
         const reader = new FileReader();
         reader.onloadend = async () => {
           const base64 = reader.result.split(',')[1];
           try {
-            const { data } = await alcabalaService.extraerDatosIA(base64, 'odometro');
+            const { data } = await alcabalaService.extraerDatosIA(base64, 'odometro', { signal: abortControllerOdoRef.current.signal });
             if (data && data.kilometraje) {
               setKilometraje(data.kilometraje);
               toast.success(`Kilometraje detectado por IA: ${data.kilometraje} km`);
             } else {
               toast.error("No se pudo detectar el kilometraje por IA. Escríbalo manual.");
             }
-          } catch {
+          } catch (err) {
+            if (err.name === 'CanceledError' || (err.message && err.message.toLowerCase().includes('cancel'))) return;
             toast.error("Fallo el OCR. Ingrese el kilometraje manualmente.");
           } finally {
             setIaLoadOdo(false);
@@ -316,18 +321,21 @@ export default function DashboardBombero() {
       // Intentar OCR de los litros del surtidor con IA
       setIaLoadSurtidor(true);
       try {
+        if (abortControllerSurtidorRef.current) abortControllerSurtidorRef.current.abort();
+        abortControllerSurtidorRef.current = new AbortController();
         const reader = new FileReader();
         reader.onloadend = async () => {
           const base64 = reader.result.split(',')[1];
           try {
-            const { data } = await alcabalaService.extraerDatosIA(base64, 'surtidor');
+            const { data } = await alcabalaService.extraerDatosIA(base64, 'surtidor', { signal: abortControllerSurtidorRef.current.signal });
             if (data && data.litros) {
               setLitrosCargar(data.litros);
               toast.success(`Litros detectados por IA: ${data.litros} L`);
             } else {
               toast.error("No se detectaron los litros por IA. Escríbalos manualmente.");
             }
-          } catch {
+          } catch (err) {
+            if (err.name === 'CanceledError' || (err.message && err.message.toLowerCase().includes('cancel'))) return;
             toast.error("Fallo el OCR del surtidor. Ingrese los litros manualmente.");
           } finally {
             setIaLoadSurtidor(false);
@@ -357,6 +365,10 @@ export default function DashboardBombero() {
     if (!fotoKilometraje || !fotoMaquina) { toast.error("Debe capturar la foto del odómetro y del surtidor"); return; }
 
       if (!conductor.trim()) { toast.error("Debe ingresar el nombre del conductor"); return; }
+
+      // Abortar peticiones de IA si están en curso
+      if (abortControllerOdoRef.current) abortControllerOdoRef.current.abort();
+      if (abortControllerSurtidorRef.current) abortControllerSurtidorRef.current.abort();
 
       setCargandoSuministro(true);
       try {
@@ -898,7 +910,7 @@ export default function DashboardBombero() {
                       </button>
                       <button
                         type="submit"
-                        disabled={cargandoSuministro || subiendoFotoK || subiendoFotoM || iaLoadOdo || iaLoadSurtidor || !fotoKilometraje || !fotoMaquina}
+                        disabled={cargandoSuministro || subiendoFotoK || subiendoFotoM || !fotoKilometraje || !fotoMaquina}
                         className="flex-1 h-12 rounded-xl bg-success text-bg-app font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-50"
                       >
                         {cargandoSuministro ? <RefreshCw size={15} className="animate-spin" /> : <Flame size={15} />}
