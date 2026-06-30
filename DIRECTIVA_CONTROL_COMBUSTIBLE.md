@@ -33,7 +33,7 @@ Para evitar inconsistencias a lo largo del programa, todas las pantallas del mó
 ### 2.4 Botones y Formularios
 - **Botón Primario (`.btn-primario`):** Degradado de `#4EDEA3` a `#10B981`, texto en negro (`#003824`), fuente `Inter` en negrita (`font-semibold`), estilo condensado y micro-animación de escala activa (`active:scale-95`).
 - **Inputs de Formulario (`.input-field`):** Fondo `--bg-low`, borde `--bg-high`. Al recibir foco, fondo `--bg-card` y borde inferior `--primary` con sombra táctica.
-- **Campos de Captura de Cámara (Odómetro y Dispensador):** Inputs de tipo `file` estructurados con los atributos obligatorios `accept="image/*" capture="environment"` para deshabilitar de forma dura la carga de fotos desde la galería y forzar la cámara trasera en dispositivos móviles.
+- **Campos de Captura de Evidencia Fotográfica (Odómetro y Dispensador):** Inputs de tipo `file` con el atributo `accept="image/*"`. El atributo `capture="environment"` ha sido **eliminado intencionalmente** para permitir que el operador elija entre usar la cámara en tiempo real o seleccionar una foto existente desde la galería del dispositivo. Esta flexibilidad aplica a ambos campos.
 
 ---
 
@@ -109,7 +109,7 @@ Para evitar inconsistencias a lo largo del programa, todas las pantallas del mó
 - **Pestañas del Monitor:** Tanques (niveles con barra de color), Flujo (feed de últimas 15 cargas), y Solicitudes (resumen de pendientes con botón de acción rápido).
 
 ### 4.6 Panel del Bombero (`DashboardBombero.jsx`)
-- **Registro de Abastecimiento:** Flujo móvil-first optimizado para el bombero de turno. Exige declaración diaria obligatoria de apertura de tanques, captura del conductor responsable y fotos obligatorias del odómetro y del dispensador/surtidor.
+- **Registro de Abastecimiento:** Flujo móvil-first optimizado para el bombero de turno. Exige declaración diaria obligatoria de apertura de tanques, captura del conductor responsable y foto obligatoria del dispensador/surtidor. La **foto del odómetro es opcional** — su ausencia no bloquea el guardado del formulario, pero su presencia activa el OCR de IA para autocompletar el kilometraje. Ambos campos de foto permiten seleccionar imagen desde la **galería del dispositivo** o capturar con la cámara directamente.
 - **Autoselección de Tanque por Combustible:** Al cargar la ficha del vehículo en la interfaz, el sistema evalúa dinámicamente su propiedad `tipo_combustible` (por ejemplo, `gasolina` o `diesel`) y pre-selecciona automáticamente el tanque surtidor correspondiente en el menú desplegable para evitar suministros erróneos (por ejemplo, cargar gasolina en un vehículo diesel).
 - **Lectura Inteligente con IA (OCR):** Integra el motor de IA Gemini 2.5 Flash a través del endpoint `/ia/extraer-datos`. Al capturar la foto del odómetro (tipo `odometro`) o del dispensador (tipo `surtidor`), la aplicación procesa la imagen de forma asíncrona, mostrando un indicador de estado "Leyendo con IA..." y rellenando automáticamente el campo numérico respectivo con los valores reconocidos (litros en formato decimal y kilometraje en formato entero).
 - **Tolerancia a Fallos y Edición Manual:** En caso de que la lectura de la IA falle, devuelva un valor nulo/erróneo o tarde en responder, el flujo no se interrumpe en ningún momento. El bombero siempre puede modificar o ingresar manualmente tanto los litros cargados como el kilometraje actual. Además, el análisis de IA es **no bloqueante** para el guardado del formulario; si el bombero ingresa los datos manualmente y presiona "Completar Suministro", el formulario se guardará de inmediato y cualquier petición a la IA en curso será abortada para ahorrar recursos del servidor y cuota de API.
@@ -174,5 +174,5 @@ Las fotos del surtidor y del odómetro se almacenan como **Base64 en la columna 
 
 ---
 
-*Última actualización: 2026-06-10 (Registro de abastecimientos excepcionales retroactivos vinculados a cierres y edición de litrajes con reajuste automático de stock por Administrador de Base y Comandante)*
+*Última actualización: 2026-06-30 (Flexibilización del formulario de abastecimiento del Bombero: foto del odómetro ahora es opcional y ambas fotos permiten selección desde galería del dispositivo — se elimina `capture="environment"` de los inputs de archivo)*
 *Aprobado por: Comandante de Base & Antigravity Aegis Command*

@@ -362,7 +362,7 @@ export default function DashboardBombero() {
     if (!tanqueSeleccionado) { toast.error("Seleccione un tanque de suministro"); return; }
     if (!kilometraje || isNaN(kilometraje) || parseInt(kilometraje) <= 0) { toast.error("Ingrese un kilometraje numérico válido"); return; }
     if (!litrosCargar || isNaN(litrosCargar) || parseFloat(litrosCargar) <= 0) { toast.error("Ingrese litros válidos"); return; }
-    if (!fotoKilometraje || !fotoMaquina) { toast.error("Debe capturar la foto del odómetro y del surtidor"); return; }
+    if (!fotoMaquina) { toast.error("Debe adjuntar la foto del dispensador/surtidor"); return; }
 
       if (!conductor.trim()) { toast.error("Debe ingresar el nombre del conductor"); return; }
 
@@ -372,7 +372,7 @@ export default function DashboardBombero() {
 
       setCargandoSuministro(true);
       try {
-        const odoB64 = await fileToBase64(fotoKilometraje);
+        const odoB64 = fotoKilometraje ? await fileToBase64(fotoKilometraje) : null;
         const maqB64 = await fileToBase64(fotoMaquina);
 
         const payload = {
@@ -819,11 +819,14 @@ export default function DashboardBombero() {
                       />
                     </div>
 
-                    {/* Fotos obligatorias de cámara */}
+                    {/* Fotos: Odómetro (opcional) y Dispensador (obligatoria) */}
                     <div className="grid grid-cols-2 gap-3">
-                      {/* Foto Odómetro */}
+                      {/* Foto Odómetro — OPCIONAL */}
                       <div className="space-y-1">
-                        <span className="text-[8px] font-black uppercase tracking-widest text-text-muted">Foto Odómetro</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[8px] font-black uppercase tracking-widest text-text-muted">Foto Odómetro</span>
+                          <span className="text-[7px] font-bold text-text-muted/50 uppercase tracking-wider">(opcional)</span>
+                        </div>
                         <button
                           type="button"
                           onClick={() => fileOdoRef.current.click()}
@@ -843,30 +846,32 @@ export default function DashboardBombero() {
                           ) : (
                             <>
                               <Camera size={20} className="text-text-muted" />
-                              <span className="text-[8px] font-black uppercase tracking-widest text-text-muted">Cámara</span>
+                              <span className="text-[8px] font-black uppercase tracking-widest text-text-muted">Cámara / Galería</span>
                             </>
                           )}
                         </button>
                         <input 
                           type="file" 
                           ref={fileOdoRef} 
-                          accept="image/*" 
-                          capture="environment" 
+                          accept="image/*"
                           onChange={(e) => handleFotoChange(e, 'kilometraje')}
                           className="hidden" 
                         />
                         {iaLoadOdo && <p className="text-[8px] text-success animate-pulse font-bold uppercase tracking-wider text-center mt-1">Leyendo con IA...</p>}
                       </div>
 
-                      {/* Foto Máquina */}
+                      {/* Foto Dispensador — OBLIGATORIA */}
                       <div className="space-y-1">
-                        <span className="text-[8px] font-black uppercase tracking-widest text-text-muted">Foto Dispensador</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[8px] font-black uppercase tracking-widest text-text-muted">Foto Dispensador</span>
+                          <span className="text-[7px] font-bold text-danger/60 uppercase tracking-wider">(*)</span>
+                        </div>
                         <button
                           type="button"
                           onClick={() => fileMaquinaRef.current.click()}
                           className={cn(
                             "w-full aspect-[1.5/1] rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1.5 transition-all relative overflow-hidden",
-                            fotoMaquinaUrl ? "border-success/40 bg-success/5" : "border-white/10 hover:border-white/20 bg-bg-low/10"
+                            fotoMaquinaUrl ? "border-success/40 bg-success/5" : "border-danger/20 hover:border-danger/30 bg-bg-low/10"
                           )}
                         >
                           {fotoMaquinaUrl ? (
@@ -878,16 +883,15 @@ export default function DashboardBombero() {
                             </>
                           ) : (
                             <>
-                              <Camera size={20} className="text-text-muted" />
-                              <span className="text-[8px] font-black uppercase tracking-widest text-text-muted">Cámara</span>
+                              <Camera size={20} className="text-danger/60" />
+                              <span className="text-[8px] font-black uppercase tracking-widest text-danger/60">Cámara / Galería</span>
                             </>
                           )}
                         </button>
                         <input 
                           type="file" 
                           ref={fileMaquinaRef} 
-                          accept="image/*" 
-                          capture="environment" 
+                          accept="image/*"
                           onChange={(e) => handleFotoChange(e, 'maquina')}
                           className="hidden" 
                         />
@@ -910,7 +914,7 @@ export default function DashboardBombero() {
                       </button>
                       <button
                         type="submit"
-                        disabled={cargandoSuministro || subiendoFotoK || subiendoFotoM || !fotoKilometraje || !fotoMaquina}
+                        disabled={cargandoSuministro || subiendoFotoK || subiendoFotoM || !fotoMaquina}
                         className="flex-1 h-12 rounded-xl bg-success text-bg-app font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-50"
                       >
                         {cargandoSuministro ? <RefreshCw size={15} className="animate-spin" /> : <Flame size={15} />}
