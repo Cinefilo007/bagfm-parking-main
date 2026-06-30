@@ -439,7 +439,7 @@ class AbastecimientoService:
             cantidad_abastecida=cantidad_abastecida,
             distancia_recorrida=distancia,
             rendimiento_tramo=rendimiento,
-            foto_kilometraje_url=datos["foto_kilometraje_url"],
+            foto_kilometraje_url=datos.get("foto_kilometraje_url") or "",
             foto_maquina_url=datos["foto_maquina_url"],
             datos_ia_ocr=datos.get("datos_ia_ocr"),
             tiene_alerta=tiene_alerta,

@@ -43,7 +43,7 @@ class AbastecimientoRequest(BaseModel):
     tanque_id: UUID
     kilometraje_actual: int
     cantidad_abastecida: float
-    foto_kilometraje_url: str
+    foto_kilometraje_url: Optional[str] = None
     foto_maquina_url: str
     datos_ia_ocr: Optional[Dict[str, Any]] = None
     solicitud_aprobacion_id: Optional[UUID] = None

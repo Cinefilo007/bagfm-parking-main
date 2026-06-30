@@ -174,5 +174,5 @@ Las fotos del surtidor y del odómetro se almacenan como **Base64 en la columna 
 
 ---
 
-*Última actualización: 2026-06-30 (Flexibilización del formulario de abastecimiento del Bombero: foto del odómetro ahora es opcional y ambas fotos permiten selección desde galería del dispositivo — se elimina `capture="environment"` de los inputs de archivo)*
+*Última actualización: 2026-06-30 (Fix crítico: `foto_kilometraje_url` ahora es `Optional[str] = None` en `AbastecimientoRequest` — el campo seguía siendo `str` obligatorio en el schema Pydantic aunque se cambió a opcional en UI, causando error 422 silencioso. El service usa fallback `or ""` para respetar el NOT NULL de la BD. El catch del frontend ahora extrae y muestra los errores Pydantic de validación en formato legible)*
 *Aprobado por: Comandante de Base & Antigravity Aegis Command*

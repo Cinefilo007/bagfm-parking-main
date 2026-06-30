@@ -400,7 +400,18 @@ export default function DashboardBombero() {
       cargarBandejaSolicitudes();
       cargarHistorialBombero();
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Error al registrar suministro");
+      console.error('[Suministro] Error completo:', err?.response?.data || err?.message || err);
+      const detail = err?.response?.data?.detail;
+      let mensajeError = 'Error al registrar suministro';
+      if (typeof detail === 'string') {
+        mensajeError = detail;
+      } else if (Array.isArray(detail) && detail.length > 0) {
+        // Error de validación Pydantic: array de { loc, msg, type }
+        mensajeError = detail.map(d => `${d.loc?.slice(-1)[0] || d.loc?.join('.')}: ${d.msg}`).join(' | ');
+      } else if (err?.message) {
+        mensajeError = err.message;
+      }
+      toast.error(mensajeError, { duration: 6000 });
     } finally {
       setCargandoSuministro(false);
     }
