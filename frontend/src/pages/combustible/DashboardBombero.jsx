@@ -381,7 +381,7 @@ export default function DashboardBombero() {
 
       setCargandoSuministro(true);
       try {
-        const odoB64 = fotoKilometraje ? await fileToBase64(fotoKilometraje) : null;
+        const odoB64 = fotoKilometraje ? await fileToBase64(fotoKilometraje) : "";
         const maqB64 = await fileToBase64(fotoMaquina);
 
         const payload = {
@@ -389,8 +389,8 @@ export default function DashboardBombero() {
           tanque_id: tanqueSeleccionado,
           kilometraje_actual: parseInt(kilometraje),
           cantidad_abastecida: parseFloat(litrosCargar),
-          foto_kilometraje_url: odoB64,
-          foto_maquina_url: maqB64,
+          foto_kilometraje_url: odoB64 || "",
+          foto_maquina_url: maqB64 || "",
           solicitud_aprobacion_id: solicitudVinculada ? solicitudVinculada.id : null,
           datos_ia_ocr: { kilometraje_ia: parseInt(kilometraje) },
           conductor: conductor.trim().toUpperCase()

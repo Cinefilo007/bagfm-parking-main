@@ -189,6 +189,6 @@ Para prevenir el crecimiento desmedido de la base de datos PostgreSQL en Supabas
 
 ---
 
-*Última actualización: 2026-07-21 (Optimización de Almacenamiento Supabase: Implementada compresión en cliente a 800px / JPEG 65% con imageCompressor.js y política de purga automática de fotos Base64 a los 7 días).*
+*Última actualización: 2026-07-21 (Fix Móvil & Optimización Supabase: Resuelto error de envío en dispositivos móviles garantizando compresión de fotos de cámara a 800px / JPEG 65% independientemente del tipo MIME/WebView, y enviando cadena vacía "" cuando la foto de odómetro es opcional para satisfacer restricciones NOT NULL de la base de datos).*
 *Aprobado por: Comandante de Base & Antigravity Aegis Command*
 
