@@ -856,4 +856,27 @@ class AbastecimientoService:
         await db.flush()
         return abastecimiento
 
+    async def purgar_fotos_antiguas(self, db: AsyncSession, dias_retencion: int = 7) -> int:
+        """
+        Purga la evidencia fotográfica en Base64 de los abastecimientos con antigüedad mayor a 'dias_retencion'.
+        Mantiene todos los datos de auditoría e historial intactos (litros, odómetro, fecha, conductor).
+        """
+        limite_fecha = datetime.now(ZoneInfo("America/Caracas")) - timedelta(days=dias_retencion)
+        
+        query = select(Abastecimiento).where(
+            Abastecimiento.fecha < limite_fecha,
+            ((Abastecimiento.foto_maquina_url != "") | (Abastecimiento.foto_kilometraje_url != ""))
+        )
+        res = await db.execute(query)
+        registros = res.scalars().all()
+        
+        conteo = 0
+        for ab in registros:
+            ab.foto_maquina_url = ""
+            ab.foto_kilometraje_url = ""
+            conteo += 1
+            
+        await db.flush()
+        return conteo
+
 abastecimiento_service = AbastecimientoService()

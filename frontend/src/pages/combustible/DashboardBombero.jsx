@@ -9,6 +9,8 @@ import { toast } from 'react-hot-toast';
 import { combustibleService } from '../../services/combustible.service';
 import { alcabalaService } from '../../services/alcabala.service';
 
+import { compressImage } from '../../utils/imageCompressor';
+
 export default function DashboardBombero() {
   const [tanques, setTanques] = useState([]);
   const [tieneLecturaSemana, setTieneLecturaSemana] = useState(true);
@@ -273,10 +275,17 @@ export default function DashboardBombero() {
     }
   };
 
-  // Capturar foto desde cámara nativa
+  // Capturar foto desde cámara nativa (comprimiendo en cliente a 800px / JPEG 65%)
   const handleFotoChange = async (e, tipo) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const rawFile = e.target.files[0];
+    if (!rawFile) return;
+
+    let file = rawFile;
+    try {
+      file = await compressImage(rawFile, { maxWidth: 800, maxHeight: 800, quality: 0.65 });
+    } catch (errCompress) {
+      console.warn("[Compresión] Error al comprimir imagen, usando original:", errCompress);
+    }
 
     if (tipo === 'kilometraje') {
       setSubiendoFotoK(true);

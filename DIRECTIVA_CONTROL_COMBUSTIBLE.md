@@ -174,5 +174,21 @@ Las fotos del surtidor y del odómetro se almacenan como **Base64 en la columna 
 
 ---
 
-*Última actualización: 2026-06-30 (Fix crítico: `foto_kilometraje_url` ahora es `Optional[str] = None` en `AbastecimientoRequest` — el campo seguía siendo `str` obligatorio en el schema Pydantic aunque se cambió a opcional en UI, causando error 422 silencioso. El service usa fallback `or ""` para respetar el NOT NULL de la BD. El catch del frontend ahora extrae y muestra los errores Pydantic de validación en formato legible)*
+## 8. POLÍTICA DE OPTIMIZACIÓN Y RETENCIÓN DE EVIDENCIA FOTOGRÁFICA
+
+### 8.1 Compresión de Imágenes en Cliente (Frontend)
+Para prevenir el crecimiento desmedido de la base de datos PostgreSQL en Supabase, las fotos capturadas desde la interfaz del bombero (odómetro y surtidor) deben comprimirse en el cliente antes de su conversión a Base64:
+- **Redimensionamiento:** Máximo de 800px de ancho/alto conservando la relación de aspecto.
+- **Formato y Calidad:** Formato `image/jpeg` al 65% de calidad.
+- **Impacto:** Reduce el peso de cada foto de ~5 MB a ~35 KB (reducción superior al 98%) garantizando legibilidad total para el OCR de IA y la auditoría visual.
+
+### 8.2 Purga Programada de Evidencia Fotográfica (Retención 7 Días)
+- **Conservación de Datos Numéricos:** Todos los registros de la bitácora de abastecimiento (litros, odómetro, vehículo, conductor, fecha, alertas) permanecen en la base de datos de manera **permanente**.
+- **Purga de Fotos Base64:** Pasados **7 días** de la fecha del suministro, los campos `foto_maquina_url` y `foto_kilometraje_url` son reemplazados por una cadena vacía `""` mediante el servicio de purga.
+- **Endpoint de Mantenimiento:** `POST /api/v1/combustible/mantenimiento/purgar-fotos?dias_retencion=7` (Restringido a roles `ADMIN_BASE`, `COMANDANTE` y `SUPERVISOR_BOMBEROS`).
+
+---
+
+*Última actualización: 2026-07-21 (Optimización de Almacenamiento Supabase: Implementada compresión en cliente a 800px / JPEG 65% con imageCompressor.js y política de purga automática de fotos Base64 a los 7 días).*
 *Aprobado por: Comandante de Base & Antigravity Aegis Command*
+

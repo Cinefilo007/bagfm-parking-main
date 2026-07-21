@@ -1774,3 +1774,29 @@ async def obtener_datos_reporte_cierre_con_fotos(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al generar reporte con fotos: {str(e)}")
+
+@router.post("/mantenimiento/purgar-fotos")
+async def purgar_fotos_mantenimiento(
+    dias_retencion: int = Query(default=7, ge=1, le=90),
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = Depends(obtener_usuario_actual)
+):
+    """
+    Ejecuta la purga de evidencias fotográficas en Base64 con antigüedad mayor a 'dias_retencion'.
+    Solo accesible para roles de Administración (ADMIN_BASE, COMANDANTE, SUPERVISOR_BOMBEROS).
+    """
+    if usuario.rol not in [RolTipo.ADMIN_BASE, RolTipo.COMANDANTE, RolTipo.SUPERVISOR_BOMBEROS]:
+        raise HTTPException(status_code=403, detail="Permisos insuficientes. Rol de administración requerido.")
+        
+    try:
+        conteo = await abastecimiento_service.purgar_fotos_antiguas(db, dias_retencion=dias_retencion)
+        await db.commit()
+        return {
+            "status": "success",
+            "message": f"Se han purgado las fotos de {conteo} abastecimientos anteriores a {dias_retencion} días.",
+            "registros_purgados": conteo
+        }
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al purgar fotos: {str(e)}")
+
