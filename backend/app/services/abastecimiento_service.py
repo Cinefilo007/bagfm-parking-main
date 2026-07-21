@@ -7,7 +7,7 @@ import logging
 from datetime import datetime, timedelta, time
 from zoneinfo import ZoneInfo
 from typing import List, Optional, Dict, Any
-from sqlalchemy import select, func, and_, update
+from sqlalchemy import select, func, and_, update, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.vehiculo import Vehiculo
@@ -859,9 +859,14 @@ class AbastecimientoService:
     async def purgar_fotos_antiguas(self, db: AsyncSession, dias_retencion: int = 7) -> int:
         """
         Purga la evidencia fotográfica en Base64 de los abastecimientos con antigüedad mayor a 'dias_retencion'.
-        Se ejecuta en lotes (batch de 50) para evitar timeouts en PostgreSQL ante tablas grandes.
+        Se ejecuta en lotes de 20 registros y desactiva el timeout de sentencia para evitar bloqueos.
         Mantiene todos los datos de auditoría e historial intactos (litros, odómetro, fecha, conductor).
         """
+        try:
+            await db.execute(text("SET statement_timeout = 0"))
+        except Exception as e_tout:
+            logging.warning(f"No se pudo desactivar statement_timeout: {e_tout}")
+
         limite_fecha = datetime.now(ZoneInfo("America/Caracas")) - timedelta(days=dias_retencion)
         total_purgados = 0
 
@@ -869,7 +874,7 @@ class AbastecimientoService:
             query_ids = select(Abastecimiento.id).where(
                 Abastecimiento.fecha < limite_fecha,
                 ((Abastecimiento.foto_maquina_url != "") | (Abastecimiento.foto_kilometraje_url != ""))
-            ).limit(50)
+            ).limit(20)
 
             res_ids = await db.execute(query_ids)
             ids_batch = res_ids.scalars().all()
@@ -886,6 +891,7 @@ class AbastecimientoService:
             await db.commit()
 
             total_purgados += len(ids_batch)
+            print(f"[Purga BD] Purgados {total_purgados} abastecimientos antiguos...")
 
         return total_purgados
 
