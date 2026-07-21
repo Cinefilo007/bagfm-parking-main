@@ -7,7 +7,7 @@ import logging
 from datetime import datetime, timedelta, time
 from zoneinfo import ZoneInfo
 from typing import List, Optional, Dict, Any
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.vehiculo import Vehiculo
@@ -859,24 +859,34 @@ class AbastecimientoService:
     async def purgar_fotos_antiguas(self, db: AsyncSession, dias_retencion: int = 7) -> int:
         """
         Purga la evidencia fotográfica en Base64 de los abastecimientos con antigüedad mayor a 'dias_retencion'.
+        Se ejecuta en lotes (batch de 50) para evitar timeouts en PostgreSQL ante tablas grandes.
         Mantiene todos los datos de auditoría e historial intactos (litros, odómetro, fecha, conductor).
         """
         limite_fecha = datetime.now(ZoneInfo("America/Caracas")) - timedelta(days=dias_retencion)
-        
-        query = select(Abastecimiento).where(
-            Abastecimiento.fecha < limite_fecha,
-            ((Abastecimiento.foto_maquina_url != "") | (Abastecimiento.foto_kilometraje_url != ""))
-        )
-        res = await db.execute(query)
-        registros = res.scalars().all()
-        
-        conteo = 0
-        for ab in registros:
-            ab.foto_maquina_url = ""
-            ab.foto_kilometraje_url = ""
-            conteo += 1
-            
-        await db.flush()
-        return conteo
+        total_purgados = 0
+
+        while True:
+            query_ids = select(Abastecimiento.id).where(
+                Abastecimiento.fecha < limite_fecha,
+                ((Abastecimiento.foto_maquina_url != "") | (Abastecimiento.foto_kilometraje_url != ""))
+            ).limit(50)
+
+            res_ids = await db.execute(query_ids)
+            ids_batch = res_ids.scalars().all()
+
+            if not ids_batch:
+                break
+
+            stmt_update = (
+                update(Abastecimiento)
+                .where(Abastecimiento.id.in_(ids_batch))
+                .values(foto_maquina_url="", foto_kilometraje_url="")
+            )
+            await db.execute(stmt_update)
+            await db.commit()
+
+            total_purgados += len(ids_batch)
+
+        return total_purgados
 
 abastecimiento_service = AbastecimientoService()
