@@ -116,6 +116,15 @@ Para evitar inconsistencias a lo largo del programa, todas las pantallas del mó
 - **Navegación Fluida del Buscador (Acceso Denegado):** Se incluye un botón de "Volver" táctil (con área interactiva de 48px de altura) en la interfaz de "Acceso Denegado a Combustible". Esto le permite al bombero cancelar el flujo y regresar al buscador de placas en un solo toque, eliminando la necesidad de recargar la página del navegador ante vehículos bloqueados o no autorizados.
 - **Sugerencias y Autocompletado de Placas:** Implementación de autocompletado en tiempo real a partir de 2 caracteres con un retardo (debounce) de 300ms para evitar sobrecarga. Muestra un listado flotante táctil (mínimo de 48px de altura por sugerencia) de hasta 5 coincidencias. Seleccionar una sugerencia rellena la placa y ejecuta la consulta del vehículo automáticamente.
 
+### 4.7 Preregistro de Despachos Simultáneos (Cola de Surtidor)
+El surtidor de la base admite dos vehículos en simultáneo, por lo que el flujo de un vehículo a la vez obligaba a que el segundo conductor esperara a que se cerrara el registro del primero. Para eliminar ese cuello de botella el panel del bombero incorpora una **cola de preregistros**:
+
+- **Preregistro:** Con la ficha del vehículo cargada, el botón "Preregistrar y Atender Otro" guarda lo que el bombero tiene a la mano al iniciar la carga (conductor responsable, kilometraje, tanque surtidor, litros estimados y la solicitud de bypass si aplica) y devuelve la pantalla al buscador de placas para atender al siguiente vehículo. **No se descuenta inventario ni se crea registro de abastecimiento en este paso.**
+- **Validación temprana:** El preregistro exige conductor, kilometraje válido y tanque seleccionado, y aplica en el cliente la misma regla de odómetro creciente que el backend (salvo que exista un bypass aprobado vinculado), de modo que el error se detecta al inicio de la carga y no al final. No se admiten dos preregistros activos para la misma placa.
+- **Cierre del suministro:** Al terminar de cargar, el bombero retoma el preregistro desde el listado "Surtiendo Ahora" que aparece en la pestaña Surtir. El sistema **revalida contra el backend la autorización y el cupo de entidad del vehículo** (que pudieron cambiar mientras cargaba) y reabre el formulario con los datos preservados para tomar la foto del dispensador, ajustar los litros reales (con OCR de IA) y ejecutar el guardado definitivo. Es en ese momento —y sólo en ese— cuando se descuenta el inventario del tanque por el flujo normal de `/combustible/abastecer`.
+- **Persistencia local:** La cola vive únicamente en el dispositivo del bombero (`localStorage`, con clave segregada por usuario). Sobrevive recargas y cierres accidentales del navegador, pero **no es un registro de auditoría**: es una libreta de trabajo transitoria. Un preregistro descartado o perdido no deja rastro en la base de datos porque nunca representó combustible despachado.
+- **Compatibilidad:** El flujo directo de un solo vehículo ("Completar Suministro") se conserva intacto para cuando no hay concurrencia.
+
 ---
 
 ## 5. ROLES Y PRIVILEGIOS DE ADMINISTRACIÓN DE PERSONAL DE COMBUSTIBLE
@@ -128,7 +137,13 @@ Para evitar inconsistencias a lo largo del programa, todas las pantallas del mó
 ### 5.2 Acceso al Menú del Parque Automotor y Tanques
 - **Barra de Navegación (Sidebar):** Los roles de Comandante y Administrador de Base tienen visible de forma fija el acceso al módulo "Parque Automotor" y "Tanques Combustible" desde la barra de navegación lateral para la administración, carga de flotas e inventario.
 
-### 5.3 Abastecimientos Excepcionales y Edición de Litraje (Auditoría de Administrador)
+### 5.3 Despacho Directo de Combustible por el Supervisor de Bomberos
+- **Motivo:** El `SUPERVISOR_BOMBEROS` debe poder operar el surtidor por sí mismo cuando se encuentra solo en la bomba, sin depender de la presencia de un `BOMBERO` de turno.
+- **Acceso en el Menú:** El rol dispone de la entrada "Despacho de Combustible" en la barra lateral y en el menú móvil extendido, y del acceso directo "Surtir" en la barra inferior móvil, todos apuntando a `/combustible/dashboard` (`DashboardBombero.jsx`). Esto convive con su "Centro de Control" (`DashboardSupervisorBomberos.jsx`), que conserva su función de supervisión, cierres y reportes.
+- **Alcance en Backend:** El supervisor opera el panel del bombero con las mismas reglas de negocio y validaciones (apertura del día, odómetro creciente, cupo de entidad, foto obligatoria del dispensador). Los endpoints `/combustible/solicitudes/bombero` y `/combustible/abastecimientos/historial-bombero`, antes exclusivos de `BOMBERO`, aceptan también `SUPERVISOR_BOMBEROS` y filtran por el usuario autenticado, de modo que cada operador ve únicamente su propia bandeja e historial.
+- **Trazabilidad:** Los abastecimientos que registre quedan asentados con su identidad en `Abastecimiento.bombero_id`, por lo que los reportes de cierre y auditoría distinguen sin ambigüedad quién despachó cada carga.
+
+### 5.4 Abastecimientos Excepcionales y Edición de Litraje (Auditoría de Administrador)
 - **Carga Excepcional:** Los roles de `ADMIN_BASE` y `COMANDANTE` pueden registrar abastecimientos excepcionales retroactivos. Estos registros se vinculan a la fecha del cierre diario seleccionado desde la pestaña de Cierres Diarios en el módulo de Tanques.
 - **Bypass de Restricciones:** El registro excepcional elude las restricciones convencionales de cierre de día. Si el vehículo no se encuentra registrado en el censo, se creará automáticamente bajo la entidad `"Tránsito / Externo"`. La interfaz del modal excepcional provee selectores de archivos opcionales para capturar fotos de evidencia del odómetro y del surtidor (si no se suministran, el sistema completa el registro con marcadores vacíos sin bloquear la operación).
 - **Edición de Registros:** Los administradores pueden editar la cantidad abastecida (litros), kilometraje y conductor de un abastecimiento existente desde el modal de Detalles Suministro en la pestaña de Abastecimientos.

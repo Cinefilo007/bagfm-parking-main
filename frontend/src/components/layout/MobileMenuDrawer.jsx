@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { 
   X, CalendarRange, AlertTriangle, UserCog, Palette, 
   ShieldAlert, Bell, Settings, LogOut, ShieldCheck,
-  User, ChevronRight, Flame, Sunrise, Car as CarIcon
+  User, ChevronRight, Flame, Sunrise, Car as CarIcon, Fuel
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/auth.store';
@@ -59,6 +59,7 @@ export const MobileMenuDrawer = ({ isOpen, onClose }) => {
     );
   } else if (user?.rol === 'SUPERVISOR_BOMBEROS') {
     extendedNavItems.push(
+      { to: '/combustible/dashboard', label: 'Despacho Combustible', icon: Fuel, color: 'text-success' },
       { to: '/combustible/aprobaciones', label: 'Buzón Aprob.', icon: Bell, color: 'text-red-400' },
       { to: '/parque-automotor', label: 'Parque Automotor', icon: CarIcon, color: 'text-emerald-400' },
       { to: '/combustible/tanques', label: 'Tanques Combustible', icon: Sunrise, color: 'text-amber-400' },

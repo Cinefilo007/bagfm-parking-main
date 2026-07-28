@@ -5,7 +5,7 @@ import {
   LayoutDashboard, UserCircle, Map as MapIcon,
   Camera, Sun, Moon, UserCog, ParkingCircle, Activity, Radio, AlertTriangle, Palette,
   ClipboardList, CalendarRange, Building2, Users, ParkingSquare, ShieldAlert,
-  QrCode, ArrowRightLeft, Car as CarIcon, Flame, Sunrise
+  QrCode, ArrowRightLeft, Car as CarIcon, Flame, Sunrise, Fuel
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/auth.store';
@@ -71,6 +71,7 @@ export const Sidebar = () => {
   } else if (user?.rol === 'SUPERVISOR_BOMBEROS') {
     navItems.push(
       { to: '/combustible-supervisor/dashboard', label: 'Centro de Control', icon: Flame },
+      { to: '/combustible/dashboard', label: 'Despacho de Combustible', icon: Fuel },
       { to: '/combustible/aprobaciones', label: 'Buzón Aprobaciones', icon: Bell },
       { to: '/parque-automotor', label: 'Parque Automotor', icon: CarIcon },
       { to: '/combustible/tanques', label: 'Tanques Combustible', icon: Sunrise },

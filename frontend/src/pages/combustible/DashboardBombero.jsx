@@ -1,17 +1,34 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Car, Compass, RefreshCw, AlertTriangle, CheckCircle2, 
+import {
+  Car, Compass, RefreshCw, AlertTriangle, CheckCircle2,
   Send, Camera, Eye, PlusCircle, Power, User, ShieldAlert,
-  Flame, HardDrive, BarChart3, Clock, XCircle, ClipboardList
+  Flame, HardDrive, BarChart3, Clock, XCircle, ClipboardList, Layers
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { toast } from 'react-hot-toast';
 import { combustibleService } from '../../services/combustible.service';
 import { alcabalaService } from '../../services/alcabala.service';
+import { useAuthStore } from '../../store/auth.store';
 
 import { compressImage } from '../../utils/imageCompressor';
 
+// Los preregistros viven sólo en el dispositivo del bombero: son una cola de trabajo
+// temporal (aún no descuentan inventario) hasta que se adjunta la foto del surtidor.
+const clavePreregistros = (usuarioId) => `bagfm_preregistros_combustible_v1_${usuarioId || 'anon'}`;
+
+const leerPreregistrosGuardados = (usuarioId) => {
+  try {
+    const crudo = localStorage.getItem(clavePreregistros(usuarioId));
+    const parseado = crudo ? JSON.parse(crudo) : [];
+    return Array.isArray(parseado) ? parseado : [];
+  } catch (err) {
+    console.warn("[Preregistro] No se pudo leer la cola guardada:", err);
+    return [];
+  }
+};
+
 export default function DashboardBombero() {
+  const usuarioId = useAuthStore.getState().user?.sub;
   const [tanques, setTanques] = useState([]);
   const [tieneLecturaSemana, setTieneLecturaSemana] = useState(true);
   const [cargandoTanques, setCargandoTanques] = useState(true);
@@ -52,6 +69,10 @@ export default function DashboardBombero() {
   // Solicitud vinculada para bypass temporal
   const [solicitudVinculada, setSolicitudVinculada] = useState(null);
 
+  // Cola de preregistros (vehículos surtiendo en paralelo, pendientes de foto del surtidor)
+  const [preregistros, setPreregistros] = useState(() => leerPreregistrosGuardados(usuarioId));
+  const [preregistroActivoId, setPreregistroActivoId] = useState(null);
+
   // Estados de Bandeja de Solicitudes
   const [solicitudesEspera, setSolicitudesEspera] = useState([]);
   const [solicitudesAprobadas, setSolicitudesAprobadas] = useState([]);
@@ -88,6 +109,110 @@ export default function DashboardBombero() {
       }
     };
   }, []);
+
+  // Persistir la cola para que sobreviva recargas de la página o cierres accidentales
+  useEffect(() => {
+    try {
+      localStorage.setItem(clavePreregistros(usuarioId), JSON.stringify(preregistros));
+    } catch (err) {
+      console.warn("[Preregistro] No se pudo persistir la cola:", err);
+    }
+  }, [preregistros, usuarioId]);
+
+  // Deja el formulario de suministro en blanco sin tocar la cola de preregistros
+  const limpiarFormularioSuministro = () => {
+    setVehiculoEncontrado(null);
+    setPlacaBusqueda('');
+    setPlacaNoEncontrada(false);
+    setSolicitudVinculada(null);
+    setPreregistroActivoId(null);
+    setConductor('');
+    setKilometraje('');
+    setLitrosCargar('');
+    setFotoKilometraje(null);
+    setFotoKilometrajeUrl('');
+    setFotoMaquina(null);
+    setFotoMaquinaUrl('');
+  };
+
+  // Guarda lo que se tiene a la mano (conductor y odómetro) y libera la pantalla
+  // para atender al segundo vehículo del surtidor.
+  const handlePreregistrar = () => {
+    if (!vehiculoEncontrado) return;
+    if (!conductor.trim()) { toast.error("Debe ingresar el nombre del conductor"); return; }
+    if (!kilometraje || isNaN(kilometraje) || parseInt(kilometraje) <= 0) { toast.error("Ingrese un kilometraje numérico válido"); return; }
+    if (!tanqueSeleccionado) { toast.error("Seleccione un tanque de suministro"); return; }
+
+    const kmActual = parseInt(kilometraje);
+    const kmAnterior = vehiculoEncontrado.ultimo_kilometraje || 0;
+    if (!solicitudVinculada && kmAnterior > 0 && kmActual <= kmAnterior) {
+      toast.error(`Kilometraje inválido. Debe ser mayor al anterior (${kmAnterior} km).`);
+      return;
+    }
+
+    const yaEnCola = preregistros.some(p => p.placa === vehiculoEncontrado.placa && p.id !== preregistroActivoId);
+    if (yaEnCola) {
+      toast.error(`La placa ${vehiculoEncontrado.placa} ya tiene un preregistro en curso.`);
+      return;
+    }
+
+    const registro = {
+      id: preregistroActivoId || (crypto.randomUUID ? crypto.randomUUID() : `pre_${Date.now()}`),
+      placa: vehiculoEncontrado.placa,
+      vehiculo: vehiculoEncontrado,
+      conductor: conductor.trim().toUpperCase(),
+      kilometraje: kmActual,
+      litros: litrosCargar !== '' && !isNaN(litrosCargar) ? parseFloat(litrosCargar) : null,
+      tanque_id: tanqueSeleccionado,
+      solicitud: solicitudVinculada,
+      creado_en: new Date().toISOString()
+    };
+
+    setPreregistros(prev => (
+      prev.some(p => p.id === registro.id)
+        ? prev.map(p => (p.id === registro.id ? registro : p))
+        : [...prev, registro]
+    ));
+
+    toast.success(`${registro.placa} en cola. Al terminar de cargar, tome la foto del surtidor.`);
+    limpiarFormularioSuministro();
+  };
+
+  // Retoma un preregistro para adjuntar la foto del surtidor y cerrar el suministro
+  const handleRetomarPreregistro = async (pre) => {
+    setVistaTab('surtir');
+    setBuscandoVehiculo(true);
+    setSugerenciasPlacas([]);
+    setPlacaBusqueda(pre.placa);
+    setPlacaNoEncontrada(false);
+    setFotoKilometraje(null);
+    setFotoKilometrajeUrl('');
+    setFotoMaquina(null);
+    setFotoMaquinaUrl('');
+    setPreregistroActivoId(pre.id);
+    setConductor(pre.conductor || '');
+    setKilometraje(pre.kilometraje ? String(pre.kilometraje) : '');
+    setLitrosCargar(pre.litros !== null && pre.litros !== undefined ? String(pre.litros) : '');
+    setTanqueSeleccionado(pre.tanque_id);
+    setSolicitudVinculada(pre.solicitud || null);
+
+    // Revalidar autorización y cupo: pudieron cambiar desde que se hizo el preregistro
+    try {
+      const datos = await combustibleService.consultarVehiculo(pre.placa);
+      setVehiculoEncontrado(datos);
+    } catch (err) {
+      setVehiculoEncontrado(pre.vehiculo);
+      toast.error("No se pudo revalidar el vehículo. Se usarán los datos del preregistro.");
+    } finally {
+      setBuscandoVehiculo(false);
+    }
+  };
+
+  const handleEliminarPreregistro = (id) => {
+    setPreregistros(prev => prev.filter(p => p.id !== id));
+    if (preregistroActivoId === id) limpiarFormularioSuministro();
+    toast.success("Preregistro descartado");
+  };
 
   const cargarHistorialBombero = async () => {
     setCargandoHistorial(true);
@@ -179,6 +304,7 @@ export default function DashboardBombero() {
     setVehiculoEncontrado(null);
     setPlacaNoEncontrada(false);
     setSolicitudVinculada(null);
+    setPreregistroActivoId(null);
     setFotoKilometraje(null);
     setFotoKilometrajeUrl('');
     setFotoMaquina(null);
@@ -186,7 +312,7 @@ export default function DashboardBombero() {
     setKilometraje('');
     setLitrosCargar('');
     setConductor('');
-    
+
     try {
       const datos = await combustibleService.consultarVehiculo(placa);
       setVehiculoEncontrado(datos);
@@ -254,6 +380,7 @@ export default function DashboardBombero() {
       const datos = await combustibleService.consultarVehiculo(sol.placa);
       setVehiculoEncontrado(datos);
       setSolicitudVinculada(sol);
+      setPreregistroActivoId(null);
       setLitrosCargar(sol.cantidad_solicitada);
       // Seleccionar tanque automáticamente según el tipo de combustible del vehículo
       if (datos.tipo_combustible && tanques.length > 0) {
@@ -398,13 +525,13 @@ export default function DashboardBombero() {
 
         const res = await combustibleService.registrarAbastecimiento(payload);
         toast.success(res.message || "Suministro registrado con éxito");
-        
-        // Limpiar estados
-        setVehiculoEncontrado(null);
-        setPlacaBusqueda('');
-        setSolicitudVinculada(null);
-        setConductor('');
-      
+
+        // El preregistro ya cumplió su ciclo: sale de la cola
+        if (preregistroActivoId) {
+          setPreregistros(prev => prev.filter(p => p.id !== preregistroActivoId));
+        }
+        limpiarFormularioSuministro();
+
       cargarDatosTanques();
       cargarBandejaSolicitudes();
       cargarHistorialBombero();
@@ -665,6 +792,52 @@ export default function DashboardBombero() {
               </form>
             )}
 
+            {/* Cola de preregistros: vehículos cargando en paralelo, pendientes de foto */}
+            {!vehiculoEncontrado && preregistros.length > 0 && (
+              <div className="bg-bg-card rounded-2xl border border-warning/30 p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[9px] font-black text-warning uppercase tracking-widest flex items-center gap-1.5">
+                    <Layers size={12} /> Surtiendo Ahora ({preregistros.length})
+                  </p>
+                  <span className="text-[8px] font-bold text-text-muted uppercase tracking-wider">Falta foto del surtidor</span>
+                </div>
+                <div className="space-y-2">
+                  {preregistros.map(pre => (
+                    <div key={pre.id} className="bg-bg-low border border-warning/20 rounded-xl p-3 flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleRetomarPreregistro(pre)}
+                        className="flex-1 min-w-0 text-left"
+                      >
+                        <p className="text-sm font-black text-text-main font-display tracking-wide">{pre.placa}</p>
+                        <p className="text-[9px] text-text-muted mt-0.5 truncate">
+                          {pre.conductor} · {pre.kilometraje} km
+                          {pre.litros ? ` · ${pre.litros} L prev.` : ''}
+                        </p>
+                      </button>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleRetomarPreregistro(pre)}
+                          className="h-9 px-3 rounded-lg bg-warning text-black font-black text-[9px] uppercase tracking-widest flex items-center gap-1 active:scale-95 transition-all"
+                        >
+                          <Camera size={12} /> Finalizar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleEliminarPreregistro(pre.id)}
+                          className="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-text-muted hover:text-danger transition-all"
+                          aria-label={`Descartar preregistro de ${pre.placa}`}
+                        >
+                          <XCircle size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Historial Bombero (Solo si no hay vehiculo buscado) */}
             {!vehiculoEncontrado && historialBombero.length > 0 && (
               <div className="bg-bg-card rounded-2xl border border-white/5 p-4 space-y-3">
@@ -745,11 +918,7 @@ export default function DashboardBombero() {
                     <div className="flex gap-2">
                       <button
                         type="button"
-                        onClick={() => {
-                          setVehiculoEncontrado(null);
-                          setPlacaBusqueda('');
-                          setSolicitudVinculada(null);
-                        }}
+                        onClick={limpiarFormularioSuministro}
                         className="w-1/3 h-12 bg-white/5 border border-white/10 rounded-xl text-text-sec text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all flex items-center justify-center cursor-pointer"
                       >
                         Volver
@@ -773,6 +942,15 @@ export default function DashboardBombero() {
                 ) : (
                   // FORMULARIO DE ABASTECIMIENTO ACTIVO (AUTORIZADO O BYPASS APROBADO)
                   <form onSubmit={handleRegistrarSuministro} className="space-y-4">
+                    {preregistroActivoId && (
+                      <div className="p-3 bg-warning/15 border border-warning/30 rounded-xl flex items-center gap-2">
+                        <Layers size={16} className="text-warning shrink-0" />
+                        <span className="text-[9px] font-black text-warning uppercase tracking-widest">
+                          Cerrando preregistro: ajuste los litros y tome la foto del surtidor
+                        </span>
+                      </div>
+                    )}
+
                     {solicitudVinculada && (
                       <div className="p-3 bg-success/15 border border-success/30 rounded-xl flex items-center gap-2">
                         <CheckCircle2 size={16} className="text-success shrink-0" />
@@ -919,27 +1097,34 @@ export default function DashboardBombero() {
                       </div>
                     </div>
 
-                    {/* Botón de envío */}
-                    <div className="pt-2 flex gap-2">
+                    {/* Botones de envío */}
+                    <div className="pt-2 space-y-2">
                       <button
                         type="button"
-                        onClick={() => {
-                          setVehiculoEncontrado(null);
-                          setPlacaBusqueda('');
-                          setSolicitudVinculada(null);
-                        }}
-                        className="w-1/3 h-12 bg-white/5 border border-white/10 rounded-xl text-text-muted text-[10px] font-black uppercase tracking-widest"
+                        onClick={handlePreregistrar}
+                        disabled={cargandoSuministro}
+                        className="w-full h-12 rounded-xl bg-warning/10 border border-warning/40 text-warning font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-50 active:scale-98 transition-all"
                       >
-                        Cancelar
+                        <Layers size={15} />
+                        {preregistroActivoId ? 'Guardar y Atender Otro' : 'Preregistrar y Atender Otro'}
                       </button>
-                      <button
-                        type="submit"
-                        disabled={cargandoSuministro || subiendoFotoK || subiendoFotoM || !fotoMaquina}
-                        className="flex-1 h-12 rounded-xl bg-success text-bg-app font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-50"
-                      >
-                        {cargandoSuministro ? <RefreshCw size={15} className="animate-spin" /> : <Flame size={15} />}
-                        Completar Suministro
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={limpiarFormularioSuministro}
+                          className="w-1/3 h-12 bg-white/5 border border-white/10 rounded-xl text-text-muted text-[10px] font-black uppercase tracking-widest"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={cargandoSuministro || subiendoFotoK || subiendoFotoM || !fotoMaquina}
+                          className="flex-1 h-12 rounded-xl bg-success text-bg-app font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                          {cargandoSuministro ? <RefreshCw size={15} className="animate-spin" /> : <Flame size={15} />}
+                          Completar Suministro
+                        </button>
+                      </div>
                     </div>
                   </form>
                 )}

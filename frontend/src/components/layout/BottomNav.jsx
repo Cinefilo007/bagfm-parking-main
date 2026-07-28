@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { ShieldCheck, Users, Menu, ClipboardList, Camera, UserCog, LogOut, ParkingSquare, Radio, Bell, ShieldAlert, QrCode, AlertTriangle, IdCard, ArrowRightLeft, Car, Flame } from 'lucide-react';
+import { ShieldCheck, Users, Menu, ClipboardList, Camera, UserCog, LogOut, ParkingSquare, Radio, Bell, ShieldAlert, QrCode, AlertTriangle, IdCard, ArrowRightLeft, Car, Flame, Fuel } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/auth.store';
 import { MobileMenuDrawer } from './MobileMenuDrawer';
@@ -64,8 +64,8 @@ export const BottomNav = () => {
   } else if (user?.rol === 'SUPERVISOR_BOMBEROS') {
     navItems.push(
       { to: '/combustible-supervisor/dashboard', label: 'Centro', icon: ShieldCheck },
+      { to: '/combustible/dashboard', label: 'Surtir', icon: Fuel },
       { to: '/parque-automotor', label: 'Parque', icon: Car },
-      { to: '/combustible/tanques', label: 'Tanques', icon: Flame },
       { label: 'Más', icon: Menu, isDrawerTrigger: true }
     );
   } else if (user?.rol === 'BOMBERO') {

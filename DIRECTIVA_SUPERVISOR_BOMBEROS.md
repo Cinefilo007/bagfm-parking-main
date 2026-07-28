@@ -20,7 +20,9 @@ El **Supervisor de Bomberos** (`SUPERVISOR_BOMBEROS`) es el jefe operativo de la
 | Parque Automotor | Toggle autorización combustible | ✅ |
 | Gestión de Tanques | Ver estado, apertura/cierre | ✅ |
 | Gestión de Tanques | Crear/eliminar tanques | ❌ (solo Comando) |
-| Abastecimientos | Registrar suministro directo | ✅ |
+| Abastecimientos | Registrar suministro directo | ✅ (panel del bombero) |
+| Abastecimientos | Preregistrar despachos en paralelo | ✅ |
+| Abastecimientos | Ver su propia bandeja e historial de bombero | ✅ |
 | Solicitudes Excepcionales | Aprobar / Rechazar | ✅ (con auditoría) |
 | Reportes de Combustible | Ver | ✅ |
 | Cola de Aprobaciones | Ver y resolver | ✅ |
@@ -102,6 +104,7 @@ Ruta: `/combustible-supervisor/dashboard`
 | Sección | Ruta |
 |---|---|
 | Centro de Control | `/combustible-supervisor/dashboard` |
+| Despacho de Combustible | `/combustible/dashboard` |
 | Buzón de Aprobaciones | `/combustible/aprobaciones` |
 | Parque Automotor | `/parque-automotor` |
 | Tanques Combustible | `/combustible/tanques` |
@@ -150,3 +153,8 @@ ALTER TYPE tipo_lectura_tanque_enum ADD VALUE IF NOT EXISTS 'cierre_dia';
 - **Problema:** El Supervisor de Bomberos recibía un error `403 Forbidden` al intentar descargar la plantilla de importación, procesar un archivo Excel de vehículos, o registrar un vehículo de forma individual.
 - **Causa:** Los endpoints del backend (`GET /template`, `POST /importar-excel` y `POST /vehiculos` en `combustible.py`) estaban restringidos de forma rígida únicamente a los roles `COMANDANTE` y `ADMIN_BASE`.
 - **Solución:** Se añadieron los roles `SUPERVISOR_BOMBEROS`, `SUPERVISOR` y `ADMIN_ENTIDAD` a la lista de permitidos en dichos endpoints del backend. Se incluyó además un control de seguridad para restringir a los usuarios con rol `ADMIN_ENTIDAD` para que solo importen o registren vehículos pertenecientes a su propia entidad civil.
+
+### [2026-07-27] Habilitación del Despacho de Combustible para el Supervisor de Bomberos
+- **Problema:** Cuando el Supervisor de Bomberos se encontraba solo en la bomba no tenía forma de despachar combustible: el panel operativo (`DashboardBombero.jsx`) no figuraba en ninguno de sus menús.
+- **Causa:** Aunque la ruta `/combustible/dashboard` y el endpoint `POST /combustible/abastecer` ya admitían el rol, los endpoints auxiliares `GET /combustible/solicitudes/bombero` y `GET /combustible/abastecimientos/historial-bombero` estaban restringidos con una comparación estricta a `RolTipo.BOMBERO`, y ninguna barra de navegación exponía el acceso.
+- **Solución:** Ambos endpoints pasaron a aceptar `[RolTipo.BOMBERO, RolTipo.SUPERVISOR_BOMBEROS]` (siguen filtrando por el usuario autenticado, así que cada operador ve sólo su bandeja e historial). Se añadió "Despacho de Combustible" al `Sidebar.jsx` y al `MobileMenuDrawer.jsx`, y el acceso directo "Surtir" al `BottomNav.jsx` — donde desplazó a "Tanques", que permanece disponible en el menú móvil extendido para respetar el límite de cuatro elementos de la barra inferior. Los tres usan el icono `Fuel` de `lucide-react`.

@@ -206,8 +206,8 @@ async def listar_solicitudes_bombero(
     """
     Obtiene las solicitudes activas de emergencia creadas por el bombero logueado.
     """
-    if usuario.rol != RolTipo.BOMBERO:
-         raise HTTPException(status_code=403, detail="Rol de Bombero requerido.")
+    if usuario.rol not in [RolTipo.BOMBERO, RolTipo.SUPERVISOR_BOMBEROS]:
+         raise HTTPException(status_code=403, detail="Rol de Bombero o Supervisor de Bomberos requerido.")
          
     try:
         from app.models.solicitud_combustible import SolicitudCombustible
@@ -1091,8 +1091,8 @@ async def obtener_historial_bombero(
     """
     Obtiene los Ǹltimos abastecimientos realizados por el bombero logueado.
     """
-    if usuario.rol != RolTipo.BOMBERO:
-        raise HTTPException(status_code=403, detail="Ruta exclusiva para bomberos.")
+    if usuario.rol not in [RolTipo.BOMBERO, RolTipo.SUPERVISOR_BOMBEROS]:
+        raise HTTPException(status_code=403, detail="Ruta exclusiva para bomberos y supervisores de bomberos.")
         
     try:
         from app.models.abastecimiento import Abastecimiento
