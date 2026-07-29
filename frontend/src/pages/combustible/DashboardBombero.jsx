@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Car, Compass, RefreshCw, AlertTriangle, CheckCircle2,
   Send, Camera, Eye, PlusCircle, Power, User, ShieldAlert,
-  Flame, HardDrive, BarChart3, Clock, XCircle, ClipboardList, Layers
+  Flame, HardDrive, BarChart3, Clock, XCircle, ClipboardList, Layers,
+  Image as ImageIcon
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { toast } from 'react-hot-toast';
@@ -60,6 +61,9 @@ export default function DashboardBombero() {
   const [fotoMaquina, setFotoMaquina] = useState(null);
   const [fotoMaquinaUrl, setFotoMaquinaUrl] = useState('');
   
+  // Tipo de foto cuyo selector de origen está abierto: null | 'kilometraje' | 'maquina'
+  const [selectorFoto, setSelectorFoto] = useState(null);
+
   const [iaLoadOdo, setIaLoadOdo] = useState(false);
   const [iaLoadSurtidor, setIaLoadSurtidor] = useState(false);
   const [subiendoFotoK, setSubiendoFotoK] = useState(false);
@@ -93,9 +97,12 @@ export default function DashboardBombero() {
   });
   const [enviandoSolicitud, setEnviandoSolicitud] = useState(false);
 
-  // Refs para inputs de cámara forzada
-  const fileOdoRef = useRef(null);
-  const fileMaquinaRef = useRef(null);
+  // Refs de inputs de archivo: uno por origen (cámara / galería) y por tipo de foto,
+  // para que el bombero elija explícitamente en vez de depender del selector nativo.
+  const fileOdoCamRef = useRef(null);
+  const fileOdoGalRef = useRef(null);
+  const fileMaquinaCamRef = useRef(null);
+  const fileMaquinaGalRef = useRef(null);
   const abortControllerOdoRef = useRef(null);
   const abortControllerSurtidorRef = useRef(null);
 
@@ -316,9 +323,10 @@ export default function DashboardBombero() {
     try {
       const datos = await combustibleService.consultarVehiculo(placa);
       setVehiculoEncontrado(datos);
-      if (datos.capacidad_tanque > 0) {
-        setLitrosCargar(datos.capacidad_tanque); // sugerir tanque lleno
-      }
+      // Los litros NO se autocompletan: sólo pueden venir del OCR del surtidor o del
+      // bombero. Un valor por defecto se guardaría tal cual si el OCR falla y nadie revisa,
+      // descontando del tanque combustible que nunca se surtió. La capacidad del vehículo
+      // se muestra únicamente como placeholder y como tope 'max' del input.
       // Seleccionar tanque automáticamente según el tipo de combustible del vehículo
       if (datos.tipo_combustible && tanques.length > 0) {
         const tanqueSugerido = tanques.find(t => t.tipo_combustible === datos.tipo_combustible);
@@ -381,7 +389,9 @@ export default function DashboardBombero() {
       setVehiculoEncontrado(datos);
       setSolicitudVinculada(sol);
       setPreregistroActivoId(null);
-      setLitrosCargar(sol.cantidad_solicitada);
+      // La cantidad aprobada es un tope máximo, no lo realmente surtido: se aplica como
+      // 'max' y placeholder del input, nunca como valor precargado.
+      setLitrosCargar('');
       // Seleccionar tanque automáticamente según el tipo de combustible del vehículo
       if (datos.tipo_combustible && tanques.length > 0) {
         const tanqueSugerido = tanques.find(t => t.tipo_combustible === datos.tipo_combustible);
@@ -400,6 +410,17 @@ export default function DashboardBombero() {
     } finally {
       setBuscandoVehiculo(false);
     }
+  };
+
+  // Dispara el input correspondiente al origen elegido en el selector
+  const abrirFuenteFoto = (fuente) => {
+    const inputs = {
+      kilometraje: { camara: fileOdoCamRef, galeria: fileOdoGalRef },
+      maquina: { camara: fileMaquinaCamRef, galeria: fileMaquinaGalRef }
+    };
+    const ref = inputs[selectorFoto]?.[fuente];
+    setSelectorFoto(null);
+    ref?.current?.click();
   };
 
   // Capturar foto desde cámara nativa (comprimiendo en cliente a 800px / JPEG 65%)
@@ -986,7 +1007,11 @@ export default function DashboardBombero() {
                           onChange={e => setLitrosCargar(e.target.value)}
                           max={solicitudVinculada ? solicitudVinculada.cantidad_solicitada : (vehiculoEncontrado.capacidad_tanque || undefined)}
                           className="w-full bg-bg-low border border-white/10 rounded-lg px-3 py-2.5 text-sm font-black text-text-main outline-none focus:border-success/50"
-                          placeholder="0.0"
+                          placeholder={
+                            solicitudVinculada
+                              ? `Máx ${solicitudVinculada.cantidad_solicitada} L`
+                              : (vehiculoEncontrado.capacidad_tanque > 0 ? `${vehiculoEncontrado.capacidad_tanque} L` : '0.0')
+                          }
                         />
                         <span className="text-[8px] text-text-muted">Cap. Tanque: {vehiculoEncontrado.capacidad_tanque} L</span>
                       </div>
@@ -1027,7 +1052,7 @@ export default function DashboardBombero() {
                         </div>
                         <button
                           type="button"
-                          onClick={() => fileOdoRef.current.click()}
+                          onClick={() => setSelectorFoto('kilometraje')}
                           disabled={iaLoadOdo}
                           className={cn(
                             "w-full aspect-[1.5/1] rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1.5 transition-all relative overflow-hidden",
@@ -1048,12 +1073,20 @@ export default function DashboardBombero() {
                             </>
                           )}
                         </button>
-                        <input 
-                          type="file" 
-                          ref={fileOdoRef} 
+                        <input
+                          type="file"
+                          ref={fileOdoCamRef}
                           accept="image/*"
-                          onChange={(e) => handleFotoChange(e, 'kilometraje')}
-                          className="hidden" 
+                          capture="environment"
+                          onChange={(e) => { const inp = e.target; handleFotoChange(e, 'kilometraje'); inp.value = ''; }}
+                          className="hidden"
+                        />
+                        <input
+                          type="file"
+                          ref={fileOdoGalRef}
+                          accept="image/*"
+                          onChange={(e) => { const inp = e.target; handleFotoChange(e, 'kilometraje'); inp.value = ''; }}
+                          className="hidden"
                         />
                         {iaLoadOdo && <p className="text-[8px] text-success animate-pulse font-bold uppercase tracking-wider text-center mt-1">Leyendo con IA...</p>}
                       </div>
@@ -1066,7 +1099,7 @@ export default function DashboardBombero() {
                         </div>
                         <button
                           type="button"
-                          onClick={() => fileMaquinaRef.current.click()}
+                          onClick={() => setSelectorFoto('maquina')}
                           className={cn(
                             "w-full aspect-[1.5/1] rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1.5 transition-all relative overflow-hidden",
                             fotoMaquinaUrl ? "border-success/40 bg-success/5" : "border-danger/20 hover:border-danger/30 bg-bg-low/10"
@@ -1086,12 +1119,20 @@ export default function DashboardBombero() {
                             </>
                           )}
                         </button>
-                        <input 
-                          type="file" 
-                          ref={fileMaquinaRef} 
+                        <input
+                          type="file"
+                          ref={fileMaquinaCamRef}
                           accept="image/*"
-                          onChange={(e) => handleFotoChange(e, 'maquina')}
-                          className="hidden" 
+                          capture="environment"
+                          onChange={(e) => { const inp = e.target; handleFotoChange(e, 'maquina'); inp.value = ''; }}
+                          className="hidden"
+                        />
+                        <input
+                          type="file"
+                          ref={fileMaquinaGalRef}
+                          accept="image/*"
+                          onChange={(e) => { const inp = e.target; handleFotoChange(e, 'maquina'); inp.value = ''; }}
+                          className="hidden"
                         />
                         {iaLoadSurtidor && <p className="text-[8px] text-success animate-pulse font-bold uppercase tracking-wider text-center mt-1">Leyendo con IA...</p>}
                       </div>
@@ -1200,6 +1241,50 @@ export default function DashboardBombero() {
           </div>
         )}
       </div>
+
+      {/* SELECTOR DE ORIGEN DE LA FOTO (CÁMARA / GALERÍA) */}
+      {selectorFoto && (
+        <div
+          className="fixed inset-0 z-[160] flex items-end justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setSelectorFoto(null)}
+        >
+          <div
+            className="w-full max-w-sm bg-bg-card rounded-t-2xl border-t border-x border-white/10 shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-4 py-3 border-b border-white/5 bg-bg-low/50 flex items-center gap-2">
+              <div className={cn("w-1.5 h-4 rounded-full", selectorFoto === 'maquina' ? 'bg-danger' : 'bg-success')} />
+              <p className="text-[10px] font-black uppercase tracking-wider text-text-main">
+                Foto del {selectorFoto === 'maquina' ? 'Dispensador' : 'Odómetro'}
+              </p>
+            </div>
+
+            <div className="p-4 space-y-2">
+              <button
+                type="button"
+                onClick={() => abrirFuenteFoto('camara')}
+                className="w-full h-14 rounded-xl bg-success/10 border border-success/30 text-success font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2.5 active:scale-98 transition-all"
+              >
+                <Camera size={18} /> Tomar Foto
+              </button>
+              <button
+                type="button"
+                onClick={() => abrirFuenteFoto('galeria')}
+                className="w-full h-14 rounded-xl bg-white/5 border border-white/10 text-text-main font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2.5 active:scale-98 transition-all"
+              >
+                <ImageIcon size={18} /> Subir de Galería
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectorFoto(null)}
+                className="w-full h-12 rounded-xl text-text-muted font-black text-[10px] uppercase tracking-widest"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL NUEVA SOLICITUD DE EMERGENCIA */}
       {modalSolicitud && (
