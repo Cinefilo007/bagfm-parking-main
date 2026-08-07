@@ -4,6 +4,14 @@ FROM node:20-alpine AS build-stage
 # Establecer directorio de trabajo
 WORKDIR /app
 
+# Vite congela las variables VITE_* en tiempo de build, no en runtime.
+# Sin estos ARG/ENV el build no las ve y el código cae a las URLs por defecto
+# de src/services/api.js, que apuntan a producción.
+ARG VITE_API_URL
+ARG VITE_VAPID_PUBLIC_KEY
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_VAPID_PUBLIC_KEY=$VITE_VAPID_PUBLIC_KEY
+
 # Copiar archivos de dependencias
 COPY package*.json ./
 
