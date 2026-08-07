@@ -5,14 +5,20 @@ a archivos en el volumen privado, dejando en la columna una referencia 'file:<ru
 Es idempotente: los registros ya convertidos se saltean, así que se puede correr
 varias veces sin duplicar archivos.
 
-Uso, dentro del contenedor del backend:
-    python scripts/migrar_fotos_a_archivos.py            # convierte
-    python scripts/migrar_fotos_a_archivos.py --simular  # solo informa, no escribe
+Uso, dentro del contenedor del backend (PYTHONPATH hace falta porque el script se
+ejecuta por ruta y su carpeta, no /app, es la que entra al path):
+    PYTHONPATH=/app python scripts/migrar_fotos_a_archivos.py --simular  # solo informa
+    PYTHONPATH=/app python scripts/migrar_fotos_a_archivos.py            # convierte
 """
 import asyncio
 import sys
 
 from sqlalchemy import select, update
+
+# Registrar TODOS los modelos antes de usar cualquiera: las relaciones entre ellos se
+# resuelven por nombre, y si falta alguno SQLAlchemy falla al configurar el mapper.
+# Es la misma razón por la que main.py hace este import antes que nada.
+from app.models import base  # noqa: F401
 
 from app.core.database import FabricaSesion
 from app.models.abastecimiento import Abastecimiento

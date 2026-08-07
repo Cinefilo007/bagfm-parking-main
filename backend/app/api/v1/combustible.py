@@ -21,7 +21,7 @@ from app.models.usuario import Usuario
 from app.models.enums import RolTipo, EstadoSolicitudCombustible, TipoLecturaTanque
 from app.models.tanque_combustible import TanqueCombustible
 from app.services.abastecimiento_service import abastecimiento_service
-from app.services.storage_local import leer_imagen
+from app.services.storage_local import leer_imagen, leer_imagen_data_uri
 from app.services.import_combustible_service import import_combustible_service
 from app.services.template_service import template_service
 
@@ -839,8 +839,8 @@ async def obtener_dashboard_kpis(
                 "litros": a.cantidad_abastecida,
                 "fecha": a.fecha.isoformat(),
                 "tiene_alerta": a.tiene_alerta,
-                "foto_odometro": a.foto_kilometraje_url,
-                "foto_surtidor": a.foto_maquina_url
+                "foto_odometro": leer_imagen_data_uri(a.foto_kilometraje_url),
+                "foto_surtidor": leer_imagen_data_uri(a.foto_maquina_url)
             } for a in ultimos
         ]
 
@@ -1184,8 +1184,8 @@ async def obtener_detalle_abastecimiento(
                 "tiene_alerta": a.tiene_alerta,
                 "distancia_recorrida": a.distancia_recorrida,
                 "rendimiento_tramo": a.rendimiento_tramo,
-                "foto_odometro": a.foto_kilometraje_url,
-                "foto_surtidor": a.foto_maquina_url
+                "foto_odometro": leer_imagen_data_uri(a.foto_kilometraje_url),
+                "foto_surtidor": leer_imagen_data_uri(a.foto_maquina_url)
             }
         }
     except HTTPException:
