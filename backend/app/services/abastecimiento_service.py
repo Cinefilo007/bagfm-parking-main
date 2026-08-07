@@ -19,6 +19,7 @@ from app.models.abastecimiento import Abastecimiento
 from app.models.usuario import Usuario
 from app.models.enums import RolTipo, EstadoSolicitudCombustible, TipoSolicitudCombustible, TipoLecturaTanque, UsoVehiculo, TipoCombustible
 from app.services.notificacion_service import notificacion_service
+from app.services.storage_local import guardar_imagen_base64, borrar_imagenes
 
 class AbastecimientoService:
     
@@ -439,8 +440,8 @@ class AbastecimientoService:
             cantidad_abastecida=cantidad_abastecida,
             distancia_recorrida=distancia,
             rendimiento_tramo=rendimiento,
-            foto_kilometraje_url=datos.get("foto_kilometraje_url") or "",
-            foto_maquina_url=datos["foto_maquina_url"],
+            foto_kilometraje_url=guardar_imagen_base64(datos.get("foto_kilometraje_url"), "abastecimientos"),
+            foto_maquina_url=guardar_imagen_base64(datos["foto_maquina_url"], "abastecimientos"),
             datos_ia_ocr=datos.get("datos_ia_ocr"),
             tiene_alerta=tiene_alerta,
             solicitud_aprobacion_id=solicitud_id,
@@ -753,8 +754,8 @@ class AbastecimientoService:
         tanque.cantidad_actual -= cantidad_abastecida
         
         # 4. Fotos opcionales (marcador de posición si no se envían)
-        foto_k = datos.get("foto_kilometraje_url") or "placeholder_excepcional"
-        foto_m = datos.get("foto_maquina_url") or "placeholder_excepcional"
+        foto_k = guardar_imagen_base64(datos.get("foto_kilometraje_url"), "abastecimientos") or "placeholder_excepcional"
+        foto_m = guardar_imagen_base64(datos.get("foto_maquina_url"), "abastecimientos") or "placeholder_excepcional"
 
         # 5. Crear el registro de abastecimiento
         abastecimiento = Abastecimiento(
@@ -871,16 +872,27 @@ class AbastecimientoService:
         total_purgados = 0
 
         while True:
-            query_ids = select(Abastecimiento.id).where(
+            query_ids = select(
+                Abastecimiento.id,
+                Abastecimiento.foto_maquina_url,
+                Abastecimiento.foto_kilometraje_url,
+            ).where(
                 Abastecimiento.fecha < limite_fecha,
                 ((Abastecimiento.foto_maquina_url != "") | (Abastecimiento.foto_kilometraje_url != ""))
             ).limit(20)
 
             res_ids = await db.execute(query_ids)
-            ids_batch = res_ids.scalars().all()
+            filas_batch = res_ids.all()
 
-            if not ids_batch:
+            if not filas_batch:
                 break
+
+            ids_batch = [fila[0] for fila in filas_batch]
+
+            # Borrar los archivos ANTES de limpiar la columna: una vez borrada la
+            # referencia no hay forma de saber qué archivo le correspondía, y quedarían
+            # ocupando disco para siempre.
+            borrar_imagenes([valor for fila in filas_batch for valor in (fila[1], fila[2])])
 
             stmt_update = (
                 update(Abastecimiento)

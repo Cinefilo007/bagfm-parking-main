@@ -26,9 +26,13 @@ class Configuracion(BaseSettings):
     supabase_service_key: str = ""
 
     # Almacenamiento de archivos (reemplaza a Supabase Storage).
-    # storage_dir DEBE ser un volumen persistente: si no, cada despliegue borra los archivos.
+    # Ambos DEBEN ser volúmenes persistentes: si no, cada despliegue borra los archivos.
+    # storage_dir se sirve como estático y es público (ZIP y PDF de pases).
+    # storage_private_dir NO se sirve como estático: la evidencia fotográfica solo se
+    # entrega por endpoints que validan el token del abastecimiento.
     storage_dir: str = "/app/storage"
     storage_url_prefix: str = "/archivos"
+    storage_private_dir: str = "/app/privado"
 
     # JWT
     jwt_secret: str

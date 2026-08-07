@@ -21,6 +21,7 @@ from app.models.usuario import Usuario
 from app.models.enums import RolTipo, EstadoSolicitudCombustible, TipoLecturaTanque
 from app.models.tanque_combustible import TanqueCombustible
 from app.services.abastecimiento_service import abastecimiento_service
+from app.services.storage_local import leer_imagen
 from app.services.import_combustible_service import import_combustible_service
 from app.services.template_service import template_service
 
@@ -1585,25 +1586,23 @@ async def servir_foto_abastecimiento(
         raise HTTPException(status_code=404, detail="Abastecimiento no encontrado.")
 
     # 4. Seleccionar la foto correcta
-    foto_b64 = abast.foto_maquina_url if tipo_foto == "surtidor" else abast.foto_kilometraje_url
+    foto_valor = abast.foto_maquina_url if tipo_foto == "surtidor" else abast.foto_kilometraje_url
 
-    if not foto_b64:
+    if not foto_valor or foto_valor == "placeholder_excepcional":
         raise HTTPException(status_code=404, detail="Foto no disponible para este registro.")
 
-    # 5. Decodificar Base64 y devolver como imagen
+    # 5. Obtener los bytes de la imagen.
+    # Puede ser una referencia a archivo en el volumen privado ('file:...') o, en los
+    # registros anteriores a la migración, base64 guardado en la propia columna.
+    # Se resuelve fuera del try: si estuviera dentro, el `except Exception` de abajo
+    # convertiría el 404 en un 500.
+    mime_type = "image/jpeg"
+    imagen_bytes = leer_imagen(foto_valor)
+
+    if not imagen_bytes:
+        raise HTTPException(status_code=404, detail="Foto no disponible para este registro.")
+
     try:
-        # La foto puede estar almacenada como Data URI (data:image/jpeg;base64,...)
-        # o como Base64 puro
-        if foto_b64.startswith("data:"):
-            # Extraer el tipo MIME y el contenido Base64
-            header, b64_data = foto_b64.split(",", 1)
-            mime_type = header.split(";")[0].replace("data:", "")
-        else:
-            b64_data = foto_b64
-            mime_type = "image/jpeg"  # Fallback seguro
-
-        imagen_bytes = base64.b64decode(b64_data)
-
         # --- OPTIMIZACIÓN DE IMAGEN AL VUELO ---
         try:
             from PIL import Image, ImageOps
