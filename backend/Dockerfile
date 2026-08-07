@@ -10,9 +10,11 @@ ENV TZ="America/Caracas"
 WORKDIR /app
 
 # Instalar dependencias del sistema necesarias para psycopg2, qrcode, etc.
+# curl lo necesita el healthcheck de Coolify, que se ejecuta dentro del contenedor.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copiar requirements e instalar dependencias
