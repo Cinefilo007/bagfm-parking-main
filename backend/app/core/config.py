@@ -25,6 +25,11 @@ class Configuracion(BaseSettings):
     supabase_url: str = ""
     supabase_service_key: str = ""
 
+    # Almacenamiento de archivos (reemplaza a Supabase Storage).
+    # storage_dir DEBE ser un volumen persistente: si no, cada despliegue borra los archivos.
+    storage_dir: str = "/app/storage"
+    storage_url_prefix: str = "/archivos"
+
     # JWT
     jwt_secret: str
     jwt_algoritmo: str = "HS256"

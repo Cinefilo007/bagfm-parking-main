@@ -1,7 +1,9 @@
 from fastapi import FastAPI, Request, status
 import asyncio
+from pathlib import Path
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.core.excepciones import BagfmError, EntidadNoEncontrada, EntidadDuplicada, AccesoDenegado
 from app.core.config import obtener_config
 
@@ -42,6 +44,17 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# Archivos subidos (ZIP de pases, evidencia de infracciones).
+# Reemplaza a Supabase Storage: los archivos viven en config.storage_dir, que en
+# producción es un volumen persistente. StaticFiles no sirve nada fuera de ese
+# directorio, ni sigue rutas con '..'.
+Path(config.storage_dir).mkdir(parents=True, exist_ok=True)
+app.mount(
+    config.storage_url_prefix,
+    StaticFiles(directory=config.storage_dir),
+    name="archivos",
 )
 
 # Soporte para Proxy (Railway HTTPS) - Fix infalible

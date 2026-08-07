@@ -7,9 +7,9 @@ from typing import List, Optional, Tuple
 from sqlalchemy.future import select
 from sqlalchemy import func, and_, or_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
-from supabase import create_client, Client
 
 from app.core.config import obtener_config
+from app.services.storage_local import almacenamiento
 from app.models.alcabala_evento import LotePaseMasivo, SolicitudEvento
 from app.models.codigo_qr import CodigoQR
 from app.models.enums import PasseTipo, QRTipo, RolTipo
@@ -24,15 +24,17 @@ from app.core.security import crear_token_evento
 config = obtener_config()
 
 class PaseService:
-    def __init__(self):
-        try:
-            if config.supabase_url and config.supabase_service_key and config.supabase_url.startswith("http"):
-                self.supabase: Client = create_client(config.supabase_url, config.supabase_service_key)
-            else:
-                self.supabase = None
-        except Exception as e:
-            print(f"ALERTA TÁCTICA: Fallo al inicializar Supabase Storage: {e}")
-            self.supabase = None
+    # Carpeta raíz de los archivos de pases dentro del volumen.
+    # Conserva el nombre del bucket que se usaba en Supabase Storage.
+    CARPETA = "bagfm-pases"
+
+    @staticmethod
+    def _ruta_zip(nombre_limpio: str, serial: str) -> str:
+        return f"{PaseService.CARPETA}/pases/{nombre_limpio}_{serial}.zip"
+
+    @staticmethod
+    def _ruta_pdf(nombre_limpio: str, serial: str) -> str:
+        return f"{PaseService.CARPETA}/pases_pdf/{nombre_limpio}_{serial}.pdf"
 
     async def crear_lote(
         self, 
@@ -938,30 +940,18 @@ class PaseService:
         
         zip_buffer.seek(0)
         
-        # Subir a Supabase Storage
-        if self.supabase:
-            import re
-            nombre_limpio = re.sub(r'[^a-zA-Z0-9_\-]', '_', lote.nombre_evento).strip('_')
-            file_path = f"pases/{nombre_limpio}_{lote.codigo_serial}.zip"
-            # Limpiar si ya existe
-            try:
-                self.supabase.storage.from_("bagfm-pases").remove([file_path])
-            except: pass
-            
-            res_storage = self.supabase.storage.from_("bagfm-pases").upload(
-                file_path, 
-                zip_buffer.getvalue(),
-                {"content-type": "application/zip"}
-            )
-            
-            public_url = self.supabase.storage.from_("bagfm-pases").get_public_url(file_path)
-            lote.zip_url = public_url
-            lote.zip_generado = True
-            lote.zip_listo_at = datetime.now(timezone.utc)
-            await db.commit()
-            return public_url
-            
-        return "storage_not_configured"
+        # Guardar en el volumen del servidor
+        import re
+        nombre_limpio = re.sub(r'[^a-zA-Z0-9_\-]', '_', lote.nombre_evento).strip('_')
+        file_path = self._ruta_zip(nombre_limpio, lote.codigo_serial)
+
+        public_url = almacenamiento.guardar(zip_buffer.getvalue(), file_path)
+
+        lote.zip_url = public_url
+        lote.zip_generado = True
+        lote.zip_listo_at = datetime.now(timezone.utc)
+        await db.commit()
+        return public_url
 
     async def generar_pdf_masivo(self, db: AsyncSession, lote_id: uuid.UUID) -> str:
         """
@@ -974,28 +964,16 @@ class PaseService:
         
         pdf_buffer = await pdf_service.generar_pdf_lote(db, lote_id)
         
-        # Subir a Supabase
-        if self.supabase:
-            import re
-            nombre_limpio = re.sub(r'[^a-zA-Z0-9_\-]', '_', lote.nombre_evento).strip('_')
-            file_path = f"pases_pdf/{nombre_limpio}_{lote.codigo_serial}.pdf"
-            
-            try:
-                self.supabase.storage.from_("bagfm-pases").remove([file_path])
-            except: pass
-            
-            self.supabase.storage.from_("bagfm-pases").upload(
-                file_path, 
-                pdf_buffer.getvalue(),
-                {"content-type": "application/pdf"}
-            )
-            
-            public_url = self.supabase.storage.from_("bagfm-pases").get_public_url(file_path)
-            lote.pdf_url = public_url # Asegurarse de que el modelo tiene este campo
-            await db.commit()
-            return public_url
-            
-        return "storage_not_configured"
+        # Guardar en el volumen del servidor
+        import re
+        nombre_limpio = re.sub(r'[^a-zA-Z0-9_\-]', '_', lote.nombre_evento).strip('_')
+        file_path = self._ruta_pdf(nombre_limpio, lote.codigo_serial)
+
+        public_url = almacenamiento.guardar(pdf_buffer.getvalue(), file_path)
+
+        lote.pdf_url = public_url
+        await db.commit()
+        return public_url
 
     async def generar_excel_lote(self, db: AsyncSession, lote_id: uuid.UUID, base_url: str = "https://bagfm.app") -> io.BytesIO:
         """
@@ -1117,21 +1095,14 @@ class PaseService:
         res_qrs = await db.execute(query_qrs)
         user_ids = [uid for uid in res_qrs.scalars().all() if uid]
         
-        # 2. Eliminar archivos de Supabase
-        if self.supabase:
-            import re
-            nombre_limpio = re.sub(r'[^a-zA-Z0-9_\-]', '_', lote.nombre_evento).strip('_')
-            
-            # Rutas posibles
-            paths = [
-                f"pases/{nombre_limpio}_{lote.codigo_serial}.zip",
-                f"pases_pdf/{nombre_limpio}_{lote.codigo_serial}.pdf"
-            ]
-            
-            try:
-                self.supabase.storage.from_("bagfm-pases").remove(paths)
-            except Exception as e:
-                print(f"ALERTA STORAGE: No se pudieron borrar algunos archivos: {e}")
+        # 2. Eliminar archivos del volumen
+        import re
+        nombre_limpio = re.sub(r'[^a-zA-Z0-9_\-]', '_', lote.nombre_evento).strip('_')
+
+        almacenamiento.borrar([
+            self._ruta_zip(nombre_limpio, lote.codigo_serial),
+            self._ruta_pdf(nombre_limpio, lote.codigo_serial),
+        ])
         
         # 3. Eliminar el lote (CodigoQR caen por CASCADE debido al modelo)
         await db.delete(lote)
