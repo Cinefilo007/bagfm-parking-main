@@ -39,15 +39,6 @@ _EXTENSION_POR_MIME = {
     "image/gif": "gif",
 }
 
-_MIME_POR_EXTENSION = {
-    "jpg": "image/jpeg",
-    "jpeg": "image/jpeg",
-    "png": "image/png",
-    "webp": "image/webp",
-    "heic": "image/heic",
-    "gif": "image/gif",
-}
-
 
 class AlmacenamientoLocal:
     def __init__(self, directorio_base: str, prefijo_url: Optional[str] = None) -> None:
@@ -190,27 +181,6 @@ def leer_imagen(valor: Optional[str]) -> Optional[bytes]:
 
     decodificado = _decodificar(valor)
     return decodificado[0] if decodificado else None
-
-
-def leer_imagen_data_uri(valor: Optional[str]) -> Optional[str]:
-    """
-    Devuelve la imagen como Data URI, esté guardada como archivo o como base64.
-
-    Es para los endpoints que entregan la foto embebida en el JSON: el frontend pone
-    ese valor directamente en un <img src>, y una referencia 'file:...' no le sirve.
-    Con esto el contrato de la API no cambia al migrar el almacenamiento.
-    """
-    if not valor or not valor.startswith(PREFIJO_ARCHIVO):
-        # Vacío, marcador, o ya es un Data URI / base64: se devuelve intacto.
-        return valor
-
-    contenido = leer_imagen(valor)
-    if not contenido:
-        return ""
-
-    extension = valor.rsplit(".", 1)[-1].lower() if "." in valor else "jpg"
-    mime = _MIME_POR_EXTENSION.get(extension, "image/jpeg")
-    return f"data:{mime};base64,{base64.b64encode(contenido).decode('ascii')}"
 
 
 def borrar_imagenes(valores: Iterable[Optional[str]]) -> None:

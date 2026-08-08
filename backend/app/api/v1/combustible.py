@@ -21,12 +21,30 @@ from app.models.usuario import Usuario
 from app.models.enums import RolTipo, EstadoSolicitudCombustible, TipoLecturaTanque
 from app.models.tanque_combustible import TanqueCombustible
 from app.services.abastecimiento_service import abastecimiento_service
-from app.services.storage_local import leer_imagen, leer_imagen_data_uri
+from app.services.storage_local import leer_imagen
 from app.services.import_combustible_service import import_combustible_service
 from app.services.template_service import template_service
 
 router = APIRouter()
 _config = obtener_config()
+
+
+def _url_foto(abastecimiento, tipo: str) -> str:
+    """
+    URL firmada de una foto de abastecimiento, o "" si ese registro no la tiene.
+
+    Se devuelve la URL y no la imagen embebida: el frontend la usa igual en un
+    <img src>, pero la respuesta deja de arrastrar la foto en base64. En el listado
+    de últimos abastecimientos eso son hasta 30 imágenes por petición.
+
+    El token dura 72 h y solo sirve para leer esta foto (proposito='foto_auditoria'),
+    así que la evidencia sigue sin ser pública.
+    """
+    valor = abastecimiento.foto_maquina_url if tipo == "surtidor" else abastecimiento.foto_kilometraje_url
+    if not valor or valor == "placeholder_excepcional":
+        return ""
+    token = crear_token_foto(str(abastecimiento.id), tipo=tipo, horas=72)
+    return f"{_config.backend_url_base}/api/v1/combustible/foto/{abastecimiento.id}?token={token}"
 
 # --- Esquemas Pydantic ---
 class SolicitudCombustibleRequest(BaseModel):
@@ -839,8 +857,8 @@ async def obtener_dashboard_kpis(
                 "litros": a.cantidad_abastecida,
                 "fecha": a.fecha.isoformat(),
                 "tiene_alerta": a.tiene_alerta,
-                "foto_odometro": leer_imagen_data_uri(a.foto_kilometraje_url),
-                "foto_surtidor": leer_imagen_data_uri(a.foto_maquina_url)
+                "foto_odometro": _url_foto(a, "odometro"),
+                "foto_surtidor": _url_foto(a, "surtidor")
             } for a in ultimos
         ]
 
@@ -1184,8 +1202,8 @@ async def obtener_detalle_abastecimiento(
                 "tiene_alerta": a.tiene_alerta,
                 "distancia_recorrida": a.distancia_recorrida,
                 "rendimiento_tramo": a.rendimiento_tramo,
-                "foto_odometro": leer_imagen_data_uri(a.foto_kilometraje_url),
-                "foto_surtidor": leer_imagen_data_uri(a.foto_maquina_url)
+                "foto_odometro": _url_foto(a, "odometro"),
+                "foto_surtidor": _url_foto(a, "surtidor")
             }
         }
     except HTTPException:
