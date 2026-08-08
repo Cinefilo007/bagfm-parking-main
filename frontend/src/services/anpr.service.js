@@ -46,6 +46,12 @@ export const anprService = {
     return data;
   },
 
+  /** Últimas detecciones con ficha completa, para el TV de la alcabala. */
+  async getMonitor(limite = 4) {
+    const { data } = await api.get('/anpr/monitor', { params: { limite } });
+    return data;
+  },
+
   // ── Administración de cámaras (Comandante) ────────────────────────────────
 
   async getCamaras() {

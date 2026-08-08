@@ -396,6 +396,35 @@ async def listar_pendientes(
     return [_a_salida(e) for e in eventos]
 
 
+@router.get("/monitor")
+async def monitor_alcabala(
+    limite: int = 4,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = DEPENDENCY_ALCABALA,
+):
+    """
+    Últimas detecciones con su ficha completa, para el TV de la alcabala.
+
+    La pantalla se alimenta del WebSocket en vivo; esto es lo que pinta al encenderla
+    o tras un corte, para que el monitor nunca aparezca en blanco delante de la fila.
+    """
+    punto_id = (await db.execute(
+        select(PuntoAcceso.id).where(PuntoAcceso.usuario_id == usuario.id)
+    )).scalars().first()
+
+    consulta = (
+        select(EventoAnpr)
+        .where(EventoAnpr.estado != AnprEstado.duplicado)
+        .order_by(EventoAnpr.timestamp_recibido.desc())
+        .limit(min(limite, 10))
+    )
+    if punto_id:
+        consulta = consulta.where(EventoAnpr.punto_acceso_id == punto_id)
+
+    eventos = (await db.execute(consulta)).scalars().all()
+    return [await anpr_service.construir_ficha(db, e) for e in eventos]
+
+
 @router.get("/evento/{evento_id}/foto/{cual}")
 async def obtener_foto(
     evento_id: UUID,

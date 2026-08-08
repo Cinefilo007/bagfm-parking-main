@@ -14,6 +14,7 @@ import EstacionamientosEntidad from '../pages/entidad/Estacionamientos';
 import DashboardAlcabala from '../pages/alcabala/Dashboard';
 import ScannerAlcabala from '../pages/alcabala/Scanner';
 import PuertaAlcabala from '../pages/alcabala/Puerta';
+import MonitorAlcabala from '../pages/alcabala/Monitor';
 import Alcabalas from '../pages/comandante/Alcabalas';
 import CamarasAnpr from '../pages/comandante/CamarasAnpr';
 import EventosMando from '../pages/comandante/EventosMando';
@@ -81,9 +82,23 @@ export const router = createBrowserRouter([
         path: '',
         element: <HomeRedirect />
       },
+      // ====== MONITOR DE ALCABALA (TV, MODO KIOSCO) ======
+      // Va en su propia rama con hideNav y en la raíz: la pantalla del TV no se
+      // navega, y una ruta corta es más fácil de teclear en el navegador de un
+      // televisor, donde no hay teclado cómodo.
+      {
+        element: <MainLayout hideNav />,
+        children: [
+          {
+            path: 'monitor',
+            element: <RutaProtegida rolesPermitidos={['ALCABALA', 'ADMIN_BASE', 'COMANDANTE', 'SUPERVISOR']} />,
+            children: [{ path: '', element: <MonitorAlcabala /> }]
+          }
+        ]
+      },
       // ====== RUTAS CON NAVEGACIÓN (LAYOUT PRINCIPAL) ======
       {
-        element: <MainLayout />, 
+        element: <MainLayout />,
         children: [
           // COMANDO
           {

@@ -1,7 +1,7 @@
 """
 Ingesta de eventos de las cámaras ANPR de las alcabalas.
 
-La cámara (Hikvision DS-TCG406-E) tiene configurado un "HTTP Listening": cada vez que
+La cámara ANPR de Hikvision tiene configurado un "HTTP Listening": cada vez que
 reconoce una placa hace un POST a nuestro endpoint con el evento y las fotos. Nosotros
 no le preguntamos nada a ella; el flujo entero es de entrada.
 
@@ -22,9 +22,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import obtener_config
 from app.core.notify_manager import manager
+from app.models.acceso import Acceso
 from app.models.alcabala_evento import PuntoAcceso
+from app.models.destino_alcabala import DestinoAlcabala
+from app.models.infraccion import Infraccion
 from app.models.camara_anpr import CamaraAnpr, hashear_token
-from app.models.enums import AnprDireccion, AnprEstado
+from app.models.enums import AnprDireccion, AnprEstado, InfraccionEstado
 from app.models.evento_anpr import EventoAnpr
 from app.services.placa_lookup import verificar_placa, normalizar_placa
 from app.services.storage_local import almacenamiento_privado, PREFIJO_ARCHIVO
@@ -387,15 +390,130 @@ class AnprService:
         if not duplicado:
             # Igual que en acceso_service, la notificación va después del commit: si
             # el WebSocket falla, la detección ya está guardada y no se pierde.
-            await self._notificar(evento, punto, veredicto)
+            ficha = None
+            try:
+                ficha = await self.construir_ficha(db, evento, veredicto)
+            except Exception as e:
+                # El monitor se queda sin los datos extra, pero la tarjeta del guardia
+                # tiene que llegar igual: es la que desatasca la fila.
+                print(f"[ANPR] No se pudo construir la ficha de {evento.id}: {e}")
+            await self._notificar(evento, punto, veredicto, ficha)
 
         return evento
 
-    async def _notificar(self, evento: EventoAnpr, punto: PuntoAcceso, veredicto: Dict[str, Any]) -> None:
+    # ──────────────────────────────────────────────────────────────────────────
+    # Ficha para el monitor de la alcabala
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def _destinos_recientes(self, db: AsyncSession, placa: str, limite: int = 3) -> List[Dict[str, Any]]:
+        """
+        A dónde ha ido antes este vehículo.
+
+        Es el dato que convierte el monitor en algo útil de verdad: un vehículo que
+        siempre va al club de pádel y hoy declara otra cosa es justo el patrón que
+        este sistema existe para hacer visible.
+        """
+        filas = (await db.execute(
+            select(Acceso.timestamp, DestinoAlcabala.nombre, Acceso.observaciones)
+            .join(DestinoAlcabala, Acceso.destino_id == DestinoAlcabala.id)
+            .where(Acceso.vehiculo_placa == placa)
+            .order_by(Acceso.timestamp.desc())
+            .limit(limite)
+        )).all()
+
+        return [
+            {
+                "destino": f.nombre,
+                "detalle": f.observaciones,
+                "fecha": f.timestamp,
+            }
+            for f in filas
+        ]
+
+    async def _infracciones_activas(self, db: AsyncSession, vehiculo_id: Optional[str]) -> List[Dict[str, Any]]:
+        """Infracciones sin resolver del vehículo. Vacía si la placa no está registrada."""
+        if not vehiculo_id:
+            return []
+
+        filas = (await db.execute(
+            select(Infraccion)
+            .where(
+                Infraccion.vehiculo_id == uuid.UUID(str(vehiculo_id)),
+                Infraccion.estado == InfraccionEstado.activa,
+            )
+            .order_by(Infraccion.created_at.desc())
+            .limit(5)
+        )).scalars().all()
+
+        return [
+            {
+                "tipo": i.tipo.value if i.tipo else None,
+                "gravedad": i.gravedad.value if i.gravedad else None,
+                "descripcion": i.descripcion,
+                "bloquea_salida": i.bloquea_salida,
+                "fecha": i.created_at,
+            }
+            for i in filas
+        ]
+
+    async def construir_ficha(
+        self,
+        db: AsyncSession,
+        evento: EventoAnpr,
+        veredicto: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Todo lo que el monitor de la alcabala muestra de una detección.
+
+        Se recalcula el veredicto cuando no viene dado (caso de las detecciones que se
+        recuperan al cargar la pantalla) en vez de leer el `coincidencia` guardado:
+        para el monitor interesa la situación de ahora, no la de hace media hora.
+        """
+        if veredicto is None:
+            veredicto = await verificar_placa(db, evento.placa)
+
+        base = f"{config.backend_url_base}/api/v1/anpr/evento/{evento.id}/foto"
+
+        return {
+            "evento_id": str(evento.id),
+            "placa": evento.placa,
+            "direccion": evento.direccion.value if evento.direccion else None,
+            "timestamp": evento.timestamp_recibido,
+            "estado": evento.estado.value if evento.estado else None,
+            "vehiculo": {
+                "tipo": evento.tipo_vehiculo,
+                "color": evento.color_vehiculo,
+                "marca": evento.marca_vehiculo,
+                "foto_placa_url": f"{base}/placa" if evento.foto_placa_path else None,
+                "foto_escena_url": f"{base}/escena" if evento.foto_escena_path else None,
+            },
+            "persona": {
+                "nombre": veredicto.get("nombre_portador"),
+                "coincidencia": veredicto.get("coincidencia"),
+                "tipo_pase": veredicto.get("tipo_pase"),
+                "tipo_pase_color": veredicto.get("tipo_pase_color"),
+                "mensaje": veredicto.get("mensaje"),
+                "alerta": veredicto.get("alerta"),
+            },
+            "destinos_recientes": await self._destinos_recientes(db, evento.placa),
+            "infracciones": await self._infracciones_activas(db, veredicto.get("vehiculo_id")),
+        }
+
+    async def _notificar(
+        self,
+        evento: EventoAnpr,
+        punto: PuntoAcceso,
+        veredicto: Dict[str, Any],
+        ficha: Optional[Dict[str, Any]] = None,
+    ) -> None:
         try:
             await manager.broadcast(
                 {
                     "evento": "anpr_deteccion",
+                    # El telefono del guardia usa los campos sueltos; el monitor de la
+                    # alcabala usa la ficha. Van en el mismo mensaje para que ambas
+                    # pantallas se enteren a la vez y no se contradigan.
+                    "ficha": ficha,
                     "evento_id": str(evento.id),
                     "punto_acceso_id": str(punto.id),
                     "punto_nombre": punto.nombre,
