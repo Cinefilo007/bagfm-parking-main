@@ -1,0 +1,53 @@
+# Avisos automáticos de dependencias con vulnerabilidades o desactualizadas.
+# GitHub abre un Pull Request por cada actualización; nada se aplica solo.
+version: 2
+
+updates:
+  # Python del backend
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Caracas
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "backend"
+    # Agrupar las actualizaciones menores y de parche en un solo PR: de lo contrario
+    # son decenas de PRs por semana y se terminan ignorando todos.
+    groups:
+      backend-menores:
+        update-types:
+          - minor
+          - patch
+
+  # JavaScript del frontend
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Caracas
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "frontend"
+    groups:
+      frontend-menores:
+        update-types:
+          - minor
+          - patch
+
+  # Imágenes base de los Dockerfile (python:3.11-slim, node:20-alpine, nginx:stable-alpine)
+  - package-ecosystem: docker
+    directories:
+      - /backend
+      - /frontend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Caracas
+    commit-message:
+      prefix: "docker"
