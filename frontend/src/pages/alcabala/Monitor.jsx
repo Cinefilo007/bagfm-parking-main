@@ -27,6 +27,15 @@ import { cn } from '../../lib/utils';
 const CLAVE_TEMA = 'monitor_tema';
 
 /**
+ * Cuánto se queda una detección en pantalla antes de volver a "esperando".
+ *
+ * Dejarla hasta que llegue el siguiente vehículo hacía imposible distinguir un dato
+ * fresco de uno de hace media hora, y el cambio de una detección a otra pasaba
+ * desapercibido. Volver al estado de espera hace que cada llegada se note.
+ */
+const SEGUNDOS_EN_PANTALLA = 25;
+
+/**
  * El color lo decide el backend. Aquí solo se pinta.
  *
  * Tres estados y no más: a diez metros y con una fila detrás, nadie distingue seis
@@ -196,10 +205,19 @@ const Principal = ({ ficha, token, urlFoto, tema, nombreTema }) => {
           style={{ backgroundColor: `${color}22`, color, border: `4px solid ${color}` }}
         >
           <Icono className="h-[clamp(2rem,4vw,4rem)] w-[clamp(2rem,4vw,4rem)] shrink-0" />
-          <div>
+          <div className="min-w-0">
             <p className="text-[clamp(1.5rem,3.6vw,3.75rem)] font-black uppercase leading-none tracking-wide">{rotulo}</p>
             <p className="mt-1 text-[clamp(0.75rem,1.35vw,1.5rem)] font-bold uppercase tracking-widest opacity-80">
               {ETIQUETAS[ficha.persona?.coincidencia] || 'NO REGISTRADO'}
+              {' · '}
+              {/* Las infracciones se dicen SIEMPRE, también cuando no hay. Un hueco
+                  vacío se lee como "no se comprobó"; "sin infracciones" se lee como
+                  una respuesta, que es lo que el guardia necesita. */}
+              <span style={infracciones.length > 0 ? { color: SEMAFORO.rojo[nombreTema] } : undefined}>
+                {infracciones.length === 0
+                  ? 'Sin infracciones'
+                  : `${infracciones.length} infracci${infracciones.length > 1 ? 'ones' : 'ón'}`}
+              </span>
             </p>
           </div>
         </div>
@@ -208,7 +226,22 @@ const Principal = ({ ficha, token, urlFoto, tema, nombreTema }) => {
       {/* DERECHA — la persona y su historial */}
       <div className="flex min-w-0 flex-1 flex-col gap-[1.2vh]">
         <Panel titulo="Titular" tema={tema} className="shrink-0">
-          <p className={cn('truncate text-[clamp(1.5rem,3.4vw,3.75rem)] font-black uppercase leading-tight', tema.texto)}>
+          {/* Hasta tres líneas y con la fuente más contenida: los nombres de las
+              unidades son largos ("Comando Aéreo del Ejército de Venezuela") y
+              cortados a la mitad no identifican a nadie, que es justo para lo que
+              está este panel. */}
+          <p
+            className={cn(
+              'text-[clamp(0.95rem,2vw,2.25rem)] font-black uppercase leading-[1.1]',
+              tema.texto
+            )}
+            style={{
+              display: '-webkit-box',
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            }}
+          >
             {ficha.persona?.nombre || 'Sin registrar'}
           </p>
         </Panel>
@@ -299,9 +332,13 @@ const Anteriores = ({ fichas, token, urlFoto, tema, nombreTema }) => (
 const Confirmacion = ({ dato }) => (
   <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-black/70">
     <div className="flex flex-col items-center gap-6 rounded-3xl border-4 border-emerald-400 bg-emerald-500/15 px-20 py-14">
-      <CheckCircle2 className="h-32 w-32 text-emerald-400" />
-      <p className="font-mono text-7xl font-black tracking-widest text-white">{dato.placa}</p>
-      <p className="text-5xl font-black uppercase tracking-wide text-emerald-300">Registrado</p>
+      <CheckCircle2 className="h-[clamp(4rem,9vw,8rem)] w-[clamp(4rem,9vw,8rem)] text-emerald-400" />
+      <p className="font-mono text-[clamp(2rem,5vw,4.5rem)] font-black tracking-widest text-white">
+        {dato.placa}
+      </p>
+      <p className="text-[clamp(1.5rem,3.6vw,3rem)] font-black uppercase tracking-wide text-emerald-300">
+        Acceso concedido
+      </p>
       <p className="text-4xl text-white/70">{dato.destino}</p>
     </div>
   </div>
@@ -322,7 +359,10 @@ const Monitor = () => {
   const sesion = useNotifications();
   const pantalla = usePantallaSocket(tokenPantalla);
 
-  const [fichas, setFichas] = useState([]);
+  // La detección que se muestra en grande va aparte de las anteriores: la primera
+  // caduca sola y las otras se acumulan en la franja de abajo.
+  const [actual, setActual] = useState(null);
+  const [anteriores, setAnteriores] = useState([]);
   const [titulo, setTitulo] = useState('Alcabala');
   const [reloj, setReloj] = useState(new Date());
   const [confirmacion, setConfirmacion] = useState(null);
@@ -354,12 +394,29 @@ const Monitor = () => {
     if (necesitaEmparejar) return;
 
     try {
+      let lista;
       if (esPantalla) {
         const datos = await pantallaService.getMonitor(tokenPantalla);
-        setFichas(datos.detecciones || []);
+        lista = datos.detecciones || [];
         if (datos.punto_nombre) setTitulo(datos.punto_nombre);
       } else {
-        setFichas(await anprService.getMonitor(4));
+        lista = await anprService.getMonitor(4);
+      }
+
+      // Al encender la pantalla, lo recuperado va al historial y NO al panel grande:
+      // mostrar como "actual" una detección de hace media hora sería mentir. Solo si
+      // la última es tan reciente que aún estaría en pantalla, se pone de actual.
+      const [primera, ...resto] = lista;
+      const frescura = primera
+        ? (Date.now() - new Date(primera.timestamp).getTime()) / 1000
+        : Infinity;
+
+      if (primera && frescura < SEGUNDOS_EN_PANTALLA) {
+        setActual(primera);
+        setAnteriores(resto.slice(0, 3));
+      } else {
+        setActual(null);
+        setAnteriores(lista.slice(0, 3));
       }
     } catch (error) {
       if (esPantalla && error?.response?.status === 401) {
@@ -375,7 +432,9 @@ const Monitor = () => {
   useEffect(() => { cargar(); }, [cargar]);
 
   useEffect(() => {
-    const t = setInterval(() => setReloj(new Date()), 30000);
+    // Cada segundo, y con los segundos a la vista: es la prueba de un vistazo de
+    // que la pantalla sigue viva y no se quedó congelada.
+    const t = setInterval(() => setReloj(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
 
@@ -387,12 +446,19 @@ const Monitor = () => {
       else sesion.setLastNotification(null);
     };
 
-    // El guardia registró el acceso: se confirma en grande unos segundos.
+    // El guardia registró el acceso: se confirma en grande y el vehículo pasa al
+    // historial, porque ya está resuelto y no hay nada que decidir sobre él.
     if (aviso.evento === 'anpr_resuelto') {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setConfirmacion({ placa: aviso.placa, destino: aviso.destino });
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFichas((previas) => previas.filter((f) => f.evento_id !== aviso.evento_id));
+       
+      setActual((previa) => {
+        if (previa && previa.evento_id === aviso.evento_id) {
+          setAnteriores((prev) => [previa, ...prev].slice(0, 3));
+          return null;
+        }
+        return previa;
+      });
       limpiarAviso();
       const t = setTimeout(() => setConfirmacion(null), 4000);
       return () => clearTimeout(t);
@@ -422,21 +488,33 @@ const Monitor = () => {
       infracciones: [],
     };
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setFichas((previas) =>
-      previas.some((f) => f.evento_id === ficha.evento_id)
-        ? previas
-        : [ficha, ...previas].slice(0, 4)
-    );
+     
+    setActual((previa) => {
+      if (previa?.evento_id === ficha.evento_id) return previa;
+      // La que estaba en grande baja al historial en vez de desaparecer.
+      if (previa) setAnteriores((prev) => [previa, ...prev].slice(0, 3));
+      return ficha;
+    });
     limpiarAviso();
     return undefined;
   }, [aviso, esPantalla, pantalla, sesion, cambiarTema]);
 
+  // Caducidad de la detección en pantalla. El temporizador se rearma con cada
+  // vehículo nuevo, así que la cuenta siempre corre desde la última llegada.
+  useEffect(() => {
+    if (!actual) return undefined;
+
+    const t = setTimeout(() => {
+      setActual(null);
+      setAnteriores((prev) => [actual, ...prev].slice(0, 3));
+    }, SEGUNDOS_EN_PANTALLA * 1000);
+
+    return () => clearTimeout(t);
+  }, [actual]);
+
   if (necesitaEmparejar) {
     return <EmparejarPantalla onEmparejada={guardarToken} />;
   }
-
-  const [actual, ...anteriores] = fichas;
 
   return (
     <div className="flex h-screen flex-col gap-[1.5vh] p-[1.8vh]" style={{ backgroundColor: tema.fondo }}>
@@ -468,7 +546,9 @@ const Monitor = () => {
 
           <span className={cn('flex items-center gap-2 text-[clamp(1rem,1.9vw,1.875rem)] font-bold tabular-nums', tema.textoSuave)}>
             <Clock className="h-6 w-6" />
-            {reloj.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}
+            {reloj.toLocaleTimeString('es-VE', {
+              hour: '2-digit', minute: '2-digit', second: '2-digit',
+            })}
           </span>
         </div>
       </header>
