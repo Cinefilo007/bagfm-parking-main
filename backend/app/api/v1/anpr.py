@@ -53,7 +53,7 @@ from app.schemas.anpr import (
 )
 from app.services.acceso_service import acceso_service
 from app.services.anpr_service import anpr_service
-from app.services.placa_lookup import normalizar_placa
+from app.services.placa_lookup import normalizar_placa, verificar_placa
 from app.services.storage_local import leer_imagen
 
 router = APIRouter()
@@ -1029,6 +1029,80 @@ async def descartar_evento(
 # ──────────────────────────────────────────────────────────────────────────────
 # Consulta histórica
 # ──────────────────────────────────────────────────────────────────────────────
+
+@router.get("/diagnostico-placa")
+async def diagnostico_placa(
+    placa: str,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = DEPENDENCY_ADMIN,
+):
+    """
+    Dice en qué tablas aparece una placa y con qué datos.
+
+    Existe porque la información de vehículos vive repartida en tres sitios
+    (`vehiculos`, `codigos_qr`, `vehiculos_pase`) y, cuando la alcabala dice que un
+    vehículo no está registrado, sin esto no hay forma de saber si el dato falta, si
+    está en otra tabla, o si difiere por un guion en la placa.
+    """
+    from app.models.vehiculo import Vehiculo
+    from app.models.vehiculo_pase import VehiculoPase
+    from app.models.codigo_qr import CodigoQR
+    from app.services.placa_lookup import _placa_sin_separadores
+
+    buscada = normalizar_placa(placa)
+
+    vehiculos = (await db.execute(
+        select(Vehiculo).where(_placa_sin_separadores(Vehiculo.placa) == buscada)
+    )).scalars().all()
+
+    qrs = (await db.execute(
+        select(CodigoQR).where(_placa_sin_separadores(CodigoQR.vehiculo_placa) == buscada)
+    )).scalars().all()
+
+    pases = (await db.execute(
+        select(VehiculoPase).where(_placa_sin_separadores(VehiculoPase.placa) == buscada)
+    )).scalars().all()
+
+    return {
+        "placa_buscada": buscada,
+        # El mismo veredicto que verá la alcabala, para poder contrastarlo con lo que
+        # hay en cada tabla sin tener que reproducir la detección.
+        "veredicto": await verificar_placa(db, buscada),
+        "vehiculos": [
+            {
+                "id": str(v.id),
+                # Tal cual está guardada: si trae guion o espacio, aquí se ve.
+                "placa_guardada": v.placa,
+                "activo": v.activo,
+                "socio_id": str(v.socio_id) if v.socio_id else None,
+                "entidad_id": str(v.entidad_id) if v.entidad_id else None,
+                "marca": v.marca,
+                "modelo": v.modelo,
+            }
+            for v in vehiculos
+        ],
+        "codigos_qr": [
+            {
+                "id": str(q.id),
+                "placa_guardada": q.vehiculo_placa,
+                "activo": q.activo,
+                "tipo": q.tipo.value if q.tipo else None,
+                "nombre_portador": q.nombre_portador,
+                "expira": q.fecha_expiracion.isoformat() if q.fecha_expiracion else None,
+            }
+            for q in qrs
+        ],
+        "vehiculos_pase": [
+            {
+                "id": str(vp.id),
+                "placa_guardada": vp.placa,
+                "ingresado": vp.ingresado,
+                "qr_id": str(vp.qr_id) if vp.qr_id else None,
+            }
+            for vp in pases
+        ],
+    }
+
 
 @router.get("/eventos", response_model=PaginatedEventosAnpr)
 async def historial_eventos(

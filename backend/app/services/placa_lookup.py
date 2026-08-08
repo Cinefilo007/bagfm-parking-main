@@ -25,6 +25,7 @@ from app.models.vehiculo_pase import VehiculoPase
 from app.models.codigo_qr import CodigoQR
 from app.models.usuario import Usuario
 from app.models.membresia import Membresia
+from app.models.entidad_civil import EntidadCivil
 from app.models.enums import MembresiaEstado
 
 
@@ -37,6 +38,9 @@ COINCIDENCIA_SOCIO_VENCIDO = "socio_vencido"
 COINCIDENCIA_PASE = "pase"
 COINCIDENCIA_PASE_INVALIDO = "pase_invalido"
 COINCIDENCIA_NO_REGISTRADO = "no_registrado"
+# El vehículo SÍ está en el registro pero no cuelga de un socio: es de una entidad
+# —los internos de la base, los del módulo de combustible— o quedó sin dueño.
+COINCIDENCIA_VEHICULO = "vehiculo_registrado"
 
 
 # Semáforo: la lectura de un vistazo, a varios metros y con prisa. Se calcula en el
@@ -52,6 +56,7 @@ SEMAFORO_ROJO = "rojo"
 
 _SEMAFORO_POR_COINCIDENCIA = {
     COINCIDENCIA_SOCIO: SEMAFORO_VERDE,
+    COINCIDENCIA_VEHICULO: SEMAFORO_VERDE,
     COINCIDENCIA_PASE: SEMAFORO_VERDE,
     COINCIDENCIA_REINGRESO: SEMAFORO_AMARILLO,
     COINCIDENCIA_NO_REGISTRADO: SEMAFORO_AMARILLO,
@@ -99,9 +104,15 @@ async def verificar_placa(
     Resuelve qué es una placa, en este orden:
 
       1. ¿Ya está adentro? (VehiculoPase ingresado) → reingreso
-      2. ¿Vehículo de socio? → verifica membresía
+      2. ¿Está en el registro de vehículos?
+           · con socio activo → verifica su membresía
+           · sin socio (vehículo de entidad o interno de la base) → registrado igual
       3. ¿Tiene un QR activo? → verifica expiración y cupo de accesos
       4. No registrado
+
+    El paso 2 no exige socio a propósito. Los vehículos internos de la base cuelgan
+    de una entidad y no de una persona; exigirlo hacía que todo el parque propio
+    saliera como desconocido en la alcabala.
 
     El orden importa: un socio que ya entró tiene que dar "reingreso", no "socio",
     porque si no el sistema le abre dos veces y descuadra la ocupación de la zona.
@@ -152,10 +163,12 @@ async def verificar_placa(
             )
         )).scalars().first()
 
-    if vehiculo and vehiculo.socio_id:
-        socio = (await db.execute(
-            select(Usuario).where(Usuario.id == vehiculo.socio_id, Usuario.activo == True)
-        )).scalars().first()
+    if vehiculo:
+        socio = None
+        if vehiculo.socio_id:
+            socio = (await db.execute(
+                select(Usuario).where(Usuario.id == vehiculo.socio_id, Usuario.activo == True)
+            )).scalars().first()
 
         if socio:
             membresia = (await db.execute(
@@ -207,6 +220,39 @@ async def verificar_placa(
                 "mensaje": "✅ Socio registrado — Membresía vigente",
                 "alerta": "success",
             }
+
+        # Está en el registro de vehículos pero sin socio activo detrás. Antes se
+        # caía por aquí hasta acabar en "NO REGISTRADO", que es falso y grave: los
+        # vehículos internos de la base cuelgan de una entidad, no de un socio, así
+        # que todo el parque propio aparecía como desconocido en la alcabala.
+        entidad = None
+        if vehiculo.entidad_id:
+            entidad = (await db.execute(
+                select(EntidadCivil).where(EntidadCivil.id == vehiculo.entidad_id)
+            )).scalars().first()
+
+        return {
+            "encontrado": True,
+            "sin_datos": False,
+            "ya_ingresado": False,
+            "pase_valido": True,
+            "coincidencia": COINCIDENCIA_VEHICULO,
+            # Sin dueño de ningún tipo es un registro incompleto, no una autorización:
+            # se deja en ámbar para que el guardia lo mire, no para frenarlo.
+            "semaforo": SEMAFORO_VERDE if entidad else SEMAFORO_AMARILLO,
+            "tipo_pase": "VEHÍCULO REGISTRADO",
+            "tipo_pase_color": "#3b82f6",
+            "nombre_portador": entidad.nombre if entidad else None,
+            "usuario_id": None,
+            "vehiculo_id": str(vehiculo.id),
+            "qr_id": None,
+            "vehiculo_pase_id": None,
+            "mensaje": (
+                f"✅ Vehículo de {entidad.nombre}" if entidad
+                else "⚠️ Vehículo registrado sin titular asignado"
+            ),
+            "alerta": "success" if entidad else "warning",
+        }
 
     # ── 3. CodigoQR activo (pases masivos/temporales) ──────────────────────────
     qr = (await db.execute(

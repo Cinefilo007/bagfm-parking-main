@@ -39,12 +39,13 @@ const SEMAFORO = {
 };
 
 const ETIQUETAS = {
-  socio:         'SOCIO VIGENTE',
-  pase:          'PASE VIGENTE',
-  reingreso:     'YA ESTÁ ADENTRO',
-  socio_vencido: 'MEMBRESÍA VENCIDA',
-  pase_invalido: 'PASE NO VÁLIDO',
-  no_registrado: 'NO REGISTRADO',
+  socio:               'SOCIO VIGENTE',
+  vehiculo_registrado: 'VEHÍCULO REGISTRADO',
+  pase:                'PASE VIGENTE',
+  reingreso:           'YA ESTÁ ADENTRO',
+  socio_vencido:       'MEMBRESÍA VENCIDA',
+  pase_invalido:       'PASE NO VÁLIDO',
+  no_registrado:       'NO REGISTRADO',
 };
 
 const TEMAS = {
@@ -54,6 +55,7 @@ const TEMAS = {
     textoSuave: 'text-white/50',
     textoTenue: 'text-white/30',
     tarjeta: 'bg-white/5',
+    panel: 'border-white/10 bg-white/[0.03]',
     marcaAgua: 'text-emerald-400',
   },
   claro: {
@@ -62,9 +64,30 @@ const TEMAS = {
     textoSuave: 'text-slate-600',
     textoTenue: 'text-slate-400',
     tarjeta: 'bg-slate-900/5',
+    panel: 'border-slate-300 bg-white',
     marcaAgua: 'text-emerald-700',
   },
 };
+
+/**
+ * Caja con borde y titulillo.
+ *
+ * Sin un contorno explícito, en una pantalla grande todo flota junto y no se sabe
+ * qué dato pertenece a qué: el titular parecía referirse a la lista de abajo. Cada
+ * bloque encerrado se lee como una unidad.
+ */
+const Panel = ({ titulo, tema, className, children }) => (
+  <section
+    className={cn('flex min-h-0 flex-col rounded-2xl border p-5', tema.panel, className)}
+  >
+    {titulo && (
+      <h2 className={cn('mb-3 shrink-0 text-lg font-black uppercase tracking-[0.25em]', tema.textoTenue)}>
+        {titulo}
+      </h2>
+    )}
+    {children}
+  </section>
+);
 
 const semaforoDe = (ficha, tema) => {
   const s = SEMAFORO[ficha?.semaforo] || SEMAFORO.amarillo;
@@ -136,52 +159,57 @@ const Principal = ({ ficha, token, urlFoto, tema, nombreTema }) => {
   const destinos = ficha.destinos_recientes || [];
 
   return (
-    <div className="flex flex-1 gap-8 overflow-hidden">
-      <div className="flex w-[46%] shrink-0 flex-col gap-5">
-        <Foto
-          url={urlFoto(ficha, v.foto_escena_url ? 'escena' : 'placa')}
-          alt="Vehículo"
-          token={token}
-          tema={tema}
-          className="h-[38%] w-full rounded-2xl"
-        />
-
-        <div>
-          <p className={cn('font-mono text-[7rem] font-black leading-none tracking-tight', tema.texto)}>
+    <div className="flex min-h-0 flex-1 gap-6">
+      {/* IZQUIERDA — el vehículo: qué entra y si puede pasar */}
+      <div className="flex w-[46%] shrink-0 flex-col gap-4">
+        <Panel titulo="Vehículo" tema={tema} className="min-h-0 flex-1">
+          <Foto
+            url={urlFoto(ficha, v.foto_escena_url ? 'escena' : 'placa')}
+            alt="Vehículo"
+            token={token}
+            tema={tema}
+            className="min-h-0 w-full flex-1 rounded-xl"
+          />
+          <p className={cn('mt-4 shrink-0 font-mono text-[6rem] font-black leading-none tracking-tight', tema.texto)}>
             {ficha.placa}
           </p>
-          {atributos && (
-            <p className={cn('mt-2 text-3xl uppercase tracking-wide', tema.textoSuave)}>{atributos}</p>
-          )}
-        </div>
+          <p className={cn('mt-1 shrink-0 text-3xl uppercase tracking-wide', tema.textoSuave)}>
+            {atributos || 'Sin atributos'}
+          </p>
+        </Panel>
 
-        {/* El semáforo ocupa toda la anchura: es lo que se lee desde lejos. */}
+        {/* El semáforo va suelto y sin panel: es el único elemento que debe
+            competir por la atención desde el otro lado de la garita. */}
         <div
-          className="flex items-center gap-5 rounded-2xl px-8 py-6"
-          style={{ backgroundColor: `${color}22`, color, border: `3px solid ${color}` }}
+          className="flex shrink-0 items-center justify-center gap-5 rounded-2xl px-8 py-7"
+          style={{ backgroundColor: `${color}22`, color, border: `4px solid ${color}` }}
         >
-          <Icono className="h-14 w-14 shrink-0" />
-          <span className="text-5xl font-black uppercase tracking-wide">{rotulo}</span>
+          <Icono className="h-16 w-16 shrink-0" />
+          <div>
+            <p className="text-6xl font-black uppercase leading-none tracking-wide">{rotulo}</p>
+            <p className="mt-1 text-2xl font-bold uppercase tracking-widest opacity-80">
+              {ETIQUETAS[ficha.persona?.coincidencia] || 'NO REGISTRADO'}
+            </p>
+          </div>
         </div>
-
-        <p className={cn('text-2xl font-bold uppercase tracking-widest', tema.textoSuave)}>
-          {ETIQUETAS[ficha.persona?.coincidencia] || 'NO REGISTRADO'}
-        </p>
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-hidden">
-        <div>
-          <p className={cn('text-xl font-black uppercase tracking-[0.3em]', tema.textoTenue)}>Titular</p>
-          <p className={cn('mt-1 truncate text-6xl font-black uppercase leading-tight', tema.texto)}>
+      {/* DERECHA — la persona y su historial */}
+      <div className="flex min-w-0 flex-1 flex-col gap-4">
+        <Panel titulo="Titular" tema={tema} className="shrink-0">
+          <p className={cn('truncate text-6xl font-black uppercase leading-tight', tema.texto)}>
             {ficha.persona?.nombre || 'Sin registrar'}
           </p>
-        </div>
+        </Panel>
 
         {infracciones.length > 0 && (
-          <div className="rounded-2xl border-2 border-red-500/60 bg-red-500/10 p-5">
+          <section
+            className="shrink-0 rounded-2xl border-4 p-5"
+            style={{ borderColor: SEMAFORO.rojo[nombreTema], backgroundColor: `${SEMAFORO.rojo[nombreTema]}1a` }}
+          >
             <div className="flex items-center gap-3" style={{ color: SEMAFORO.rojo[nombreTema] }}>
-              <TriangleAlert className="h-8 w-8 shrink-0" />
-              <span className="text-2xl font-black uppercase tracking-wide">
+              <TriangleAlert className="h-9 w-9 shrink-0" />
+              <span className="text-3xl font-black uppercase tracking-wide">
                 {infracciones.length} infracción{infracciones.length > 1 ? 'es' : ''} activa{infracciones.length > 1 ? 's' : ''}
               </span>
             </div>
@@ -191,24 +219,22 @@ const Principal = ({ ficha, token, urlFoto, tema, nombreTema }) => {
                   {(inf.tipo || '').replace(/_/g, ' ').toUpperCase()}
                   {inf.gravedad && <span className={tema.textoTenue}> · {inf.gravedad}</span>}
                   {inf.bloquea_salida && (
-                    <span className="ml-2 rounded bg-red-500/30 px-2 py-0.5 text-lg font-bold">
+                    <span className="ml-2 rounded px-2 py-0.5 text-lg font-bold text-white"
+                          style={{ backgroundColor: SEMAFORO.rojo[nombreTema] }}>
                       BLOQUEA SALIDA
                     </span>
                   )}
                 </li>
               ))}
             </ul>
-          </div>
+          </section>
         )}
 
-        <div className="min-h-0 flex-1">
-          <p className={cn('text-xl font-black uppercase tracking-[0.3em]', tema.textoTenue)}>
-            Últimos destinos
-          </p>
+        <Panel titulo="Últimos destinos" tema={tema} className="min-h-0 flex-1">
           {destinos.length === 0 ? (
-            <p className={cn('mt-2 text-3xl', tema.textoTenue)}>Sin visitas previas registradas</p>
+            <p className={cn('text-3xl', tema.textoTenue)}>Sin visitas previas registradas</p>
           ) : (
-            <ul className="mt-2 space-y-2">
+            <ul className="space-y-3 overflow-hidden">
               {destinos.map((d, i) => (
                 <li key={i} className="flex items-baseline gap-4">
                   <MapPin className={cn('h-6 w-6 shrink-0 translate-y-1', tema.textoTenue)} />
@@ -220,14 +246,15 @@ const Principal = ({ ficha, token, urlFoto, tema, nombreTema }) => {
               ))}
             </ul>
           )}
-        </div>
+        </Panel>
       </div>
     </div>
   );
 };
 
 const Anteriores = ({ fichas, token, urlFoto, tema, nombreTema }) => (
-  <div className="grid shrink-0 grid-cols-3 gap-4">
+  <Panel titulo="Anteriores" tema={tema} className="shrink-0">
+   <div className="grid grid-cols-3 gap-4">
     {fichas.map((f) => {
       const { color } = semaforoDe(f, nombreTema);
       return (
@@ -247,7 +274,8 @@ const Anteriores = ({ fichas, token, urlFoto, tema, nombreTema }) => (
         </div>
       );
     })}
-  </div>
+   </div>
+  </Panel>
 );
 
 /**
