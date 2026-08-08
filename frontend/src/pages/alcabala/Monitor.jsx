@@ -262,6 +262,12 @@ const Monitor = () => {
   }, [esPantalla, tokenPantalla]);
 
   const cargar = useCallback(async () => {
+    // Sin credencial no se pide nada. El efecto de carga se dispara en el montaje,
+    // antes de que la vista llegue a decidir que toca emparejar; si aquí se llamara
+    // al endpoint con sesión, el 401 haría que el interceptor de api.js mandara el
+    // televisor al login y el emparejamiento no llegaría a verse nunca.
+    if (necesitaEmparejar) return;
+
     try {
       if (esPantalla) {
         const datos = await pantallaService.getMonitor(tokenPantalla);
@@ -271,11 +277,19 @@ const Monitor = () => {
         setFichas(await anprService.getMonitor(4));
       }
     } catch (error) {
+      // Si al televisor le revocaron la credencial, se descarta y vuelve solo a la
+      // pantalla de emparejamiento. Sin esto se quedaría en blanco indefinidamente y
+      // habría que ir a la garita a averiguar por qué.
+      if (esPantalla && error?.response?.status === 401) {
+        pantallaToken.borrar();
+        setTokenPantalla(null);
+        return;
+      }
       // Se deja constancia en consola en vez de tragarse el fallo: esta pantalla
       // vive sola en una garita y nadie va a estar mirando si algo falló.
       console.warn('[monitor] no se pudo cargar el histórico inicial', error);
     }
-  }, [esPantalla, tokenPantalla]);
+  }, [esPantalla, tokenPantalla, necesitaEmparejar]);
 
   // Carga inicial. La regla no distingue una petición al servidor de un setState
   // gratuito, y sin esto la pantalla arrancaría en blanco.
