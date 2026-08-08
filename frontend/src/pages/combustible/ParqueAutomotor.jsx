@@ -3,18 +3,20 @@ import {
   Car, RefreshCw, Upload, Edit3, Settings, ShieldAlert,
   CheckCircle, AlertTriangle, XCircle, Search, ToggleLeft, ToggleRight,
   Database, Flame, FileSpreadsheet, PlusCircle, Download,
-  ChevronLeft, ChevronRight, TrendingUp
+  ChevronLeft, ChevronRight, TrendingUp, Copy
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { toast } from 'react-hot-toast';
 import { combustibleService } from '../../services/combustible.service';
 import { entidadService } from '../../services/entidad.service';
 import { useAuthStore } from '../../store/auth.store';
+import { VehiculosDuplicados } from '../../components/combustible/VehiculosDuplicados';
 
 export default function ParqueAutomotor() {
   const { user } = useAuthStore();
   const esAdmin = user?.rol === 'ADMIN_BASE' || user?.rol === 'COMANDANTE';
 
+  const [verDuplicados, setVerDuplicados] = useState(false);
   const [vehiculos, setVehiculos] = useState([]);
   const [entidades, setEntidades] = useState([]);
   const [cargandoVehiculos, setCargandoVehiculos] = useState(true);
@@ -368,6 +370,21 @@ export default function ParqueAutomotor() {
             <Upload size={14} />
             Carga Masiva
           </button>
+          {esAdmin && (
+            <button
+              onClick={() => setVerDuplicados((v) => !v)}
+              className={cn(
+                "flex-1 sm:flex-initial h-10 px-4 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 border",
+                verDuplicados
+                  ? "bg-warning text-on-primary border-warning"
+                  : "bg-white/5 text-text-muted border-bg-high/30 hover:text-text-main"
+              )}
+              title="Fichas del mismo vehículo cargadas más de una vez"
+            >
+              <Copy size={14} />
+              Duplicados
+            </button>
+          )}
           <button 
             onClick={() => { cargarEntidades(); cargarVehiculos(); }}
             className="w-10 h-10 rounded-xl bg-white/5 border border-bg-high/30 flex items-center justify-center text-text-muted hover:text-text-main transition-all"
@@ -377,6 +394,19 @@ export default function ParqueAutomotor() {
           </button>
         </div>
       </div>
+
+      {/* SANEAMIENTO DE FICHAS DUPLICADAS */}
+      {verDuplicados && esAdmin && (
+        <div className="bg-bg-card border border-warning/40 rounded-xl p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Copy size={16} className="text-warning" />
+            <h2 className="text-sm font-black uppercase tracking-widest text-text-main font-mono">
+              Fichas duplicadas
+            </h2>
+          </div>
+          <VehiculosDuplicados />
+        </div>
+      )}
 
       {/* PLANIFICADOR SEMANAL DE ABASTECIMIENTO */}
       <div className="bg-bg-card border border-bg-high/50 rounded-xl p-4 space-y-4">

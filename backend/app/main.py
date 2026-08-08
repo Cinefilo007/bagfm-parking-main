@@ -112,7 +112,7 @@ from app.api.v1 import (
     auth, entidades, socios, accesos, 
     infracciones, websocket, comando, eventos, mapa,
     personal, pases, ia, zonas, parqueros, fantasmas, cron, tipos_acceso, biometrico, notificaciones, configuracion_correo,
-    supervisor_base, combustible, anpr
+    supervisor_base, combustible, anpr, vehiculos
 )
 
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Autenticación"])
@@ -138,3 +138,4 @@ app.include_router(notificaciones.router, prefix="/api/v1", tags=["Sistema de No
 app.include_router(configuracion_correo.router, prefix="/api/v1/configuracion-correo", tags=["Configuración Sistema"])
 app.include_router(combustible.router, prefix="/api/v1/combustible", tags=["Control de Combustible"])
 app.include_router(anpr.router, prefix="/api/v1/anpr", tags=["Control de Acceso por Placa (ANPR)"])
+app.include_router(vehiculos.router, prefix="/api/v1/vehiculos", tags=["Registro de Vehículos"])
