@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import QRCode from 'react-qr-code';
+// Import con nombre y no por defecto: `react-qr-code` es CommonJS y su export por
+// defecto no sobrevive al interop del bundler; llega como objeto plano y React lo
+// rechaza con el error #130. El export con nombre sí resuelve al componente.
+import { QRCode } from 'react-qr-code';
 import { Loader2, RefreshCw, WifiOff } from 'lucide-react';
 
 import { pantallaService } from '../../services/pantalla.service';
