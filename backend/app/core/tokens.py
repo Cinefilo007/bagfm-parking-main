@@ -20,3 +20,13 @@ def generar_token() -> str:
 
 def hashear_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+# Sin 0/O, 1/I/L ni 5/S: el código se lee de una pantalla y se teclea a mano cuando
+# el QR no se deja escanear, y esas parejas son las que todo el mundo confunde.
+_ALFABETO_CODIGO = "ABCDEFGHJKMNPQRTUVWXYZ2346789"
+
+
+def generar_codigo_corto(largo: int = 6) -> str:
+    """Código legible para emparejar una pantalla. Se muestra como XXX-XXX."""
+    return "".join(secrets.choice(_ALFABETO_CODIGO) for _ in range(largo))

@@ -15,6 +15,7 @@ import DashboardAlcabala from '../pages/alcabala/Dashboard';
 import ScannerAlcabala from '../pages/alcabala/Scanner';
 import PuertaAlcabala from '../pages/alcabala/Puerta';
 import MonitorAlcabala from '../pages/alcabala/Monitor';
+import ConfirmarPantalla from '../pages/alcabala/ConfirmarPantalla';
 import Alcabalas from '../pages/comandante/Alcabalas';
 import CamarasAnpr from '../pages/comandante/CamarasAnpr';
 import EventosMando from '../pages/comandante/EventosMando';
@@ -74,6 +75,16 @@ export const router = createBrowserRouter([
     path: '/login',
     element: <Login />,
   },
+  // ====== MONITOR DE ALCABALA (TV, MODO KIOSCO) ======
+  // Al mismo nivel que /login y fuera de toda RutaProtegida: un televisor no tiene
+  // sesión de persona —se autentica con su propio token de pantalla— y dentro de la
+  // rama protegida acabaría redirigido al login. Tampoco usa MainLayout: nada de
+  // barras de navegación ni conmutador de tema encima de la imagen. Ruta corta
+  // porque hay que teclearla en el navegador de un televisor.
+  {
+    path: '/monitor',
+    element: <MonitorAlcabala />,
+  },
   {
     path: '/',
     element: <RutaProtegida />,
@@ -81,16 +92,6 @@ export const router = createBrowserRouter([
       {
         path: '',
         element: <HomeRedirect />
-      },
-      // ====== MONITOR DE ALCABALA (TV, MODO KIOSCO) ======
-      // Fuera de MainLayout y sin RutaProtegida a propósito: un televisor no tiene
-      // sesión de persona, se autentica con su propio token de pantalla, y no debe
-      // arrastrar barras de navegación ni el conmutador de tema. La propia vista
-      // decide qué credencial usa; sin ninguna, el interceptor manda al login.
-      // Ruta corta porque hay que teclearla en el navegador de un televisor.
-      {
-        path: 'monitor',
-        element: <MonitorAlcabala />
       },
       // ====== RUTAS CON NAVEGACIÓN (LAYOUT PRINCIPAL) ======
       {
@@ -142,7 +143,9 @@ export const router = createBrowserRouter([
               { path: 'scanner', element: <ScannerAlcabala /> },
               // El escáner QR sigue vivo para socios y pases; la puerta es el flujo
               // nuevo para el visitante que llega sin nada.
-              { path: 'puerta', element: <PuertaAlcabala /> }
+              { path: 'puerta', element: <PuertaAlcabala /> },
+              // Se llega escaneando el QR que muestra el televisor.
+              { path: 'emparejar/:codigo', element: <ConfirmarPantalla /> }
             ]
           },
           // PARQUERO

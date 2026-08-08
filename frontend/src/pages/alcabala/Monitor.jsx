@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Car, CheckCircle2, XCircle, AlertTriangle, TriangleAlert,
   MapPin, Clock, Wifi, WifiOff, Camera,
@@ -8,6 +8,8 @@ import { useNotifications } from '../../hooks/useNotifications';
 import { usePantallaSocket } from '../../hooks/usePantallaSocket';
 import { anprService } from '../../services/anpr.service';
 import { pantallaService, pantallaToken } from '../../services/pantalla.service';
+import { EmparejarPantalla } from '../../components/alcabala/EmparejarPantalla';
+import { useAuthStore } from '../../store/auth.store';
 import { cn } from '../../lib/utils';
 
 /**
@@ -216,8 +218,18 @@ const Anteriores = ({ fichas, token, urlFoto }) => (
 const Monitor = () => {
   // El token de pantalla se captura una sola vez: viene en la URL la primera vez y
   // de ahí queda guardado, para que el televisor arranque solo tras un corte de luz.
-  const tokenPantalla = useMemo(() => pantallaToken.capturarDeUrl(), []);
+  const [tokenPantalla, setTokenPantalla] = useState(() => pantallaToken.capturarDeUrl());
   const esPantalla = Boolean(tokenPantalla);
+
+  // Un televisor sin credencial y sin nadie logueado tiene que poder pedir permiso
+  // por sí solo; con sesión de persona se salta el emparejamiento y muestra directo.
+  const { isAuthenticated } = useAuthStore();
+  const necesitaEmparejar = !tokenPantalla && !isAuthenticated;
+
+  const guardarToken = useCallback((token) => {
+    pantallaToken.guardar(token);
+    setTokenPantalla(token);
+  }, []);
 
   // Los dos hooks se llaman siempre —no se pueden llamar condicionalmente— pero cada
   // uno se queda inerte si no tiene su credencial.
@@ -308,6 +320,10 @@ const Monitor = () => {
     if (esPantalla) pantalla.limpiar();
     else sesion.setLastNotification(null);
   }, [aviso, esPantalla, pantalla, sesion]);
+
+  if (necesitaEmparejar) {
+    return <EmparejarPantalla onEmparejada={guardarToken} />;
+  }
 
   const [actual, ...anteriores] = fichas;
 

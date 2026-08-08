@@ -10,11 +10,12 @@ Dos públicos muy distintos comparten este router:
     cámaras y consulta el histórico. Ambos con su sesión normal.
 """
 import ipaddress
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -23,7 +24,9 @@ from app.core.database import obtener_db
 from app.core.dependencias import obtener_usuario_actual, require_rol
 from app.models.alcabala_evento import PuntoAcceso
 from app.models.camara_anpr import CamaraAnpr, generar_token, hashear_token
+from app.core.tokens import generar_codigo_corto
 from app.models.destino_alcabala import DestinoAlcabala
+from app.models.emparejamiento_pantalla import EmparejamientoPantalla
 from app.models.enums import AccesoTipo, AnprEstado, OrigenRegistro, RolTipo
 from app.models.evento_anpr import EventoAnpr
 from app.models.pantalla_monitor import PantallaMonitor
@@ -37,6 +40,10 @@ from app.schemas.anpr import (
     DestinoSalida,
     EventoAnprSalida,
     PaginatedEventosAnpr,
+    EmparejamientoConfirmar,
+    EmparejamientoEstado,
+    EmparejamientoInfo,
+    EmparejamientoIniciado,
     PantallaConToken,
     PantallaCrear,
     PantallaEditar,
@@ -499,6 +506,201 @@ async def foto_pantalla(
         media_type="image/jpeg",
         headers={"Cache-Control": "private, max-age=3600"},
     )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Emparejamiento: el televisor muestra un código, el guardia lo confirma
+# ──────────────────────────────────────────────────────────────────────────────
+
+MINUTOS_EMPAREJAMIENTO = 5
+
+
+async def _purgar_emparejamientos(db: AsyncSession) -> None:
+    """Borra los caducados. Se hace al vuelo para no montar un cron por tan poco."""
+    await db.execute(
+        delete(EmparejamientoPantalla).where(
+            EmparejamientoPantalla.expira_at < datetime.now(timezone.utc)
+        )
+    )
+
+
+@router.post("/pantalla/emparejar", response_model=EmparejamientoIniciado)
+async def iniciar_emparejamiento(db: AsyncSession = Depends(obtener_db)):
+    """
+    El televisor pide un código para que lo autoricen. Sin sesión: todavía no tiene.
+
+    Devuelve además un secreto que solo conoce este aparato. El código puede verlo
+    cualquiera que mire la pantalla —para eso está— pero sin el secreto no sirve para
+    reclamar la credencial.
+    """
+    await _purgar_emparejamientos(db)
+
+    secreto = generar_token()
+    # Reintento por si el código sorteado ya estuviera vivo. Con 29^6 combinaciones
+    # la colisión es rarísima, pero el índice es único y reventaría el alta.
+    for _ in range(5):
+        codigo = generar_codigo_corto()
+        existe = (await db.execute(
+            select(EmparejamientoPantalla.id).where(EmparejamientoPantalla.codigo == codigo)
+        )).scalars().first()
+        if not existe:
+            break
+    else:
+        raise HTTPException(status_code=503, detail="No se pudo generar un código, reintente")
+
+    emparejamiento = EmparejamientoPantalla(
+        codigo=codigo,
+        secreto_hash=hashear_token(secreto),
+        expira_at=datetime.now(timezone.utc) + timedelta(minutes=MINUTOS_EMPAREJAMIENTO),
+    )
+    db.add(emparejamiento)
+    await db.commit()
+    await db.refresh(emparejamiento)
+
+    return EmparejamientoIniciado(
+        codigo=codigo,
+        secreto=secreto,
+        url_confirmacion=f"{config.frontend_url.rstrip('/')}/alcabala/emparejar/{codigo}",
+        expira_at=emparejamiento.expira_at,
+    )
+
+
+@router.get("/pantalla/emparejar/estado", response_model=EmparejamientoEstado)
+async def estado_emparejamiento(
+    secreto: str,
+    db: AsyncSession = Depends(obtener_db),
+):
+    """
+    El televisor pregunta si ya lo autorizaron.
+
+    Cuando la respuesta es que sí, se le genera aquí su credencial y se borra el
+    emparejamiento: el token existe en claro solo el tiempo de esta respuesta y de él
+    únicamente queda el hash.
+    """
+    emparejamiento = (await db.execute(
+        select(EmparejamientoPantalla).where(
+            EmparejamientoPantalla.secreto_hash == hashear_token(secreto)
+        )
+    )).scalars().first()
+
+    if not emparejamiento:
+        return EmparejamientoEstado(estado="expirado")
+
+    if emparejamiento.expira_at < datetime.now(timezone.utc):
+        await db.delete(emparejamiento)
+        await db.commit()
+        return EmparejamientoEstado(estado="expirado")
+
+    if not emparejamiento.pantalla_id:
+        return EmparejamientoEstado(estado="pendiente")
+
+    pantalla = (await db.execute(
+        select(PantallaMonitor)
+        .options(selectinload(PantallaMonitor.punto_acceso))
+        .where(PantallaMonitor.id == emparejamiento.pantalla_id)
+    )).scalars().first()
+
+    if not pantalla:
+        await db.delete(emparejamiento)
+        await db.commit()
+        return EmparejamientoEstado(estado="expirado")
+
+    token = generar_token()
+    pantalla.token_hash = hashear_token(token)
+    pantalla.token_pista = token[-4:]
+    pantalla.token_generado_at = func.now()
+
+    await db.delete(emparejamiento)
+    await db.commit()
+
+    return EmparejamientoEstado(
+        estado="confirmado",
+        token=token,
+        punto_nombre=pantalla.punto_nombre,
+    )
+
+
+@router.get("/emparejar/{codigo}", response_model=EmparejamientoInfo)
+async def consultar_emparejamiento(
+    codigo: str,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = DEPENDENCY_ALCABALA,
+):
+    """Lo que el guardia ve antes de confirmar: qué código es y a qué alcabala iría."""
+    emparejamiento = (await db.execute(
+        select(EmparejamientoPantalla).where(
+            EmparejamientoPantalla.codigo == codigo.strip().upper().replace("-", "")
+        )
+    )).scalars().first()
+
+    if not emparejamiento or emparejamiento.expira_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=404, detail="Código no válido o vencido")
+    if emparejamiento.pantalla_id:
+        raise HTTPException(status_code=409, detail="Ese código ya fue confirmado")
+
+    punto = await _punto_del_guardia(db, usuario)
+    return EmparejamientoInfo(
+        codigo=emparejamiento.codigo,
+        punto_nombre=punto.nombre if punto else None,
+        expira_at=emparejamiento.expira_at,
+    )
+
+
+async def _punto_del_guardia(db: AsyncSession, usuario: Usuario) -> Optional[PuntoAcceso]:
+    """La alcabala a la que está asignada la cuenta del guardia."""
+    return (await db.execute(
+        select(PuntoAcceso).where(PuntoAcceso.usuario_id == usuario.id)
+    )).scalars().first()
+
+
+@router.post("/emparejar/{codigo}/confirmar", response_model=PantallaSalida)
+async def confirmar_emparejamiento(
+    codigo: str,
+    datos: EmparejamientoConfirmar,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = DEPENDENCY_ALCABALA,
+):
+    """
+    El guardia autoriza el televisor desde su teléfono.
+
+    La pantalla hereda la alcabala de la cuenta que confirma, que es lo que hace este
+    flujo tan corto: el guardia no elige nada, porque su cuenta ya dice en qué garita
+    está. Un comandante, que no está asignado a ninguna, tiene que crear la pantalla
+    desde el panel.
+    """
+    emparejamiento = (await db.execute(
+        select(EmparejamientoPantalla).where(
+            EmparejamientoPantalla.codigo == codigo.strip().upper().replace("-", "")
+        )
+    )).scalars().first()
+
+    if not emparejamiento or emparejamiento.expira_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=404, detail="Código no válido o vencido")
+    if emparejamiento.pantalla_id:
+        raise HTTPException(status_code=409, detail="Ese código ya fue confirmado")
+
+    punto = await _punto_del_guardia(db, usuario)
+    if not punto:
+        raise HTTPException(
+            status_code=400,
+            detail="Su cuenta no está asignada a una alcabala. Registre la pantalla desde el panel de Cámaras ANPR.",
+        )
+
+    pantalla = PantallaMonitor(
+        nombre=(datos.nombre or f"TV {punto.nombre}").strip()[:150],
+        punto_acceso_id=punto.id,
+        creado_por=usuario.id,
+        notas=f"Emparejada desde el teléfono por {usuario.nombre} {usuario.apellido}".strip(),
+    )
+    db.add(pantalla)
+    await db.flush()
+
+    emparejamiento.pantalla_id = pantalla.id
+    emparejamiento.confirmado_por = usuario.id
+    emparejamiento.confirmado_at = func.now()
+    await db.commit()
+
+    return await _recargar_pantalla(db, pantalla.id)
 
 
 @router.get("/pantallas", response_model=List[PantallaSalida])

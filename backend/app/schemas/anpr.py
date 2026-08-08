@@ -155,6 +155,35 @@ class PantallaConToken(BaseModel):
     url_monitor: str
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Emparejamiento de pantallas (el televisor muestra un código, el guardia confirma)
+# ──────────────────────────────────────────────────────────────────────────────
+
+class EmparejamientoIniciado(BaseModel):
+    """Lo que recibe el televisor al pedir un código."""
+    codigo: str
+    secreto: str          # solo lo conoce este televisor; con él recoge su credencial
+    url_confirmacion: str  # lo que se codifica en el QR
+    expira_at: datetime
+
+
+class EmparejamientoEstado(BaseModel):
+    estado: str                     # pendiente | confirmado | expirado
+    token: Optional[str] = None     # solo cuando pasa a confirmado, y una sola vez
+    punto_nombre: Optional[str] = None
+
+
+class EmparejamientoInfo(BaseModel):
+    """Lo que ve el guardia en su teléfono antes de confirmar."""
+    codigo: str
+    punto_nombre: Optional[str] = None
+    expira_at: datetime
+
+
+class EmparejamientoConfirmar(BaseModel):
+    nombre: Optional[str] = Field(default=None, max_length=150)
+
+
 class PaginatedEventosAnpr(BaseModel):
     items: List[EventoAnprSalida]
     total: int

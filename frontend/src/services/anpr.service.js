@@ -90,6 +90,20 @@ export const anprService = {
     await api.delete(`/anpr/camaras/${camaraId}`);
   },
 
+  // ── Emparejamiento de pantallas (desde el teléfono del guardia) ───────────
+
+  /** Qué código es y a qué alcabala iría, para mostrarlo antes de confirmar. */
+  async consultarEmparejamiento(codigo) {
+    const { data } = await api.get(`/anpr/emparejar/${codigo}`);
+    return data;
+  },
+
+  /** Autoriza el televisor. La pantalla hereda la alcabala de quien confirma. */
+  async confirmarEmparejamiento(codigo, nombre = null) {
+    const { data } = await api.post(`/anpr/emparejar/${codigo}/confirmar`, { nombre });
+    return data;
+  },
+
   // ── Pantallas de garita (TV) ──────────────────────────────────────────────
 
   async getPantallas() {

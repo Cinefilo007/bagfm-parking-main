@@ -40,12 +40,34 @@ export const pantallaToken = {
     return localStorage.getItem(CLAVE_TOKEN);
   },
 
+  /** Guarda la credencial recién obtenida por emparejamiento. */
+  guardar(token) {
+    localStorage.setItem(CLAVE_TOKEN, token);
+  },
+
   borrar() {
     localStorage.removeItem(CLAVE_TOKEN);
   },
 };
 
 export const pantallaService = {
+  /**
+   * El televisor pide un código para que lo autoricen. No necesita sesión: todavía
+   * no tiene ninguna.
+   */
+  async iniciarEmparejamiento() {
+    const { data } = await axios.post(`${baseURL()}/anpr/pantalla/emparejar`);
+    return data;
+  },
+
+  /** Pregunta si el guardia ya confirmó. Devuelve el token cuando pasa a confirmado. */
+  async estadoEmparejamiento(secreto) {
+    const { data } = await axios.get(`${baseURL()}/anpr/pantalla/emparejar/estado`, {
+      params: { secreto },
+    });
+    return data;
+  },
+
   /** Últimas detecciones de la alcabala de esta pantalla. */
   async getMonitor(token, limite = 4) {
     const { data } = await axios.get(`${baseURL()}/anpr/pantalla/monitor`, {
