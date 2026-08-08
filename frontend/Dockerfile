@@ -1,5 +1,5 @@
 # Etapa 1: Build con Node.js
-FROM node:20-alpine AS build-stage
+FROM node:25-alpine AS build-stage
 
 # Establecer directorio de trabajo
 WORKDIR /app
