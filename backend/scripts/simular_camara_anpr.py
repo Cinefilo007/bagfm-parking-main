@@ -19,6 +19,7 @@ la tarjeta al guardia que tenga la pantalla de Puerta abierta. Para pruebas de
 verdad, usa una placa reconocible como PRUEBA1 y descarta el evento después.
 """
 import argparse
+import base64
 import sys
 import urllib.request
 import uuid
@@ -73,9 +74,31 @@ def extraer_token(valor: str) -> str:
     return valor
 
 
+# JPEG real de 1×1. Antes se enviaba una cabecera con relleno: el backend la
+# guardaba sin protestar, pero el navegador no sabía decodificarla y en la pantalla
+# salía el icono de imagen rota. Parecía un fallo del sistema y solo lo era del
+# simulador.
+_JPEG_MINIMO = base64.b64decode(
+    "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRof"
+    "Hh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAHwAA"
+    "AQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQR"
+    "BRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RF"
+    "RkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ip"
+    "qrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/9oACAEB"
+    "AAA/AP3+ooooA//Z"
+)
+
+
 def jpeg_falso(relleno: bytes, tamano: int) -> bytes:
-    """JPEG mínimo válido en cabecera y cierre: basta para ejercitar el guardado."""
-    return b"\xff\xd8\xff\xe0" + relleno * tamano + b"\xff\xd9"
+    """
+    Un JPEG que el navegador sabe decodificar de verdad.
+
+    `relleno` y `tamano` solo sirven para que unas salgan más grandes que otras y así
+    poder comprobar que la foto de la placa (pequeña) y la de escena (grande) se
+    clasifican bien cuando la cámara no las nombra. El relleno va DESPUÉS del cierre
+    del JPEG, donde los decodificadores lo ignoran.
+    """
+    return _JPEG_MINIMO + relleno * tamano
 
 
 def construir_multipart(xml: bytes, foto_placa: bytes, foto_escena: bytes) -> tuple[str, bytes]:

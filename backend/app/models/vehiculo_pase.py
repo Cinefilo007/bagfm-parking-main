@@ -16,6 +16,11 @@ class VehiculoPase(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     qr_id = Column(UUID(as_uuid=True), ForeignKey("codigos_qr.id", ondelete="CASCADE"), nullable=True, index=True)  # nullable para registros manuales por placa
     
+    # Enlace al registro madre. Nullable porque un pase puede ser de un visitante que
+    # nunca se dio de alta en `vehiculos`; en ese caso los campos de abajo son todo
+    # lo que se sabe del vehículo.
+    vehiculo_id = Column(UUID(as_uuid=True), ForeignKey("vehiculos.id", ondelete="SET NULL"), nullable=True, index=True)
+
     placa = Column(String(20), nullable=False)
     marca = Column(String(50), nullable=True)
     modelo = Column(String(50), nullable=True)

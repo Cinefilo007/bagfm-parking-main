@@ -497,9 +497,13 @@ class AnprService:
             "estado": evento.estado.value if evento.estado else None,
             "semaforo": semaforo,
             "vehiculo": {
-                "tipo": evento.tipo_vehiculo,
-                "color": evento.color_vehiculo,
-                "marca": evento.marca_vehiculo,
+                # Si la placa está registrada, mandan los datos del sistema sobre lo
+                # que clasificó la cámara: "saloonCar · white" es una etiqueta
+                # genérica en inglés y casi siempre la misma, mientras que el registro
+                # tiene la marca, el modelo y el color reales del vehículo.
+                "tipo": veredicto.get("vehiculo_modelo") or evento.tipo_vehiculo,
+                "color": veredicto.get("vehiculo_color") or evento.color_vehiculo,
+                "marca": veredicto.get("vehiculo_marca") or evento.marca_vehiculo,
                 "foto_placa_url": f"{base}/placa" if evento.foto_placa_path else None,
                 "foto_escena_url": f"{base}/escena" if evento.foto_escena_path else None,
             },

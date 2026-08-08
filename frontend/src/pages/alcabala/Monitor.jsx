@@ -78,10 +78,10 @@ const TEMAS = {
  */
 const Panel = ({ titulo, tema, className, children }) => (
   <section
-    className={cn('flex min-h-0 flex-col rounded-2xl border p-5', tema.panel, className)}
+    className={cn('flex min-h-0 flex-col rounded-2xl border p-[1.4vh]', tema.panel, className)}
   >
     {titulo && (
-      <h2 className={cn('mb-3 shrink-0 text-lg font-black uppercase tracking-[0.25em]', tema.textoTenue)}>
+      <h2 className={cn('mb-3 shrink-0 text-[clamp(0.6rem,0.95vw,1.125rem)] font-black uppercase tracking-[0.25em]', tema.textoTenue)}>
         {titulo}
       </h2>
     )}
@@ -134,11 +134,22 @@ const Foto = ({ url, className, alt, token, tema }) => {
   if (!src) {
     return (
       <div className={cn('flex items-center justify-center', tema.tarjeta, className)}>
-        <Camera className={cn('h-10 w-10', tema.textoTenue)} />
+        <Camera className={cn('h-[8%] min-h-6 w-auto', tema.textoTenue)} />
       </div>
     );
   }
-  return <img src={src} alt={alt} className={cn('object-cover', className)} />;
+  return (
+    <img
+      src={src}
+      alt={alt}
+      // El servidor puede devolver 200 con algo que no sea una imagen decodificable
+      // (una subida truncada, por ejemplo). Sin esto el navegador pinta el icono de
+      // imagen rota con el texto alternativo encima, que en un televisor se ve peor
+      // que no mostrar nada.
+      onError={() => setSrc(null)}
+      className={cn('object-cover', className)}
+    />
+  );
 };
 
 /** La detección actual, ocupando la mayor parte de la pantalla. */
@@ -147,7 +158,7 @@ const Principal = ({ ficha, token, urlFoto, tema, nombreTema }) => {
     return (
       <div className={cn('flex flex-1 flex-col items-center justify-center', tema.textoTenue)}>
         <Car className="h-24 w-24" />
-        <p className="mt-6 text-3xl font-black uppercase tracking-[0.2em]">Esperando vehículos</p>
+        <p className="mt-6 text-[clamp(1rem,2vw,1.875rem)] font-black uppercase tracking-[0.2em]">Esperando vehículos</p>
       </div>
     );
   }
@@ -159,9 +170,9 @@ const Principal = ({ ficha, token, urlFoto, tema, nombreTema }) => {
   const destinos = ficha.destinos_recientes || [];
 
   return (
-    <div className="flex min-h-0 flex-1 gap-6">
+    <div className="flex min-h-0 flex-1 gap-[1.5vw]">
       {/* IZQUIERDA — el vehículo: qué entra y si puede pasar */}
-      <div className="flex w-[46%] shrink-0 flex-col gap-4">
+      <div className="flex w-[46%] shrink-0 flex-col gap-[1.2vh]">
         <Panel titulo="Vehículo" tema={tema} className="min-h-0 flex-1">
           <Foto
             url={urlFoto(ficha, v.foto_escena_url ? 'escena' : 'placa')}
@@ -170,10 +181,10 @@ const Principal = ({ ficha, token, urlFoto, tema, nombreTema }) => {
             tema={tema}
             className="min-h-0 w-full flex-1 rounded-xl"
           />
-          <p className={cn('mt-4 shrink-0 font-mono text-[6rem] font-black leading-none tracking-tight', tema.texto)}>
+          <p className={cn('mt-4 shrink-0 font-mono text-[clamp(2rem,5.5vw,6rem)] font-black leading-none tracking-tight', tema.texto)}>
             {ficha.placa}
           </p>
-          <p className={cn('mt-1 shrink-0 text-3xl uppercase tracking-wide', tema.textoSuave)}>
+          <p className={cn('mt-1 shrink-0 text-[clamp(0.9rem,1.6vw,1.875rem)] uppercase tracking-wide', tema.textoSuave)}>
             {atributos || 'Sin atributos'}
           </p>
         </Panel>
@@ -181,13 +192,13 @@ const Principal = ({ ficha, token, urlFoto, tema, nombreTema }) => {
         {/* El semáforo va suelto y sin panel: es el único elemento que debe
             competir por la atención desde el otro lado de la garita. */}
         <div
-          className="flex shrink-0 items-center justify-center gap-5 rounded-2xl px-8 py-7"
+          className="flex shrink-0 items-center justify-center gap-5 rounded-2xl px-[2vw] py-[1.8vh]"
           style={{ backgroundColor: `${color}22`, color, border: `4px solid ${color}` }}
         >
-          <Icono className="h-16 w-16 shrink-0" />
+          <Icono className="h-[clamp(2rem,4vw,4rem)] w-[clamp(2rem,4vw,4rem)] shrink-0" />
           <div>
-            <p className="text-6xl font-black uppercase leading-none tracking-wide">{rotulo}</p>
-            <p className="mt-1 text-2xl font-bold uppercase tracking-widest opacity-80">
+            <p className="text-[clamp(1.5rem,3.6vw,3.75rem)] font-black uppercase leading-none tracking-wide">{rotulo}</p>
+            <p className="mt-1 text-[clamp(0.75rem,1.35vw,1.5rem)] font-bold uppercase tracking-widest opacity-80">
               {ETIQUETAS[ficha.persona?.coincidencia] || 'NO REGISTRADO'}
             </p>
           </div>
@@ -195,9 +206,9 @@ const Principal = ({ ficha, token, urlFoto, tema, nombreTema }) => {
       </div>
 
       {/* DERECHA — la persona y su historial */}
-      <div className="flex min-w-0 flex-1 flex-col gap-4">
+      <div className="flex min-w-0 flex-1 flex-col gap-[1.2vh]">
         <Panel titulo="Titular" tema={tema} className="shrink-0">
-          <p className={cn('truncate text-6xl font-black uppercase leading-tight', tema.texto)}>
+          <p className={cn('truncate text-[clamp(1.5rem,3.4vw,3.75rem)] font-black uppercase leading-tight', tema.texto)}>
             {ficha.persona?.nombre || 'Sin registrar'}
           </p>
         </Panel>
@@ -209,13 +220,13 @@ const Principal = ({ ficha, token, urlFoto, tema, nombreTema }) => {
           >
             <div className="flex items-center gap-3" style={{ color: SEMAFORO.rojo[nombreTema] }}>
               <TriangleAlert className="h-9 w-9 shrink-0" />
-              <span className="text-3xl font-black uppercase tracking-wide">
+              <span className="text-[clamp(0.95rem,1.8vw,1.875rem)] font-black uppercase tracking-wide">
                 {infracciones.length} infracción{infracciones.length > 1 ? 'es' : ''} activa{infracciones.length > 1 ? 's' : ''}
               </span>
             </div>
             <ul className="mt-3 space-y-1">
               {infracciones.slice(0, 3).map((inf, i) => (
-                <li key={i} className={cn('truncate text-2xl', tema.textoSuave)}>
+                <li key={i} className={cn('truncate text-[clamp(0.8rem,1.4vw,1.5rem)]', tema.textoSuave)}>
                   {(inf.tipo || '').replace(/_/g, ' ').toUpperCase()}
                   {inf.gravedad && <span className={tema.textoTenue}> · {inf.gravedad}</span>}
                   {inf.bloquea_salida && (
@@ -232,14 +243,14 @@ const Principal = ({ ficha, token, urlFoto, tema, nombreTema }) => {
 
         <Panel titulo="Últimos destinos" tema={tema} className="min-h-0 flex-1">
           {destinos.length === 0 ? (
-            <p className={cn('text-3xl', tema.textoTenue)}>Sin visitas previas registradas</p>
+            <p className={cn('text-[clamp(0.95rem,1.8vw,1.875rem)]', tema.textoTenue)}>Sin visitas previas registradas</p>
           ) : (
             <ul className="space-y-3 overflow-hidden">
               {destinos.map((d, i) => (
                 <li key={i} className="flex items-baseline gap-4">
                   <MapPin className={cn('h-6 w-6 shrink-0 translate-y-1', tema.textoTenue)} />
-                  <span className={cn('truncate text-4xl font-bold', tema.texto)}>{d.destino}</span>
-                  <span className={cn('ml-auto shrink-0 text-2xl', tema.textoTenue)}>
+                  <span className={cn('truncate text-[clamp(1rem,2.1vw,2.25rem)] font-bold', tema.texto)}>{d.destino}</span>
+                  <span className={cn('ml-auto shrink-0 text-[clamp(0.8rem,1.3vw,1.5rem)]', tema.textoTenue)}>
                     {fechaCorta(d.fecha)} {hora(d.fecha)}
                   </span>
                 </li>
@@ -265,12 +276,12 @@ const Anteriores = ({ fichas, token, urlFoto, tema, nombreTema }) => (
         >
           <Foto url={urlFoto(f, 'placa')} alt="" token={token} tema={tema} className="h-14 w-24 shrink-0 rounded-lg" />
           <div className="min-w-0">
-            <p className={cn('truncate font-mono text-3xl font-black', tema.texto)}>{f.placa}</p>
-            <p className={cn('truncate text-xl', tema.textoSuave)}>
+            <p className={cn('truncate font-mono text-[clamp(0.9rem,1.7vw,1.875rem)] font-black', tema.texto)}>{f.placa}</p>
+            <p className={cn('truncate text-[clamp(0.7rem,1.1vw,1.25rem)]', tema.textoSuave)}>
               {f.persona?.nombre || 'Sin registrar'}
             </p>
           </div>
-          <span className={cn('ml-auto shrink-0 text-xl', tema.textoTenue)}>{hora(f.timestamp)}</span>
+          <span className={cn('ml-auto shrink-0 text-[clamp(0.7rem,1.1vw,1.25rem)]', tema.textoTenue)}>{hora(f.timestamp)}</span>
         </div>
       );
     })}
@@ -428,13 +439,13 @@ const Monitor = () => {
   const [actual, ...anteriores] = fichas;
 
   return (
-    <div className="flex h-screen flex-col gap-6 p-8" style={{ backgroundColor: tema.fondo }}>
+    <div className="flex h-screen flex-col gap-[1.5vh] p-[1.8vh]" style={{ backgroundColor: tema.fondo }}>
       <header className="flex shrink-0 items-center justify-between">
         <div>
-          <p className={cn('font-mono text-lg font-bold uppercase tracking-[0.3em]', tema.marcaAgua)}>
+          <p className={cn('font-mono text-[clamp(0.6rem,0.95vw,1.125rem)] font-bold uppercase tracking-[0.3em]', tema.marcaAgua)}>
             Control de acceso // BAGFM
           </p>
-          <h1 className={cn('text-4xl font-black uppercase tracking-tight', tema.texto)}>{titulo}</h1>
+          <h1 className={cn('text-[clamp(1.1rem,2.2vw,2.25rem)] font-black uppercase tracking-tight', tema.texto)}>{titulo}</h1>
         </div>
 
         <div className="flex items-center gap-6">
@@ -455,7 +466,7 @@ const Monitor = () => {
             ? <Wifi className="h-7 w-7 text-emerald-500" />
             : <WifiOff className="h-7 w-7 text-red-500" />}
 
-          <span className={cn('flex items-center gap-2 text-3xl font-bold tabular-nums', tema.textoSuave)}>
+          <span className={cn('flex items-center gap-2 text-[clamp(1rem,1.9vw,1.875rem)] font-bold tabular-nums', tema.textoSuave)}>
             <Clock className="h-6 w-6" />
             {reloj.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}
           </span>

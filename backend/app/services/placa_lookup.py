@@ -144,6 +144,9 @@ async def verificar_placa(
             "vehiculo_id": None,
             "qr_id": None,
             "vehiculo_pase_id": str(vp_activo.id),
+            "vehiculo_marca": vp_activo.marca,
+            "vehiculo_modelo": vp_activo.modelo,
+            "vehiculo_color": vp_activo.color,
             "mensaje": f"⚠️ {placa} ya está registrado dentro. Se expulsará del estacionamiento al confirmar.",
             "alerta": "warning",
         }
@@ -199,6 +202,9 @@ async def verificar_placa(
                     "vehiculo_id": str(vehiculo.id),
                     "qr_id": None,
                     "vehiculo_pase_id": None,
+                    "vehiculo_marca": vehiculo.marca,
+                    "vehiculo_modelo": vehiculo.modelo,
+                    "vehiculo_color": vehiculo.color,
                     "mensaje": f"🚫 MEMBRESÍA {estado_msg}",
                     "alerta": "error",
                 }
@@ -217,6 +223,9 @@ async def verificar_placa(
                 "vehiculo_id": str(vehiculo.id),
                 "qr_id": None,
                 "vehiculo_pase_id": None,
+                "vehiculo_marca": vehiculo.marca,
+                "vehiculo_modelo": vehiculo.modelo,
+                "vehiculo_color": vehiculo.color,
                 "mensaje": "✅ Socio registrado — Membresía vigente",
                 "alerta": "success",
             }
@@ -247,6 +256,9 @@ async def verificar_placa(
             "vehiculo_id": str(vehiculo.id),
             "qr_id": None,
             "vehiculo_pase_id": None,
+            "vehiculo_marca": vehiculo.marca,
+            "vehiculo_modelo": vehiculo.modelo,
+            "vehiculo_color": vehiculo.color,
             "mensaje": (
                 f"✅ Vehículo de {entidad.nombre}" if entidad
                 else "⚠️ Vehículo registrado sin titular asignado"
@@ -289,6 +301,9 @@ async def verificar_placa(
                 "vehiculo_id": vehiculo_id,
                 "qr_id": str(qr.id),
                 "vehiculo_pase_id": None,
+                "vehiculo_marca": qr.vehiculo_marca,
+                "vehiculo_modelo": qr.vehiculo_modelo,
+                "vehiculo_color": qr.vehiculo_color,
                 "mensaje": f"🚫 PASE VENCIDO — Expiró el {qr.fecha_expiracion.strftime('%d/%m/%Y')}",
                 "alerta": "error",
             }
@@ -308,6 +323,9 @@ async def verificar_placa(
                 "vehiculo_id": vehiculo_id,
                 "qr_id": str(qr.id),
                 "vehiculo_pase_id": None,
+                "vehiculo_marca": qr.vehiculo_marca,
+                "vehiculo_modelo": qr.vehiculo_modelo,
+                "vehiculo_color": qr.vehiculo_color,
                 "mensaje": f"🚫 LÍMITE DE ACCESOS AGOTADO ({qr.max_accesos}/{qr.max_accesos})",
                 "alerta": "error",
             }
@@ -337,6 +355,9 @@ async def verificar_placa(
             "vehiculo_id": vehiculo_id,
             "qr_id": str(qr.id),
             "vehiculo_pase_id": None,
+            "vehiculo_marca": qr.vehiculo_marca,
+            "vehiculo_modelo": qr.vehiculo_modelo,
+            "vehiculo_color": qr.vehiculo_color,
             "mensaje": f"✅ Pase válido{vigencia_msg}",
             "alerta": "success",
         }
