@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@simplewebauthn/browser": "^10.0.0",
+    "@simplewebauthn/browser": "^13.3.0",
     "axios": "^1.14.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
