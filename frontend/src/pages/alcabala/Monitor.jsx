@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Car, CheckCircle2, XCircle, AlertTriangle, TriangleAlert,
   MapPin, Clock, Wifi, WifiOff, Camera,
 } from 'lucide-react';
 
 import { useNotifications } from '../../hooks/useNotifications';
+import { usePantallaSocket } from '../../hooks/usePantallaSocket';
 import { anprService } from '../../services/anpr.service';
+import { pantallaService, pantallaToken } from '../../services/pantalla.service';
 import { cn } from '../../lib/utils';
 
 /**
@@ -41,7 +43,7 @@ const fechaCorta = (v) =>
  * Foto servida por un endpoint que exige sesión, así que no se puede poner la URL
  * directa en un <img>: hay que descargarla y convertirla en object URL.
  */
-const Foto = ({ url, className, alt }) => {
+const Foto = ({ url, className, alt, token }) => {
   const [src, setSrc] = useState(null);
 
   useEffect(() => {
@@ -49,7 +51,13 @@ const Foto = ({ url, className, alt }) => {
     let vigente = true;
     let creada = null;
 
-    fetch(url, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
+    // Con token de pantalla el secreto ya viaja en la query de la URL; con sesión de
+    // persona hay que mandar el JWT en la cabecera.
+    const opciones = token
+      ? {}
+      : { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
+
+    fetch(url, opciones)
       .then((r) => (r.ok ? r.blob() : Promise.reject(new Error('sin foto'))))
       .then((blob) => {
         creada = URL.createObjectURL(blob);
@@ -62,7 +70,7 @@ const Foto = ({ url, className, alt }) => {
       vigente = false;
       if (creada) URL.revokeObjectURL(creada);
     };
-  }, [url]);
+  }, [url, token]);
 
   if (!src) {
     return (
@@ -75,7 +83,7 @@ const Foto = ({ url, className, alt }) => {
 };
 
 /** La detección actual, ocupando la mayor parte de la pantalla. */
-const Principal = ({ ficha }) => {
+const Principal = ({ ficha, token, urlFoto }) => {
   if (!ficha) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center text-white/30">
@@ -96,8 +104,9 @@ const Principal = ({ ficha }) => {
       {/* Columna izquierda: identidad del vehículo */}
       <div className="flex w-[46%] shrink-0 flex-col gap-5">
         <Foto
-          url={v.foto_escena_url || v.foto_placa_url}
+          url={urlFoto(ficha, v.foto_escena_url ? 'escena' : 'placa')}
           alt="Vehículo"
+          token={token}
           className="h-[42%] w-full rounded-2xl"
         />
 
@@ -180,7 +189,7 @@ const Principal = ({ ficha }) => {
 };
 
 /** Franja inferior con las detecciones anteriores. */
-const Anteriores = ({ fichas }) => (
+const Anteriores = ({ fichas, token, urlFoto }) => (
   <div className="grid shrink-0 grid-cols-3 gap-4">
     {fichas.map((f) => {
       const { color } = veredictoDe(f.persona?.coincidencia);
@@ -190,7 +199,7 @@ const Anteriores = ({ fichas }) => (
           className="flex items-center gap-4 rounded-xl bg-white/5 p-3"
           style={{ borderLeft: `5px solid ${color}` }}
         >
-          <Foto url={f.vehiculo?.foto_placa_url} alt="" className="h-14 w-24 shrink-0 rounded-lg" />
+          <Foto url={urlFoto(f, 'placa')} alt="" token={token} className="h-14 w-24 shrink-0 rounded-lg" />
           <div className="min-w-0">
             <p className="truncate font-mono text-3xl font-black text-white/85">{f.placa}</p>
             <p className="truncate text-xl text-white/40">
@@ -205,23 +214,59 @@ const Anteriores = ({ fichas }) => (
 );
 
 const Monitor = () => {
-  const { lastNotification, isConnected, setLastNotification } = useNotifications();
+  // El token de pantalla se captura una sola vez: viene en la URL la primera vez y
+  // de ahí queda guardado, para que el televisor arranque solo tras un corte de luz.
+  const tokenPantalla = useMemo(() => pantallaToken.capturarDeUrl(), []);
+  const esPantalla = Boolean(tokenPantalla);
+
+  // Los dos hooks se llaman siempre —no se pueden llamar condicionalmente— pero cada
+  // uno se queda inerte si no tiene su credencial.
+  const sesion = useNotifications();
+  const pantalla = usePantallaSocket(tokenPantalla);
+
   const [fichas, setFichas] = useState([]);
+  const [titulo, setTitulo] = useState('Alcabala');
   const [reloj, setReloj] = useState(new Date());
+
+  const conectado = esPantalla ? pantalla.conectado : sesion.isConnected;
+  const aviso = esPantalla ? pantalla.ultimo : sesion.lastNotification;
+
+  /**
+   * URL de una foto según el modo.
+   *
+   * La ficha trae las URL del endpoint con sesión, que el token de pantalla no puede
+   * usar: para el televisor hay que armarlas contra su propio endpoint, que además
+   * comprueba que la detección sea de SU alcabala.
+   */
+  const urlFoto = useCallback((ficha, cual) => {
+    if (!ficha) return null;
+    const tiene = cual === 'escena'
+      ? ficha.vehiculo?.foto_escena_url
+      : ficha.vehiculo?.foto_placa_url;
+    if (!tiene) return null;
+    return esPantalla
+      ? pantallaService.urlFoto(ficha.evento_id, cual, tokenPantalla)
+      : tiene;
+  }, [esPantalla, tokenPantalla]);
 
   const cargar = useCallback(async () => {
     try {
-      const datos = await anprService.getMonitor(4);
-      setFichas(datos);
+      if (esPantalla) {
+        const datos = await pantallaService.getMonitor(tokenPantalla);
+        setFichas(datos.detecciones || []);
+        if (datos.punto_nombre) setTitulo(datos.punto_nombre);
+      } else {
+        setFichas(await anprService.getMonitor(4));
+      }
     } catch (error) {
       // Se deja constancia en consola en vez de tragarse el fallo: esta pantalla
       // vive sola en una garita y nadie va a estar mirando si algo falló.
       console.warn('[monitor] no se pudo cargar el histórico inicial', error);
     }
-  }, []);
+  }, [esPantalla, tokenPantalla]);
 
-  // Carga inicial. Mismo caso que abajo: la regla no distingue una petición al
-  // servidor de un setState gratuito, y sin esto la pantalla arrancaría en blanco.
+  // Carga inicial. La regla no distingue una petición al servidor de un setState
+  // gratuito, y sin esto la pantalla arrancaría en blanco.
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { cargar(); }, [cargar]);
 
@@ -231,39 +276,38 @@ const Monitor = () => {
   }, []);
 
   useEffect(() => {
-    if (lastNotification?.evento !== 'anpr_deteccion') return;
+    if (aviso?.evento !== 'anpr_deteccion') return;
 
-    const ficha = lastNotification.ficha || {
+    const ficha = aviso.ficha || {
       // Si el servidor no pudo construir la ficha, se pinta con lo que trae el aviso:
       // más vale un monitor incompleto que uno en blanco delante de la fila.
-      evento_id: lastNotification.evento_id,
-      placa: lastNotification.placa,
-      timestamp: lastNotification.timestamp,
+      evento_id: aviso.evento_id,
+      placa: aviso.placa,
+      timestamp: aviso.timestamp,
       vehiculo: {
-        tipo: lastNotification.tipo_vehiculo,
-        color: lastNotification.color_vehiculo,
-        marca: lastNotification.marca_vehiculo,
+        tipo: aviso.tipo_vehiculo,
+        color: aviso.color_vehiculo,
+        marca: aviso.marca_vehiculo,
       },
-      persona: {
-        nombre: lastNotification.nombre_portador,
-        coincidencia: lastNotification.coincidencia,
-      },
+      persona: { nombre: aviso.nombre_portador, coincidencia: aviso.coincidencia },
       destinos_recientes: [],
       infracciones: [],
     };
 
-    // La regla set-state-in-effect no ve la suscripción, porque vive dentro de
-    // useNotifications: desde aquí `lastNotification` parece estado normal. Este es
-    // justo el caso que la propia regla permite —reaccionar a un sistema externo—,
-    // así que se silencia en esta línea y no en todo el archivo.
+    // La regla set-state-in-effect no ve la suscripción, porque vive dentro del hook
+    // del socket: desde aquí el aviso parece estado normal. Es justo el caso que la
+    // propia regla permite —reaccionar a un sistema externo—, así que se silencia en
+    // esta línea y no en todo el archivo.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setFichas((previas) =>
       previas.some((f) => f.evento_id === ficha.evento_id)
         ? previas
         : [ficha, ...previas].slice(0, 4)
     );
-    setLastNotification(null);
-  }, [lastNotification, setLastNotification]);
+
+    if (esPantalla) pantalla.limpiar();
+    else sesion.setLastNotification(null);
+  }, [aviso, esPantalla, pantalla, sesion]);
 
   const [actual, ...anteriores] = fichas;
 
@@ -274,10 +318,10 @@ const Monitor = () => {
           <p className="font-mono text-lg font-bold uppercase tracking-[0.3em] text-emerald-400">
             Control de acceso // BAGFM
           </p>
-          <h1 className="text-4xl font-black uppercase tracking-tight text-white">Alcabala</h1>
+          <h1 className="text-4xl font-black uppercase tracking-tight text-white">{titulo}</h1>
         </div>
         <div className="flex items-center gap-6 text-white/40">
-          {isConnected
+          {conectado
             ? <Wifi className="h-7 w-7 text-emerald-400" />
             : <WifiOff className="h-7 w-7 text-red-400" />}
           <span className="flex items-center gap-2 text-3xl font-bold tabular-nums text-white/70">
@@ -287,9 +331,9 @@ const Monitor = () => {
         </div>
       </header>
 
-      <Principal ficha={actual} />
+      <Principal ficha={actual} token={tokenPantalla} urlFoto={urlFoto} />
 
-      {anteriores.length > 0 && <Anteriores fichas={anteriores} />}
+      {anteriores.length > 0 && <Anteriores fichas={anteriores} token={tokenPantalla} urlFoto={urlFoto} />}
     </div>
   );
 };

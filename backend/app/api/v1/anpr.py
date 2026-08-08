@@ -26,6 +26,7 @@ from app.models.camara_anpr import CamaraAnpr, generar_token, hashear_token
 from app.models.destino_alcabala import DestinoAlcabala
 from app.models.enums import AccesoTipo, AnprEstado, OrigenRegistro, RolTipo
 from app.models.evento_anpr import EventoAnpr
+from app.models.pantalla_monitor import PantallaMonitor
 from app.models.usuario import Usuario
 from app.schemas.acceso import AccesoRegistrar
 from app.schemas.anpr import (
@@ -36,6 +37,10 @@ from app.schemas.anpr import (
     DestinoSalida,
     EventoAnprSalida,
     PaginatedEventosAnpr,
+    PantallaConToken,
+    PantallaCrear,
+    PantallaEditar,
+    PantallaSalida,
     ResolverEvento,
 )
 from app.services.acceso_service import acceso_service
@@ -394,6 +399,227 @@ async def listar_pendientes(
 
     eventos = (await db.execute(consulta)).scalars().all()
     return [_a_salida(e) for e in eventos]
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Pantallas de garita: solo lectura, autenticadas por token de dispositivo
+# ──────────────────────────────────────────────────────────────────────────────
+
+async def _autenticar_pantalla(db: AsyncSession, token: Optional[str]) -> PantallaMonitor:
+    """
+    Resuelve la pantalla a partir de su token y deja constancia de que sigue viva.
+
+    Se consulta la base en cada petición, en vez de emitir un JWT de larga duración,
+    porque una credencial que vive para siempre en un televisor de una garita tiene
+    que poder retirarse en el acto. Un JWT no se puede retirar.
+    """
+    if not token:
+        raise HTTPException(status_code=401, detail="Falta el token de la pantalla")
+
+    pantalla = (await db.execute(
+        select(PantallaMonitor)
+        .options(selectinload(PantallaMonitor.punto_acceso))
+        .where(PantallaMonitor.token_hash == hashear_token(token))
+    )).scalars().first()
+
+    if not pantalla or not pantalla.activa:
+        raise HTTPException(status_code=401, detail="Pantalla no autorizada")
+
+    pantalla.ultimo_acceso_at = func.now()
+    await db.commit()
+    return pantalla
+
+
+def _token_de_pantalla(request: Request, token: Optional[str]) -> Optional[str]:
+    """
+    El token llega por cabecera cuando se puede, y por query cuando no.
+
+    Las imágenes y el WebSocket no permiten poner cabeceras propias, así que ahí no
+    queda otra que la query. Se acepta en ambos sitios para no tener dos rutas.
+    """
+    return request.headers.get("x-pantalla-token") or token
+
+
+@router.get("/pantalla/monitor")
+async def monitor_pantalla(
+    request: Request,
+    token: Optional[str] = None,
+    limite: int = 4,
+    db: AsyncSession = Depends(obtener_db),
+):
+    """Últimas detecciones de la alcabala de esta pantalla. Solo lectura."""
+    pantalla = await _autenticar_pantalla(db, _token_de_pantalla(request, token))
+
+    eventos = (await db.execute(
+        select(EventoAnpr)
+        .where(
+            EventoAnpr.punto_acceso_id == pantalla.punto_acceso_id,
+            EventoAnpr.estado != AnprEstado.duplicado,
+        )
+        .order_by(EventoAnpr.timestamp_recibido.desc())
+        .limit(min(limite, 10))
+    )).scalars().all()
+
+    return {
+        "punto_acceso_id": str(pantalla.punto_acceso_id),
+        "punto_nombre": pantalla.punto_nombre,
+        "detecciones": [await anpr_service.construir_ficha(db, e) for e in eventos],
+    }
+
+
+@router.get("/pantalla/foto/{evento_id}/{cual}")
+async def foto_pantalla(
+    evento_id: UUID,
+    cual: str,
+    request: Request,
+    token: Optional[str] = None,
+    db: AsyncSession = Depends(obtener_db),
+):
+    """
+    Foto de una detección, para la pantalla.
+
+    Solo entrega fotos de SU alcabala: sin esa comprobación, el token de una garita
+    serviría para ver las fotos de la otra con solo cambiar el id en la URL.
+    """
+    if cual not in ("placa", "escena"):
+        raise HTTPException(status_code=400, detail="Foto inválida")
+
+    pantalla = await _autenticar_pantalla(db, _token_de_pantalla(request, token))
+
+    evento = await db.get(EventoAnpr, evento_id)
+    if not evento or evento.punto_acceso_id != pantalla.punto_acceso_id:
+        raise HTTPException(status_code=404, detail="Evento no encontrado")
+
+    contenido = leer_imagen(evento.foto_placa_path if cual == "placa" else evento.foto_escena_path)
+    if not contenido:
+        raise HTTPException(status_code=404, detail="Foto no disponible")
+
+    return Response(
+        content=contenido,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
+
+
+@router.get("/pantallas", response_model=List[PantallaSalida])
+async def listar_pantallas(
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = DEPENDENCY_ADMIN,
+):
+    pantallas = (await db.execute(
+        select(PantallaMonitor)
+        .options(selectinload(PantallaMonitor.punto_acceso))
+        .order_by(PantallaMonitor.nombre)
+    )).scalars().all()
+    return pantallas
+
+
+async def _recargar_pantalla(db: AsyncSession, pantalla_id: UUID) -> PantallaMonitor:
+    return (await db.execute(
+        select(PantallaMonitor)
+        .options(selectinload(PantallaMonitor.punto_acceso))
+        .where(PantallaMonitor.id == pantalla_id)
+    )).scalars().one()
+
+
+def _url_monitor(token: str) -> str:
+    """
+    URL que se deja como página de inicio del televisor.
+
+    Lleva el token dentro para que la pantalla arranque sola al encenderse: en una
+    garita no hay quien teclee credenciales cada vez que se va la luz.
+    """
+    return f"{config.frontend_url.rstrip('/')}/monitor?t={token}"
+
+
+@router.post("/pantallas", response_model=PantallaConToken, status_code=status.HTTP_201_CREATED)
+async def crear_pantalla(
+    datos: PantallaCrear,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = DEPENDENCY_ADMIN,
+):
+    if not await db.get(PuntoAcceso, datos.punto_acceso_id):
+        raise HTTPException(status_code=400, detail="Punto de acceso inexistente")
+
+    token = generar_token()
+    pantalla = PantallaMonitor(
+        **datos.model_dump(),
+        token_hash=hashear_token(token),
+        token_pista=token[-4:],
+        token_generado_at=func.now(),
+        creado_por=usuario.id,
+    )
+    db.add(pantalla)
+    await db.commit()
+    pantalla = await _recargar_pantalla(db, pantalla.id)
+
+    return PantallaConToken(
+        pantalla=PantallaSalida.model_validate(pantalla),
+        token=token,
+        url_monitor=_url_monitor(token),
+    )
+
+
+@router.patch("/pantallas/{pantalla_id}", response_model=PantallaSalida)
+async def editar_pantalla(
+    pantalla_id: UUID,
+    datos: PantallaEditar,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = DEPENDENCY_ADMIN,
+):
+    pantalla = await db.get(PantallaMonitor, pantalla_id)
+    if not pantalla:
+        raise HTTPException(status_code=404, detail="Pantalla no encontrada")
+
+    cambios = datos.model_dump(exclude_unset=True)
+    if cambios.get("punto_acceso_id") and not await db.get(PuntoAcceso, cambios["punto_acceso_id"]):
+        raise HTTPException(status_code=400, detail="Punto de acceso inexistente")
+
+    for campo, valor in cambios.items():
+        setattr(pantalla, campo, valor)
+
+    await db.commit()
+    return await _recargar_pantalla(db, pantalla.id)
+
+
+@router.post("/pantallas/{pantalla_id}/rotar-token", response_model=PantallaConToken)
+async def rotar_token_pantalla(
+    pantalla_id: UUID,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = DEPENDENCY_ADMIN,
+):
+    """Token nuevo. El televisor deja de mostrar datos hasta que se le cargue la URL nueva."""
+    pantalla = await db.get(PantallaMonitor, pantalla_id)
+    if not pantalla:
+        raise HTTPException(status_code=404, detail="Pantalla no encontrada")
+
+    token = generar_token()
+    pantalla.token_hash = hashear_token(token)
+    pantalla.token_pista = token[-4:]
+    pantalla.token_generado_at = func.now()
+    await db.commit()
+    pantalla = await _recargar_pantalla(db, pantalla.id)
+
+    return PantallaConToken(
+        pantalla=PantallaSalida.model_validate(pantalla),
+        token=token,
+        url_monitor=_url_monitor(token),
+    )
+
+
+@router.delete("/pantallas/{pantalla_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def eliminar_pantalla(
+    pantalla_id: UUID,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = DEPENDENCY_ADMIN,
+):
+    pantalla = await db.get(PantallaMonitor, pantalla_id)
+    if not pantalla:
+        raise HTTPException(status_code=404, detail="Pantalla no encontrada")
+
+    await db.delete(pantalla)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/monitor")

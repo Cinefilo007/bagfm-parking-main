@@ -83,18 +83,14 @@ export const router = createBrowserRouter([
         element: <HomeRedirect />
       },
       // ====== MONITOR DE ALCABALA (TV, MODO KIOSCO) ======
-      // Va en su propia rama con hideNav y en la raíz: la pantalla del TV no se
-      // navega, y una ruta corta es más fácil de teclear en el navegador de un
-      // televisor, donde no hay teclado cómodo.
+      // Fuera de MainLayout y sin RutaProtegida a propósito: un televisor no tiene
+      // sesión de persona, se autentica con su propio token de pantalla, y no debe
+      // arrastrar barras de navegación ni el conmutador de tema. La propia vista
+      // decide qué credencial usa; sin ninguna, el interceptor manda al login.
+      // Ruta corta porque hay que teclearla en el navegador de un televisor.
       {
-        element: <MainLayout hideNav />,
-        children: [
-          {
-            path: 'monitor',
-            element: <RutaProtegida rolesPermitidos={['ALCABALA', 'ADMIN_BASE', 'COMANDANTE', 'SUPERVISOR']} />,
-            children: [{ path: '', element: <MonitorAlcabala /> }]
-          }
-        ]
+        path: 'monitor',
+        element: <MonitorAlcabala />
       },
       // ====== RUTAS CON NAVEGACIÓN (LAYOUT PRINCIPAL) ======
       {

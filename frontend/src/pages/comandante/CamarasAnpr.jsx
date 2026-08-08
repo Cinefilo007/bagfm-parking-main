@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Camera, Plus, KeyRound, RotateCcw, Trash2, Copy, Check,
   Loader2, ShieldAlert, Pencil, X, Wifi, WifiOff, Power,
-  ChevronDown, ChevronRight, BookOpen, TriangleAlert,
+  ChevronDown, ChevronRight, BookOpen, TriangleAlert, Monitor as MonitorIcon,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -170,6 +170,41 @@ const ModalToken = ({ resultado, onCerrar }) => {
     </div>
   );
 };
+
+/** Token recién generado de una pantalla. También es la única vez que se muestra. */
+const ModalPantalla = ({ resultado, onCerrar }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 p-4">
+    <Card elevation={4} className="my-auto w-full max-w-2xl">
+      <div className="flex items-start gap-3">
+        <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
+        <div>
+          <h2 className="text-sm font-bold uppercase tracking-wide text-text-main">
+            Pantalla {resultado.pantalla.nombre}
+          </h2>
+          <p className="mt-1 text-xs text-text-sec">
+            Ponga esta dirección como <strong>página de inicio del televisor</strong>. Al
+            abrirla, la pantalla guarda su credencial y vuelve a funcionar sola después
+            de cada corte de luz, sin que nadie tenga que iniciar sesión.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4">
+        <CampoCopiable etiqueta="Dirección para el televisor" valor={resultado.url_monitor} />
+      </div>
+
+      <p className="mt-3 text-[11px] leading-relaxed text-text-sec">
+        Esta dirección solo permite <strong>leer</strong> el monitor de su alcabala. No
+        puede registrar accesos, ni ver el histórico, ni la otra garita. Si el televisor
+        se pierde o se cambia, rote el token y esta dirección deja de servir en el acto.
+      </p>
+
+      <div className="mt-4 flex justify-end">
+        <Boton onClick={onCerrar}>Ya la copié</Boton>
+      </div>
+    </Card>
+  </div>
+);
 
 const Paso = ({ numero, titulo, children }) => (
   <div className="flex gap-3">
@@ -467,6 +502,163 @@ const FilaCamara = ({ camara, onEditar, onRotar, onRevocar, onEliminar, onActiva
   );
 };
 
+/** Inventario de televisores de garita y sus credenciales de solo lectura. */
+const SeccionPantallas = ({ puntos, onTokenNuevo }) => {
+  const [pantallas, setPantallas] = useState([]);
+  const [creando, setCreando] = useState(false);
+  const [form, setForm] = useState({ nombre: '', punto_acceso_id: '' });
+  const [ocupada, setOcupada] = useState(false);
+
+  const cargar = useCallback(async () => {
+    try {
+      setPantallas(await anprService.getPantallas());
+    } catch {
+      toast.error('No se pudieron cargar las pantallas');
+    }
+  }, []);
+
+  useEffect(() => { cargar(); }, [cargar]);
+
+  const conOcupada = async (accion) => {
+    setOcupada(true);
+    try {
+      await accion();
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || 'La operación falló');
+    } finally {
+      setOcupada(false);
+    }
+  };
+
+  const crear = () => {
+    if (form.nombre.trim().length < 3) return toast.error('Nombre demasiado corto');
+    const punto = form.punto_acceso_id || puntos[0]?.id;
+    if (!punto) return toast.error('No hay alcabalas registradas');
+
+    return conOcupada(async () => {
+      const resultado = await anprService.crearPantalla({
+        nombre: form.nombre.trim(),
+        punto_acceso_id: punto,
+      });
+      onTokenNuevo(resultado);
+      setForm({ nombre: '', punto_acceso_id: '' });
+      setCreando(false);
+      await cargar();
+    });
+  };
+
+  const rotar = (p) => {
+    if (!window.confirm(`Rotar el token de "${p.nombre}".
+
+El televisor dejará de mostrar datos hasta que le carguen la dirección nueva.
+
+¿Continuar?`)) return;
+    conOcupada(async () => {
+      onTokenNuevo(await anprService.rotarTokenPantalla(p.id));
+      await cargar();
+    });
+  };
+
+  const eliminar = (p) => {
+    if (!window.confirm(`Eliminar la pantalla "${p.nombre}".
+
+Su dirección deja de funcionar de inmediato.
+
+¿Continuar?`)) return;
+    conOcupada(async () => {
+      await anprService.eliminarPantalla(p.id);
+      await cargar();
+      toast.success('Pantalla eliminada');
+    });
+  };
+
+  return (
+    <Card elevation={2} className="border-bg-high/10">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <MonitorIcon className="h-4 w-4 text-primary" />
+          <span className="text-xs font-bold uppercase tracking-wide text-text-main">
+            Pantallas de garita
+          </span>
+          <span className="text-[11px] text-text-sec">· solo lectura</span>
+        </div>
+        {!creando && (
+          <Boton size="sm" variant="secundario" onClick={() => setCreando(true)} disabled={puntos.length === 0}>
+            <Plus className="h-3.5 w-3.5" /> Nueva pantalla
+          </Boton>
+        )}
+      </div>
+
+      {creando && (
+        <div className="mt-4 space-y-3 rounded-xl border border-primary/30 p-3">
+          <Input
+            label="Nombre"
+            value={form.nombre}
+            onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
+            placeholder="Ej: TV Alcabala Principal"
+          />
+          <div className="mb-4">
+            <label className="mb-1.5 block text-xs font-medium tracking-[0.05em] text-text-sec">
+              Alcabala
+            </label>
+            <select
+              className="input-field"
+              value={form.punto_acceso_id || puntos[0]?.id || ''}
+              onChange={(e) => setForm((f) => ({ ...f, punto_acceso_id: e.target.value }))}
+            >
+              {puntos.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+            </select>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Boton variant="ghost" onClick={() => setCreando(false)}>Cancelar</Boton>
+            <Boton onClick={crear} isLoading={ocupada}>Crear y generar dirección</Boton>
+          </div>
+        </div>
+      )}
+
+      {pantallas.length === 0 ? (
+        <p className="mt-3 text-xs text-text-sec">
+          Sin pantallas registradas. Cree una para obtener la dirección que se deja como
+          página de inicio del televisor.
+        </p>
+      ) : (
+        <div className="mt-3 space-y-2">
+          {pantallas.map((p) => (
+            <div
+              key={p.id}
+              className={cn(
+                'flex flex-wrap items-center justify-between gap-2 rounded-xl bg-bg-low p-3',
+                !p.activa && 'opacity-60'
+              )}
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-text-main">{p.nombre}</p>
+                <p className="text-[11px] text-text-sec">
+                  {p.punto_nombre}
+                  {' · '}
+                  {p.tiene_token
+                    ? <>Token ••••{p.token_pista}</>
+                    : <span className="text-warning">Sin token</span>}
+                  {' · '}
+                  Última señal: {formatearFecha(p.ultimo_acceso_at)}
+                </p>
+              </div>
+              <div className="flex gap-1.5">
+                <Boton size="sm" variant="secundario" onClick={() => rotar(p)} disabled={ocupada}>
+                  <RotateCcw className="h-3.5 w-3.5" /> Rotar
+                </Boton>
+                <Boton size="sm" variant="destructivo" onClick={() => eliminar(p)} disabled={ocupada}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Boton>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+};
+
 const CamarasAnpr = () => {
   const [camaras, setCamaras] = useState([]);
   const [puntos, setPuntos] = useState([]);
@@ -475,6 +667,7 @@ const CamarasAnpr = () => {
   const [creando, setCreando] = useState(false);
   const [editando, setEditando] = useState(null);
   const [tokenNuevo, setTokenNuevo] = useState(null);
+  const [tokenPantalla, setTokenPantalla] = useState(null);
 
   const cargar = useCallback(async () => {
     try {
@@ -631,10 +824,15 @@ const CamarasAnpr = () => {
         </div>
       )}
 
+        <SeccionPantallas puntos={puntos} onTokenNuevo={setTokenPantalla} />
       </main>
 
       {tokenNuevo && (
         <ModalToken resultado={tokenNuevo} onCerrar={() => setTokenNuevo(null)} />
+      )}
+
+      {tokenPantalla && (
+        <ModalPantalla resultado={tokenPantalla} onCerrar={() => setTokenPantalla(null)} />
       )}
     </div>
   );

@@ -90,6 +90,33 @@ export const anprService = {
     await api.delete(`/anpr/camaras/${camaraId}`);
   },
 
+  // ── Pantallas de garita (TV) ──────────────────────────────────────────────
+
+  async getPantallas() {
+    const { data } = await api.get('/anpr/pantallas');
+    return data;
+  },
+
+  /** Devuelve { pantalla, token, url_monitor }. El token solo viaja en claro aquí. */
+  async crearPantalla(datos) {
+    const { data } = await api.post('/anpr/pantallas', datos);
+    return data;
+  },
+
+  async editarPantalla(pantallaId, cambios) {
+    const { data } = await api.patch(`/anpr/pantallas/${pantallaId}`, cambios);
+    return data;
+  },
+
+  async rotarTokenPantalla(pantallaId) {
+    const { data } = await api.post(`/anpr/pantallas/${pantallaId}/rotar-token`);
+    return data;
+  },
+
+  async eliminarPantalla(pantallaId) {
+    await api.delete(`/anpr/pantallas/${pantallaId}`);
+  },
+
   /**
    * Descarga una foto de la detección como object URL.
    *

@@ -35,6 +35,7 @@ from app.models.configuracion_correo import ConfiguracionCorreo
 from app.models.evento_anpr import EventoAnpr
 from app.models.destino_alcabala import DestinoAlcabala
 from app.models.camara_anpr import CamaraAnpr
+from app.models.pantalla_monitor import PantallaMonitor
 
 # Modelos Combustible Aegis Fuel v8.0
 from app.models.tanque_combustible import TanqueCombustible

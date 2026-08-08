@@ -14,8 +14,6 @@ persona: son 32 bytes aleatorios, imposibles de adivinar por fuerza bruta, así 
 hace falta un hash lento. Y sí hace falta que sea determinista, porque la ingesta tiene
 que encontrar la cámara buscando por el hash del token que viene en la URL.
 """
-import hashlib
-import secrets
 import uuid
 
 from sqlalchemy import Column, String, Boolean, Integer, DateTime, ForeignKey
@@ -25,14 +23,9 @@ from sqlalchemy.orm import relationship
 
 from app.core.database import Base
 
-
-def generar_token() -> str:
-    """Token de ingesta nuevo. Seguro para ir en un segmento de URL."""
-    return secrets.token_urlsafe(32)
-
-
-def hashear_token(token: str) -> str:
-    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+# Compartidos con las pantallas de garita. Se reexportan para no romper los imports
+# que ya apuntaban aquí.
+from app.core.tokens import generar_token, hashear_token  # noqa: F401
 
 
 class CamaraAnpr(Base):

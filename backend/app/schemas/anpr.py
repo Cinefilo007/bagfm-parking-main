@@ -108,6 +108,53 @@ class CamaraConToken(BaseModel):
     url_ingesta: str
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Pantallas de garita (TV)
+# ──────────────────────────────────────────────────────────────────────────────
+
+class PantallaCrear(BaseModel):
+    nombre: str = Field(min_length=3, max_length=150)
+    punto_acceso_id: UUID
+    notas: Optional[str] = Field(default=None, max_length=500)
+
+
+class PantallaEditar(BaseModel):
+    nombre: Optional[str] = Field(default=None, min_length=3, max_length=150)
+    punto_acceso_id: Optional[UUID] = None
+    notas: Optional[str] = Field(default=None, max_length=500)
+    activa: Optional[bool] = None
+
+
+class PantallaSalida(BaseModel):
+    id: UUID
+    nombre: str
+    punto_acceso_id: UUID
+    punto_nombre: Optional[str] = None
+    notas: Optional[str] = None
+    activa: bool
+
+    tiene_token: bool = False
+    token_pista: Optional[str] = None
+    token_generado_at: Optional[datetime] = None
+    ultimo_acceso_at: Optional[datetime] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PantallaConToken(BaseModel):
+    """
+    Respuesta de crear o rotar el token de una pantalla.
+
+    Igual que con las cámaras, es la única vez que el token viaja en claro. La URL
+    lleva el token dentro para poder dejarla como página de inicio del televisor y
+    que arranque sola al encenderlo.
+    """
+    pantalla: PantallaSalida
+    token: str
+    url_monitor: str
+
+
 class PaginatedEventosAnpr(BaseModel):
     items: List[EventoAnprSalida]
     total: int
