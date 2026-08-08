@@ -696,7 +696,10 @@ class AccesoService:
             observaciones = datos.observaciones,
             es_excepcion = datos.es_excepcion,
             # Zona de destino persistida en el momento del acceso
-            zona_id = zona_id_acceso
+            zona_id = zona_id_acceso,
+            # Origen del registro y destino declarado (control de acceso por ANPR)
+            origen_registro = datos.origen_registro,
+            destino_id = datos.destino_id
         )
         db.add(nuevo_acceso)
 

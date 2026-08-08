@@ -31,6 +31,11 @@ from app.models.challenge_biometrico import ChallengeBiometrico
 from app.models.push_subscription import PushSubscription
 from app.models.configuracion_correo import ConfiguracionCorreo
 
+# Modelos ANPR — control de acceso por lectura de placas en alcabalas
+from app.models.evento_anpr import EventoAnpr
+from app.models.destino_alcabala import DestinoAlcabala
+from app.models.camara_anpr import CamaraAnpr
+
 # Modelos Combustible Aegis Fuel v8.0
 from app.models.tanque_combustible import TanqueCombustible
 from app.models.lectura_tanque import LecturaTanque

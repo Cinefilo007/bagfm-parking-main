@@ -54,6 +54,27 @@ class Configuracion(BaseSettings):
     # Inteligencia Artificial
     gemini_api_key: str = ""
 
+    # ── ANPR: cámaras de lectura de placas en las alcabalas ──────────────────
+    # OBSOLETA. El token de ingesta dejó de ser único y global: ahora cada cámara
+    # tiene el suyo, se administra desde el panel del Comandante y se guarda hasheado
+    # (ver app/models/camara_anpr.py). Un token global no se puede revocar por equipo
+    # y obliga a reconfigurar todas las cámaras para rotarlo.
+    # Se conserva el campo para que un .env que todavía la traiga no rompa el arranque.
+    anpr_ingest_token: str = ""
+    # Lista separada por comas. Vacía = no se filtra por IP (solo válido en desarrollo).
+    anpr_ip_allowlist: str = ""
+    # La cámara dispara varias veces por vehículo (LPR multi-frame). Dentro de esta
+    # ventana, la misma placa en el mismo punto se marca duplicada.
+    anpr_dedupe_segundos: int = 30
+    anpr_retencion_fotos_dias: int = 90
+
+    # Control del brazo desde el backend (Fase 2). Requiere alcanzar la cámara dentro
+    # de la LAN de la base, cosa que hoy no es posible sin túnel. En Fase 1 el brazo
+    # trabaja en modo "por cámara" y no depende del servidor.
+    hikvision_control_activo: bool = False
+    hikvision_usuario: str = ""
+    hikvision_password: str = ""
+
     # WebAuthn / Biometría
     webauthn_rp_id: str = "bagfm.app"
     webauthn_rp_name: str = "BAGFM - Sistema Táctico"
@@ -71,6 +92,11 @@ class Configuracion(BaseSettings):
     @property
     def en_produccion(self) -> bool:
         return self.app_env == "production"
+
+    @property
+    def anpr_ips_permitidas(self) -> list[str]:
+        """IPs autorizadas a postear eventos ANPR. Lista vacía = sin filtro."""
+        return [ip.strip() for ip in self.anpr_ip_allowlist.split(",") if ip.strip()]
 
     @property
     def frontend_url(self) -> str:

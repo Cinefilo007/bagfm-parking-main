@@ -13,7 +13,9 @@ import SociosEntidad from '../pages/entidad/Socios';
 import EstacionamientosEntidad from '../pages/entidad/Estacionamientos';
 import DashboardAlcabala from '../pages/alcabala/Dashboard';
 import ScannerAlcabala from '../pages/alcabala/Scanner';
+import PuertaAlcabala from '../pages/alcabala/Puerta';
 import Alcabalas from '../pages/comandante/Alcabalas';
+import CamarasAnpr from '../pages/comandante/CamarasAnpr';
 import EventosMando from '../pages/comandante/EventosMando';
 import PasesMasivosEntidad from '../pages/entidad/PasesMasivos';
 import EditorCarnets from '../pages/entidad/EditorCarnets';
@@ -96,7 +98,15 @@ export const router = createBrowserRouter([
               { path: 'personal', element: <Personal /> },
               { path: 'zonas', element: <GestionZonas /> },
               { path: 'infracciones', element: <InfraccionesComando /> },
-              { path: 'carnets', element: <EditorCarnets /> }
+              { path: 'carnets', element: <EditorCarnets /> },
+              // Los endpoints de cámaras solo aceptan COMANDANTE y ADMIN_BASE, así
+              // que esta vista lleva su propia guarda: el bloque /comando también
+              // deja entrar a SUPERVISOR, que aquí solo se encontraría con 403.
+              {
+                path: 'camaras',
+                element: <RutaProtegida rolesPermitidos={['COMANDANTE', 'ADMIN_BASE']} />,
+                children: [{ path: '', element: <CamarasAnpr /> }]
+              }
             ],
           },
           // ENTIDAD
@@ -118,7 +128,10 @@ export const router = createBrowserRouter([
             element: <RutaProtegida rolesPermitidos={['ALCABALA', 'ADMIN_BASE', 'COMANDANTE']} />,
             children: [
               { path: 'dashboard', element: <DashboardAlcabala /> },
-              { path: 'scanner', element: <ScannerAlcabala /> }
+              { path: 'scanner', element: <ScannerAlcabala /> },
+              // El escáner QR sigue vivo para socios y pases; la puerta es el flujo
+              // nuevo para el visitante que llega sin nada.
+              { path: 'puerta', element: <PuertaAlcabala /> }
             ]
           },
           // PARQUERO

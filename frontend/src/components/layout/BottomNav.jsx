@@ -38,6 +38,7 @@ export const BottomNav = () => {
   } else if (user?.rol === 'ALCABALA') {
     navItems.push(
       { to: '/alcabala/dashboard', label: 'Panel', icon: ShieldCheck },
+      { to: '/alcabala/puerta', label: 'Puerta', icon: Car },
       { to: '/alcabala/scanner', label: 'Scanner', icon: Camera },
       { label: 'Cerrar', icon: LogOut, action: 'logout' }
     );

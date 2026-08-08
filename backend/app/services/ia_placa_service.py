@@ -20,16 +20,9 @@ from typing import Dict, Any, Optional
 
 import google.generativeai as genai
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
-from datetime import datetime, timezone, timedelta
 
 from app.core.config import obtener_config
-from app.models.vehiculo import Vehiculo
-from app.models.vehiculo_pase import VehiculoPase
-from app.models.codigo_qr import CodigoQR
-from app.models.usuario import Usuario
-from app.models.membresia import Membresia
-from app.models.enums import MembresiaEstado
+from app.services.placa_lookup import verificar_placa, normalizar_placa
 
 config = obtener_config()
 
@@ -141,7 +134,7 @@ class IAPlacaService:
                     content = content[4:].strip()
 
             datos = json.loads(content)
-            placa = datos.get("placa", "").strip().upper().replace(" ", "").replace("-", "")
+            placa = normalizar_placa(datos.get("placa", ""))
             return {
                 "placa": placa,
                 "confianza": datos.get("confianza", "baja"),
@@ -155,171 +148,10 @@ class IAPlacaService:
         self, db: AsyncSession, placa: str, zona_id: Optional[str]
     ) -> Dict[str, Any]:
         """
-        Verifica la placa en la base de datos siguiendo esta cadena:
-        1. VehiculoPase activo en zona → ya ingresado (re-ingreso)
-        2. Socio permanente (tabla vehiculos) → verifica membresía
-        3. CodigoQR activo (pases masivos/temporales) → verifica vigencia
-        4. No encontrado
+        Delega en `placa_lookup.verificar_placa`, que es la fuente de verdad compartida
+        con la ingesta ANPR de las alcabalas. Ver `app/services/placa_lookup.py`.
         """
-        ahora = datetime.now(timezone.utc)
-
-        # ── 1. ¿Ya está ingresado en alguna zona? ──────────────────────────
-        q_activo = select(VehiculoPase).where(
-            VehiculoPase.placa == placa,
-            VehiculoPase.ingresado == True,
-        )
-        if zona_id:
-            from uuid import UUID as _UUID
-            q_activo = q_activo.where(VehiculoPase.zona_asignada_id == _UUID(zona_id))
-
-        res_activo = await db.execute(q_activo)
-        vp_activo = res_activo.scalars().first()
-        if vp_activo:
-            return {
-                "encontrado": True,
-                "sin_datos": False,
-                "ya_ingresado": True,
-                "pase_valido": True,
-                "tipo_pase": "REINGRESO",
-                "tipo_pase_color": "#f59e0b",
-                "nombre_portador": None,
-                "vehiculo_pase_id": str(vp_activo.id),
-                "mensaje": f"⚠️ {placa} ya está registrado dentro. Se expulsará del estacionamiento al confirmar.",
-                "alerta": "warning",
-            }
-
-        # ── 2. Socio permanente ─────────────────────────────────────────────
-        res_v = await db.execute(
-            select(Vehiculo).where(Vehiculo.placa == placa, Vehiculo.activo == True)
-        )
-        vehiculo = res_v.scalars().first()
-
-        if vehiculo and vehiculo.socio_id:
-            res_u = await db.execute(
-                select(Usuario).where(Usuario.id == vehiculo.socio_id, Usuario.activo == True)
-            )
-            socio = res_u.scalars().first()
-
-            if socio:
-                res_m = await db.execute(
-                    select(Membresia)
-                    .where(Membresia.socio_id == socio.id)
-                    .order_by(Membresia.updated_at.desc())
-                )
-                membresia = res_m.scalars().first()
-
-                membresia_ok = (
-                    membresia and
-                    membresia.estado in [MembresiaEstado.activa, MembresiaEstado.exonerada]
-                )
-
-                if not membresia_ok:
-                    estado_msg = membresia.estado.value.upper() if membresia else "SIN MEMBRESÍA"
-                    return {
-                        "encontrado": True,
-                        "sin_datos": False,
-                        "ya_ingresado": False,
-                        "pase_valido": False,
-                        "tipo_pase": "SOCIO",
-                        "tipo_pase_color": "#ef4444",
-                        "nombre_portador": f"{socio.nombre} {socio.apellido}".strip(),
-                        "vehiculo_pase_id": None,
-                        "mensaje": f"🚫 MEMBRESÍA {estado_msg}",
-                        "alerta": "error",
-                    }
-
-                return {
-                    "encontrado": True,
-                    "sin_datos": False,
-                    "ya_ingresado": False,
-                    "pase_valido": True,
-                    "tipo_pase": "SOCIO PERMANENTE",
-                    "tipo_pase_color": "#3b82f6",
-                    "nombre_portador": f"{socio.nombre} {socio.apellido}".strip(),
-                    "vehiculo_pase_id": None,
-                    "mensaje": f"✅ Socio registrado — Membresía vigente",
-                    "alerta": "success",
-                }
-
-        # ── 3. CodigoQR activo (pases masivos/temporales) ──────────────────
-        res_qr = await db.execute(
-            select(CodigoQR).where(
-                CodigoQR.vehiculo_placa == placa,
-                CodigoQR.activo == True,
-            ).order_by(CodigoQR.created_at.desc())
-        )
-        qr = res_qr.scalars().first()
-
-        if qr:
-            # Verificar expiración
-            if qr.fecha_expiracion and qr.fecha_expiracion < ahora:
-                return {
-                    "encontrado": True,
-                    "sin_datos": False,
-                    "ya_ingresado": False,
-                    "pase_valido": False,
-                    "tipo_pase": qr.tipo.value.upper() if qr.tipo else "PASE",
-                    "tipo_pase_color": "#ef4444",
-                    "nombre_portador": qr.nombre_portador,
-                    "vehiculo_pase_id": None,
-                    "mensaje": f"🚫 PASE VENCIDO — Expiró el {qr.fecha_expiracion.strftime('%d/%m/%Y')}",
-                    "alerta": "error",
-                }
-
-            # Verificar límite de accesos
-            if qr.max_accesos and qr.accesos_usados >= qr.max_accesos:
-                return {
-                    "encontrado": True,
-                    "sin_datos": False,
-                    "ya_ingresado": False,
-                    "pase_valido": False,
-                    "tipo_pase": "PASE AGOTADO",
-                    "tipo_pase_color": "#ef4444",
-                    "nombre_portador": qr.nombre_portador,
-                    "vehiculo_pase_id": None,
-                    "mensaje": f"🚫 LÍMITE DE ACCESOS AGOTADO ({qr.max_accesos}/{qr.max_accesos})",
-                    "alerta": "error",
-                }
-
-            tipo_label = "PASE EVENTO"
-            tipo_color = "#10b981"
-            if qr.tipo_acceso:
-                tipo_label = qr.tipo_acceso.value.upper()
-            elif qr.tipo:
-                tipo_label = qr.tipo.value.upper()
-
-            vigencia_msg = ""
-            if qr.fecha_expiracion:
-                dias_restantes = (qr.fecha_expiracion - ahora).days
-                vigencia_msg = f" — Vence en {dias_restantes}d" if dias_restantes >= 0 else ""
-
-            return {
-                "encontrado": True,
-                "sin_datos": False,
-                "ya_ingresado": False,
-                "pase_valido": True,
-                "tipo_pase": tipo_label,
-                "tipo_pase_color": tipo_color,
-                "nombre_portador": qr.nombre_portador,
-                "qr_id": str(qr.id),
-                "vehiculo_pase_id": None,
-                "mensaje": f"✅ Pase válido{vigencia_msg}",
-                "alerta": "success",
-            }
-
-        # ── 4. No encontrado ────────────────────────────────────────────────
-        return {
-            "encontrado": False,
-            "sin_datos": True,
-            "ya_ingresado": False,
-            "pase_valido": False,
-            "tipo_pase": None,
-            "tipo_pase_color": "#94a3b8",
-            "nombre_portador": None,
-            "vehiculo_pase_id": None,
-            "mensaje": f"❌ {placa} NO REGISTRADO. Pedir Pase QR.",
-            "alerta": "error",
-        }
+        return await verificar_placa(db, placa, zona_id)
 
     async def procesar_job(self, job_id: str, db: AsyncSession):
         """

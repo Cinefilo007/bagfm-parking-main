@@ -29,6 +29,7 @@ export const Sidebar = () => {
       { to: '/comando/infracciones', label: 'Infracciones', icon: AlertTriangle },
       { to: '/comando/personal', label: 'Gestión Personal', icon: UserCog },
       { to: '/comando/carnets', label: 'Editor de carnets', icon: Palette },
+      { to: '/comando/camaras', label: 'Cámaras ANPR', icon: Camera },
       { to: '/parque-automotor', label: 'Parque Automotor', icon: CarIcon },
       { to: '/combustible/tanques', label: 'Tanques Combustible', icon: Flame },
     );
@@ -53,6 +54,7 @@ export const Sidebar = () => {
   } else if (user?.rol === 'ALCABALA') {
     navItems.push(
       { to: '/alcabala/dashboard', label: 'Resumen Turno', icon: ShieldCheck },
+      { to: '/alcabala/puerta', label: 'Puerta (Placas)', icon: CarIcon },
       { to: '/alcabala/scanner', label: 'Escanear QR', icon: Camera },
     );
   } else if (user?.rol === 'PARQUERO') {

@@ -49,6 +49,23 @@ class AccesoTipo(str, enum.Enum):
     entrada = "entrada"
     salida = "salida"
 
+class OrigenRegistro(str, enum.Enum):
+    """Cómo se originó un registro de acceso. Permite separar poblaciones en los reportes."""
+    qr = "qr"                # el guardia escaneó un código QR
+    anpr = "anpr"            # lo detectó la cámara de lectura de placas
+    manual = "manual"        # lo tecleó el guardia
+
+class AnprDireccion(str, enum.Enum):
+    entrada = "entrada"
+    salida = "salida"
+    desconocida = "desconocida"
+
+class AnprEstado(str, enum.Enum):
+    pendiente = "pendiente"    # detectada, esperando que el guardia marque destino
+    resuelto = "resuelto"      # ya generó un registro en `accesos`
+    descartado = "descartado"  # falso positivo, peatón, vehículo que se devolvió
+    duplicado = "duplicado"    # misma placa y punto dentro de la ventana de dedupe
+
 class InfraccionTipo(str, enum.Enum):
     mal_estacionado = "mal_estacionado"
     exceso_velocidad = "exceso_velocidad"

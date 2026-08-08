@@ -2,7 +2,7 @@ from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
-from app.models.enums import AccesoTipo
+from app.models.enums import AccesoTipo, OrigenRegistro
 from app.schemas.usuario import UsuarioSalida
 from app.schemas.vehiculo import VehiculoSalida
 from app.schemas.socio import MembresiaInfo
@@ -41,6 +41,12 @@ class AccesoRegistrar(BaseModel):
     # Destino / Motivo (Para vehículos fantasma o excepciones)
     observaciones: Optional[str] = None
     es_excepcion: bool = False
+
+    # Origen del registro y destino declarado (control de acceso por ANPR).
+    # Por defecto 'qr' para que el flujo de escaneo, que es el que ya existía, no
+    # tenga que cambiar en el frontend.
+    origen_registro: OrigenRegistro = OrigenRegistro.qr
+    destino_id: Optional[UUID] = None
 
 class AccesoSalida(AccesoBase):
     id: UUID

@@ -9,7 +9,7 @@ from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
-from app.models.enums import AccesoTipo
+from app.models.enums import AccesoTipo, OrigenRegistro
 
 class Acceso(Base):
     __tablename__ = "accesos"
@@ -49,6 +49,26 @@ class Acceso(Base):
     # Para pases masivos: resuelta desde codigos_qr.zona_asignada_id o lote.zona_estacionamiento_id.
     # Permite filtrar historial de parquero por zona de forma estable (no depende del QR actual).
     zona_id = Column(UUID(as_uuid=True), ForeignKey("zonas_estacionamiento.id", ondelete="SET NULL"), nullable=True, index=True) # Flag para alertas tácticas
+
+    # ── Registro por cámara ANPR (Fase 1 — control de acceso La Carlota) ──────
+    # Separa las poblaciones en los reportes: los accesos con QR son la población
+    # controlable (socios y pases), los ANPR son el visitante casual que hasta ahora
+    # no se medía.
+    origen_registro = Column(
+        SQLEnum(OrigenRegistro, name="origen_registro", native_enum=False),
+        default=OrigenRegistro.qr,
+        server_default=OrigenRegistro.qr.value,
+        nullable=False,
+        index=True,
+    )
+    # El enlace con la detección de la cámara vive en `eventos_anpr.acceso_id`, en una
+    # sola dirección a propósito: dos claves foráneas apuntándose mutuamente forman un
+    # ciclo entre las tablas y obligan a crearlas en dos pasos. Para llegar a la foto
+    # de la placa desde un acceso, se hace join por esa columna.
+
+    # Destino declarado, del catálogo cerrado. El texto libre del destino "Otro"
+    # sigue yendo a `observaciones`, que ya existía para eso.
+    destino_id = Column(UUID(as_uuid=True), ForeignKey("destinos_alcabala.id", ondelete="SET NULL"), nullable=True, index=True)
 
     # Relaciones
 
