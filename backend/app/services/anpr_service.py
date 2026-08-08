@@ -24,12 +24,14 @@ from app.core.config import obtener_config
 from app.core.notify_manager import manager
 from app.models.acceso import Acceso
 from app.models.alcabala_evento import PuntoAcceso
-from app.models.destino_alcabala import DestinoAlcabala
+from app.models.entidad_civil import EntidadCivil
 from app.models.infraccion import Infraccion
 from app.models.camara_anpr import CamaraAnpr, hashear_token
 from app.models.enums import AnprDireccion, AnprEstado, InfraccionEstado
 from app.models.evento_anpr import EventoAnpr
-from app.services.placa_lookup import verificar_placa, normalizar_placa
+from app.services.placa_lookup import (
+    verificar_placa, normalizar_placa, semaforo_de, SEMAFORO_ROJO,
+)
 from app.services.storage_local import almacenamiento_privado, PREFIJO_ARCHIVO
 
 config = obtener_config()
@@ -414,17 +416,22 @@ class AnprService:
         este sistema existe para hacer visible.
         """
         filas = (await db.execute(
-            select(Acceso.timestamp, DestinoAlcabala.nombre, Acceso.observaciones)
-            .join(DestinoAlcabala, Acceso.destino_id == DestinoAlcabala.id)
-            .where(Acceso.vehiculo_placa == placa)
+            select(Acceso.timestamp, EntidadCivil.nombre, Acceso.observaciones)
+            .outerjoin(EntidadCivil, Acceso.destino_entidad_id == EntidadCivil.id)
+            .where(
+                Acceso.vehiculo_placa == placa,
+                # Los accesos sin destino no cuentan como visita: no dicen a dónde fue.
+                (Acceso.destino_entidad_id.isnot(None)) | (Acceso.observaciones.isnot(None)),
+            )
             .order_by(Acceso.timestamp.desc())
             .limit(limite)
         )).all()
 
         return [
             {
-                "destino": f.nombre,
-                "detalle": f.observaciones,
+                # Sin entidad, el destino es el texto libre que escribió el guardia.
+                "destino": f.nombre or (f.observaciones or "Otro"),
+                "detalle": f.observaciones if f.nombre else None,
                 "fecha": f.timestamp,
             }
             for f in filas
@@ -474,12 +481,21 @@ class AnprService:
 
         base = f"{config.backend_url_base}/api/v1/anpr/evento/{evento.id}/foto"
 
+        infracciones = await self._infracciones_activas(db, veredicto.get("vehiculo_id"))
+
+        # Una infracción que bloquea manda sobre el veredicto de la placa: un socio
+        # con la membresía al día pero con una sanción activa no debe salir en verde.
+        semaforo = veredicto.get("semaforo") or semaforo_de(veredicto.get("coincidencia"))
+        if any(i["bloquea_salida"] for i in infracciones):
+            semaforo = SEMAFORO_ROJO
+
         return {
             "evento_id": str(evento.id),
             "placa": evento.placa,
             "direccion": evento.direccion.value if evento.direccion else None,
             "timestamp": evento.timestamp_recibido,
             "estado": evento.estado.value if evento.estado else None,
+            "semaforo": semaforo,
             "vehiculo": {
                 "tipo": evento.tipo_vehiculo,
                 "color": evento.color_vehiculo,
@@ -496,7 +512,7 @@ class AnprService:
                 "alerta": veredicto.get("alerta"),
             },
             "destinos_recientes": await self._destinos_recientes(db, evento.placa),
-            "infracciones": await self._infracciones_activas(db, veredicto.get("vehiculo_id")),
+            "infracciones": infracciones,
         }
 
     async def _notificar(
@@ -524,6 +540,7 @@ class AnprService:
                     "marca_vehiculo": evento.marca_vehiculo,
                     "timestamp": evento.timestamp_recibido,
                     "coincidencia": veredicto.get("coincidencia"),
+                    "semaforo": veredicto.get("semaforo"),
                     "mensaje": veredicto.get("mensaje"),
                     "alerta": veredicto.get("alerta"),
                     "tipo_pase": veredicto.get("tipo_pase"),

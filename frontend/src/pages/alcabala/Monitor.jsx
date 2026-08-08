@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Car, CheckCircle2, XCircle, AlertTriangle, TriangleAlert,
-  MapPin, Clock, Wifi, WifiOff, Camera,
+  MapPin, Clock, Wifi, WifiOff, Camera, Sun, Moon,
 } from 'lucide-react';
 
 import { useNotifications } from '../../hooks/useNotifications';
@@ -16,24 +16,60 @@ import { cn } from '../../lib/utils';
  * Monitor de alcabala — la pantalla del TV de la garita.
  *
  * No es una vista de trabajo: nadie la toca. Está pensada para leerse de pie y a
- * varios metros, así que todo va sobredimensionado y en alto contraste sobre fondo
- * oscuro. El guardia sigue resolviendo desde el teléfono; esto solo le da contexto
- * mientras pregunta el destino.
+ * varios metros, así que todo va sobredimensionado y en alto contraste.
  *
- * Se alimenta del mismo WebSocket que la pantalla de Puerta, así que las dos ven la
- * misma detección al mismo tiempo y no pueden contradecirse.
+ * Dos temas, porque una garita tiene luz de mediodía y luz de madrugada: el oscuro
+ * cansa menos de noche, pero a pleno sol un fondo negro no se lee. Se puede cambiar
+ * desde la propia pantalla o desde el teléfono del guardia, que es lo que sirve
+ * cuando el televisor está colgado sin mando a mano.
  */
 
-const VEREDICTOS = {
-  socio:         { etiqueta: 'SOCIO VIGENTE',     color: '#38bdf8', Icono: CheckCircle2 },
-  pase:          { etiqueta: 'PASE VIGENTE',      color: '#34d399', Icono: CheckCircle2 },
-  reingreso:     { etiqueta: 'YA ESTÁ ADENTRO',   color: '#fbbf24', Icono: AlertTriangle },
-  socio_vencido: { etiqueta: 'MEMBRESÍA VENCIDA', color: '#f87171', Icono: XCircle },
-  pase_invalido: { etiqueta: 'PASE NO VÁLIDO',    color: '#f87171', Icono: XCircle },
-  no_registrado: { etiqueta: 'NO REGISTRADO',     color: '#94a3b8', Icono: AlertTriangle },
+const CLAVE_TEMA = 'monitor_tema';
+
+/**
+ * El color lo decide el backend. Aquí solo se pinta.
+ *
+ * Tres estados y no más: a diez metros y con una fila detrás, nadie distingue seis
+ * matices. Verde pasa, amarillo el guardia decide, rojo no debe entrar.
+ */
+const SEMAFORO = {
+  verde:    { rotulo: 'PUEDE PASAR',   Icono: CheckCircle2,  oscuro: '#22c55e', claro: '#15803d' },
+  amarillo: { rotulo: 'REVISAR',       Icono: AlertTriangle, oscuro: '#facc15', claro: '#a16207' },
+  rojo:     { rotulo: 'NO DEBE PASAR', Icono: XCircle,       oscuro: '#f87171', claro: '#b91c1c' },
 };
 
-const veredictoDe = (c) => VEREDICTOS[c] || VEREDICTOS.no_registrado;
+const ETIQUETAS = {
+  socio:         'SOCIO VIGENTE',
+  pase:          'PASE VIGENTE',
+  reingreso:     'YA ESTÁ ADENTRO',
+  socio_vencido: 'MEMBRESÍA VENCIDA',
+  pase_invalido: 'PASE NO VÁLIDO',
+  no_registrado: 'NO REGISTRADO',
+};
+
+const TEMAS = {
+  oscuro: {
+    fondo: '#0b1220',
+    texto: 'text-white',
+    textoSuave: 'text-white/50',
+    textoTenue: 'text-white/30',
+    tarjeta: 'bg-white/5',
+    marcaAgua: 'text-emerald-400',
+  },
+  claro: {
+    fondo: '#f5f7fa',
+    texto: 'text-slate-900',
+    textoSuave: 'text-slate-600',
+    textoTenue: 'text-slate-400',
+    tarjeta: 'bg-slate-900/5',
+    marcaAgua: 'text-emerald-700',
+  },
+};
+
+const semaforoDe = (ficha, tema) => {
+  const s = SEMAFORO[ficha?.semaforo] || SEMAFORO.amarillo;
+  return { ...s, color: tema === 'claro' ? s.claro : s.oscuro };
+};
 
 const hora = (v) =>
   v ? new Date(v).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }) : '—';
@@ -42,10 +78,10 @@ const fechaCorta = (v) =>
   v ? new Date(v).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' }) : '';
 
 /**
- * Foto servida por un endpoint que exige sesión, así que no se puede poner la URL
- * directa en un <img>: hay que descargarla y convertirla en object URL.
+ * Foto de la detección. Se descarga con credencial y se convierte en object URL: el
+ * endpoint no es público porque son imágenes de civiles.
  */
-const Foto = ({ url, className, alt, token }) => {
+const Foto = ({ url, className, alt, token, tema }) => {
   const [src, setSrc] = useState(null);
 
   useEffect(() => {
@@ -53,8 +89,6 @@ const Foto = ({ url, className, alt, token }) => {
     let vigente = true;
     let creada = null;
 
-    // Con token de pantalla el secreto ya viaja en la query de la URL; con sesión de
-    // persona hay que mandar el JWT en la cabecera.
     const opciones = token
       ? {}
       : { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
@@ -76,8 +110,8 @@ const Foto = ({ url, className, alt, token }) => {
 
   if (!src) {
     return (
-      <div className={cn('flex items-center justify-center bg-white/5', className)}>
-        <Camera className="h-10 w-10 text-white/20" />
+      <div className={cn('flex items-center justify-center', tema.tarjeta, className)}>
+        <Camera className={cn('h-10 w-10', tema.textoTenue)} />
       </div>
     );
   }
@@ -85,17 +119,17 @@ const Foto = ({ url, className, alt, token }) => {
 };
 
 /** La detección actual, ocupando la mayor parte de la pantalla. */
-const Principal = ({ ficha, token, urlFoto }) => {
+const Principal = ({ ficha, token, urlFoto, tema, nombreTema }) => {
   if (!ficha) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center text-white/30">
+      <div className={cn('flex flex-1 flex-col items-center justify-center', tema.textoTenue)}>
         <Car className="h-24 w-24" />
         <p className="mt-6 text-3xl font-black uppercase tracking-[0.2em]">Esperando vehículos</p>
       </div>
     );
   }
 
-  const { etiqueta, color, Icono } = veredictoDe(ficha.persona?.coincidencia);
+  const { rotulo, color, Icono } = semaforoDe(ficha, nombreTema);
   const v = ficha.vehiculo || {};
   const atributos = [v.tipo, v.color, v.marca].filter(Boolean).join(' · ');
   const infracciones = ficha.infracciones || [];
@@ -103,47 +137,49 @@ const Principal = ({ ficha, token, urlFoto }) => {
 
   return (
     <div className="flex flex-1 gap-8 overflow-hidden">
-      {/* Columna izquierda: identidad del vehículo */}
       <div className="flex w-[46%] shrink-0 flex-col gap-5">
         <Foto
           url={urlFoto(ficha, v.foto_escena_url ? 'escena' : 'placa')}
           alt="Vehículo"
           token={token}
-          className="h-[42%] w-full rounded-2xl"
+          tema={tema}
+          className="h-[38%] w-full rounded-2xl"
         />
 
         <div>
-          <p className="font-mono text-[7rem] font-black leading-none tracking-tight text-white">
+          <p className={cn('font-mono text-[7rem] font-black leading-none tracking-tight', tema.texto)}>
             {ficha.placa}
           </p>
           {atributos && (
-            <p className="mt-2 text-3xl uppercase tracking-wide text-white/50">{atributos}</p>
+            <p className={cn('mt-2 text-3xl uppercase tracking-wide', tema.textoSuave)}>{atributos}</p>
           )}
         </div>
 
+        {/* El semáforo ocupa toda la anchura: es lo que se lee desde lejos. */}
         <div
-          className="inline-flex items-center gap-4 self-start rounded-2xl px-6 py-4"
-          style={{ backgroundColor: `${color}20`, color }}
+          className="flex items-center gap-5 rounded-2xl px-8 py-6"
+          style={{ backgroundColor: `${color}22`, color, border: `3px solid ${color}` }}
         >
-          <Icono className="h-10 w-10" />
-          <span className="text-4xl font-black uppercase tracking-wide">{etiqueta}</span>
+          <Icono className="h-14 w-14 shrink-0" />
+          <span className="text-5xl font-black uppercase tracking-wide">{rotulo}</span>
         </div>
+
+        <p className={cn('text-2xl font-bold uppercase tracking-widest', tema.textoSuave)}>
+          {ETIQUETAS[ficha.persona?.coincidencia] || 'NO REGISTRADO'}
+        </p>
       </div>
 
-      {/* Columna derecha: quién es y qué historial tiene */}
       <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-hidden">
         <div>
-          <p className="text-xl font-black uppercase tracking-[0.3em] text-white/40">Titular</p>
-          <p className="mt-1 truncate text-6xl font-black uppercase leading-tight text-white">
+          <p className={cn('text-xl font-black uppercase tracking-[0.3em]', tema.textoTenue)}>Titular</p>
+          <p className={cn('mt-1 truncate text-6xl font-black uppercase leading-tight', tema.texto)}>
             {ficha.persona?.nombre || 'Sin registrar'}
           </p>
         </div>
 
-        {/* Las infracciones van antes que el historial: si hay una activa, es lo
-            primero que el guardia tiene que ver. */}
         {infracciones.length > 0 && (
           <div className="rounded-2xl border-2 border-red-500/60 bg-red-500/10 p-5">
-            <div className="flex items-center gap-3 text-red-400">
+            <div className="flex items-center gap-3" style={{ color: SEMAFORO.rojo[nombreTema] }}>
               <TriangleAlert className="h-8 w-8 shrink-0" />
               <span className="text-2xl font-black uppercase tracking-wide">
                 {infracciones.length} infracción{infracciones.length > 1 ? 'es' : ''} activa{infracciones.length > 1 ? 's' : ''}
@@ -151,9 +187,9 @@ const Principal = ({ ficha, token, urlFoto }) => {
             </div>
             <ul className="mt-3 space-y-1">
               {infracciones.slice(0, 3).map((inf, i) => (
-                <li key={i} className="truncate text-2xl text-red-200/90">
+                <li key={i} className={cn('truncate text-2xl', tema.textoSuave)}>
                   {(inf.tipo || '').replace(/_/g, ' ').toUpperCase()}
-                  {inf.gravedad && <span className="text-red-300/60"> · {inf.gravedad}</span>}
+                  {inf.gravedad && <span className={tema.textoTenue}> · {inf.gravedad}</span>}
                   {inf.bloquea_salida && (
                     <span className="ml-2 rounded bg-red-500/30 px-2 py-0.5 text-lg font-bold">
                       BLOQUEA SALIDA
@@ -166,18 +202,18 @@ const Principal = ({ ficha, token, urlFoto }) => {
         )}
 
         <div className="min-h-0 flex-1">
-          <p className="text-xl font-black uppercase tracking-[0.3em] text-white/40">
+          <p className={cn('text-xl font-black uppercase tracking-[0.3em]', tema.textoTenue)}>
             Últimos destinos
           </p>
           {destinos.length === 0 ? (
-            <p className="mt-2 text-3xl text-white/25">Sin visitas previas registradas</p>
+            <p className={cn('mt-2 text-3xl', tema.textoTenue)}>Sin visitas previas registradas</p>
           ) : (
             <ul className="mt-2 space-y-2">
               {destinos.map((d, i) => (
                 <li key={i} className="flex items-baseline gap-4">
-                  <MapPin className="h-6 w-6 shrink-0 translate-y-1 text-white/30" />
-                  <span className="truncate text-4xl font-bold text-white/90">{d.destino}</span>
-                  <span className="ml-auto shrink-0 text-2xl text-white/40">
+                  <MapPin className={cn('h-6 w-6 shrink-0 translate-y-1', tema.textoTenue)} />
+                  <span className={cn('truncate text-4xl font-bold', tema.texto)}>{d.destino}</span>
+                  <span className={cn('ml-auto shrink-0 text-2xl', tema.textoTenue)}>
                     {fechaCorta(d.fecha)} {hora(d.fecha)}
                   </span>
                 </li>
@@ -190,39 +226,52 @@ const Principal = ({ ficha, token, urlFoto }) => {
   );
 };
 
-/** Franja inferior con las detecciones anteriores. */
-const Anteriores = ({ fichas, token, urlFoto }) => (
+const Anteriores = ({ fichas, token, urlFoto, tema, nombreTema }) => (
   <div className="grid shrink-0 grid-cols-3 gap-4">
     {fichas.map((f) => {
-      const { color } = veredictoDe(f.persona?.coincidencia);
+      const { color } = semaforoDe(f, nombreTema);
       return (
         <div
           key={f.evento_id}
-          className="flex items-center gap-4 rounded-xl bg-white/5 p-3"
+          className={cn('flex items-center gap-4 rounded-xl p-3', tema.tarjeta)}
           style={{ borderLeft: `5px solid ${color}` }}
         >
-          <Foto url={urlFoto(f, 'placa')} alt="" token={token} className="h-14 w-24 shrink-0 rounded-lg" />
+          <Foto url={urlFoto(f, 'placa')} alt="" token={token} tema={tema} className="h-14 w-24 shrink-0 rounded-lg" />
           <div className="min-w-0">
-            <p className="truncate font-mono text-3xl font-black text-white/85">{f.placa}</p>
-            <p className="truncate text-xl text-white/40">
+            <p className={cn('truncate font-mono text-3xl font-black', tema.texto)}>{f.placa}</p>
+            <p className={cn('truncate text-xl', tema.textoSuave)}>
               {f.persona?.nombre || 'Sin registrar'}
             </p>
           </div>
-          <span className="ml-auto shrink-0 text-xl text-white/30">{hora(f.timestamp)}</span>
+          <span className={cn('ml-auto shrink-0 text-xl', tema.textoTenue)}>{hora(f.timestamp)}</span>
         </div>
       );
     })}
   </div>
 );
 
+/**
+ * Confirmación de que el guardia registró el acceso.
+ *
+ * Se pone encima de todo y en verde inequívoco. Sin esto no hay forma de saber
+ * desde la garita si el toque llegó al servidor o se perdió, que es exactamente la
+ * duda que deja el sistema cuando algo falla en silencio.
+ */
+const Confirmacion = ({ dato }) => (
+  <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+    <div className="flex flex-col items-center gap-6 rounded-3xl border-4 border-emerald-400 bg-emerald-500/15 px-20 py-14">
+      <CheckCircle2 className="h-32 w-32 text-emerald-400" />
+      <p className="font-mono text-7xl font-black tracking-widest text-white">{dato.placa}</p>
+      <p className="text-5xl font-black uppercase tracking-wide text-emerald-300">Registrado</p>
+      <p className="text-4xl text-white/70">{dato.destino}</p>
+    </div>
+  </div>
+);
+
 const Monitor = () => {
-  // El token de pantalla se captura una sola vez: viene en la URL la primera vez y
-  // de ahí queda guardado, para que el televisor arranque solo tras un corte de luz.
   const [tokenPantalla, setTokenPantalla] = useState(() => pantallaToken.capturarDeUrl());
   const esPantalla = Boolean(tokenPantalla);
 
-  // Un televisor sin credencial y sin nadie logueado tiene que poder pedir permiso
-  // por sí solo; con sesión de persona se salta el emparejamiento y muestra directo.
   const { isAuthenticated } = useAuthStore();
   const necesitaEmparejar = !tokenPantalla && !isAuthenticated;
 
@@ -231,25 +280,26 @@ const Monitor = () => {
     setTokenPantalla(token);
   }, []);
 
-  // Los dos hooks se llaman siempre —no se pueden llamar condicionalmente— pero cada
-  // uno se queda inerte si no tiene su credencial.
   const sesion = useNotifications();
   const pantalla = usePantallaSocket(tokenPantalla);
 
   const [fichas, setFichas] = useState([]);
   const [titulo, setTitulo] = useState('Alcabala');
   const [reloj, setReloj] = useState(new Date());
+  const [confirmacion, setConfirmacion] = useState(null);
+  const [nombreTema, setNombreTema] = useState(
+    () => localStorage.getItem(CLAVE_TEMA) || 'oscuro'
+  );
 
+  const tema = TEMAS[nombreTema] || TEMAS.oscuro;
   const conectado = esPantalla ? pantalla.conectado : sesion.isConnected;
   const aviso = esPantalla ? pantalla.ultimo : sesion.lastNotification;
 
-  /**
-   * URL de una foto según el modo.
-   *
-   * La ficha trae las URL del endpoint con sesión, que el token de pantalla no puede
-   * usar: para el televisor hay que armarlas contra su propio endpoint, que además
-   * comprueba que la detección sea de SU alcabala.
-   */
+  const cambiarTema = useCallback((valor) => {
+    setNombreTema(valor);
+    localStorage.setItem(CLAVE_TEMA, valor);
+  }, []);
+
   const urlFoto = useCallback((ficha, cual) => {
     if (!ficha) return null;
     const tiene = cual === 'escena'
@@ -262,10 +312,6 @@ const Monitor = () => {
   }, [esPantalla, tokenPantalla]);
 
   const cargar = useCallback(async () => {
-    // Sin credencial no se pide nada. El efecto de carga se dispara en el montaje,
-    // antes de que la vista llegue a decidir que toca emparejar; si aquí se llamara
-    // al endpoint con sesión, el 401 haría que el interceptor de api.js mandara el
-    // televisor al login y el emparejamiento no llegaría a verse nunca.
     if (necesitaEmparejar) return;
 
     try {
@@ -277,22 +323,15 @@ const Monitor = () => {
         setFichas(await anprService.getMonitor(4));
       }
     } catch (error) {
-      // Si al televisor le revocaron la credencial, se descarta y vuelve solo a la
-      // pantalla de emparejamiento. Sin esto se quedaría en blanco indefinidamente y
-      // habría que ir a la garita a averiguar por qué.
       if (esPantalla && error?.response?.status === 401) {
         pantallaToken.borrar();
         setTokenPantalla(null);
         return;
       }
-      // Se deja constancia en consola en vez de tragarse el fallo: esta pantalla
-      // vive sola en una garita y nadie va a estar mirando si algo falló.
       console.warn('[monitor] no se pudo cargar el histórico inicial', error);
     }
   }, [esPantalla, tokenPantalla, necesitaEmparejar]);
 
-  // Carga inicial. La regla no distingue una petición al servidor de un setState
-  // gratuito, y sin esto la pantalla arrancaría en blanco.
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { cargar(); }, [cargar]);
 
@@ -302,14 +341,38 @@ const Monitor = () => {
   }, []);
 
   useEffect(() => {
-    if (aviso?.evento !== 'anpr_deteccion') return;
+    if (!aviso) return undefined;
+
+    const limpiarAviso = () => {
+      if (esPantalla) pantalla.limpiar();
+      else sesion.setLastNotification(null);
+    };
+
+    // El guardia registró el acceso: se confirma en grande unos segundos.
+    if (aviso.evento === 'anpr_resuelto') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setConfirmacion({ placa: aviso.placa, destino: aviso.destino });
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFichas((previas) => previas.filter((f) => f.evento_id !== aviso.evento_id));
+      limpiarAviso();
+      const t = setTimeout(() => setConfirmacion(null), 4000);
+      return () => clearTimeout(t);
+    }
+
+    // El guardia cambió el tema desde su teléfono.
+    if (aviso.evento === 'pantalla_tema') {
+      cambiarTema(aviso.tema === 'claro' ? 'claro' : 'oscuro');
+      limpiarAviso();
+      return undefined;
+    }
+
+    if (aviso.evento !== 'anpr_deteccion') return undefined;
 
     const ficha = aviso.ficha || {
-      // Si el servidor no pudo construir la ficha, se pinta con lo que trae el aviso:
-      // más vale un monitor incompleto que uno en blanco delante de la fila.
       evento_id: aviso.evento_id,
       placa: aviso.placa,
       timestamp: aviso.timestamp,
+      semaforo: aviso.semaforo,
       vehiculo: {
         tipo: aviso.tipo_vehiculo,
         color: aviso.color_vehiculo,
@@ -320,20 +383,15 @@ const Monitor = () => {
       infracciones: [],
     };
 
-    // La regla set-state-in-effect no ve la suscripción, porque vive dentro del hook
-    // del socket: desde aquí el aviso parece estado normal. Es justo el caso que la
-    // propia regla permite —reaccionar a un sistema externo—, así que se silencia en
-    // esta línea y no en todo el archivo.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setFichas((previas) =>
       previas.some((f) => f.evento_id === ficha.evento_id)
         ? previas
         : [ficha, ...previas].slice(0, 4)
     );
-
-    if (esPantalla) pantalla.limpiar();
-    else sesion.setLastNotification(null);
-  }, [aviso, esPantalla, pantalla, sesion]);
+    limpiarAviso();
+    return undefined;
+  }, [aviso, esPantalla, pantalla, sesion, cambiarTema]);
 
   if (necesitaEmparejar) {
     return <EmparejarPantalla onEmparejada={guardarToken} />;
@@ -342,28 +400,59 @@ const Monitor = () => {
   const [actual, ...anteriores] = fichas;
 
   return (
-    <div className="flex h-screen flex-col gap-6 bg-[#0b1220] p-8">
+    <div className="flex h-screen flex-col gap-6 p-8" style={{ backgroundColor: tema.fondo }}>
       <header className="flex shrink-0 items-center justify-between">
         <div>
-          <p className="font-mono text-lg font-bold uppercase tracking-[0.3em] text-emerald-400">
+          <p className={cn('font-mono text-lg font-bold uppercase tracking-[0.3em]', tema.marcaAgua)}>
             Control de acceso // BAGFM
           </p>
-          <h1 className="text-4xl font-black uppercase tracking-tight text-white">{titulo}</h1>
+          <h1 className={cn('text-4xl font-black uppercase tracking-tight', tema.texto)}>{titulo}</h1>
         </div>
-        <div className="flex items-center gap-6 text-white/40">
+
+        <div className="flex items-center gap-6">
+          {/* Botón grande: si el televisor tiene mando con puntero, hay que poder
+              acertarle desde el otro lado de la garita. */}
+          <button
+            type="button"
+            onClick={() => cambiarTema(nombreTema === 'oscuro' ? 'claro' : 'oscuro')}
+            title="Cambiar entre modo claro y oscuro"
+            className={cn('rounded-2xl p-4 transition-colors', tema.tarjeta, tema.textoSuave)}
+          >
+            {nombreTema === 'oscuro'
+              ? <Sun className="h-8 w-8" />
+              : <Moon className="h-8 w-8" />}
+          </button>
+
           {conectado
-            ? <Wifi className="h-7 w-7 text-emerald-400" />
-            : <WifiOff className="h-7 w-7 text-red-400" />}
-          <span className="flex items-center gap-2 text-3xl font-bold tabular-nums text-white/70">
+            ? <Wifi className="h-7 w-7 text-emerald-500" />
+            : <WifiOff className="h-7 w-7 text-red-500" />}
+
+          <span className={cn('flex items-center gap-2 text-3xl font-bold tabular-nums', tema.textoSuave)}>
             <Clock className="h-6 w-6" />
             {reloj.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}
           </span>
         </div>
       </header>
 
-      <Principal ficha={actual} token={tokenPantalla} urlFoto={urlFoto} />
+      <Principal
+        ficha={actual}
+        token={tokenPantalla}
+        urlFoto={urlFoto}
+        tema={tema}
+        nombreTema={nombreTema}
+      />
 
-      {anteriores.length > 0 && <Anteriores fichas={anteriores} token={tokenPantalla} urlFoto={urlFoto} />}
+      {anteriores.length > 0 && (
+        <Anteriores
+          fichas={anteriores}
+          token={tokenPantalla}
+          urlFoto={urlFoto}
+          tema={tema}
+          nombreTema={nombreTema}
+        />
+      )}
+
+      {confirmacion && <Confirmacion dato={confirmacion} />}
     </div>
   );
 };

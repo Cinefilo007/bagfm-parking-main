@@ -66,9 +66,12 @@ class Acceso(Base):
     # ciclo entre las tablas y obligan a crearlas en dos pasos. Para llegar a la foto
     # de la placa desde un acceso, se hace join por esa columna.
 
-    # Destino declarado, del catálogo cerrado. El texto libre del destino "Otro"
-    # sigue yendo a `observaciones`, que ya existía para eso.
-    destino_id = Column(UUID(as_uuid=True), ForeignKey("destinos_alcabala.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Destino declarado. Apunta a `entidades_civiles` porque los destinos de la base
+    # SON las entidades ya registradas (club, pizzería, parque...), no un catálogo
+    # aparte que habría que mantener en paralelo y que se desincronizaría.
+    # Cuando el destino no es una entidad, queda en nulo y el texto libre que dictó
+    # el visitante va a `observaciones`, que ya existía para eso.
+    destino_entidad_id = Column(UUID(as_uuid=True), ForeignKey("entidades_civiles.id", ondelete="SET NULL"), nullable=True, index=True)
 
     # Relaciones
 

@@ -7,14 +7,15 @@ from app.models.enums import AnprDireccion, AnprEstado
 
 
 class DestinoSalida(BaseModel):
+    """
+    Un destino posible dentro de la base: una entidad ya registrada en el sistema.
+
+    No hay catálogo aparte a propósito. Mantener dos listas de lo mismo garantiza que
+    tarde o temprano se den de alta entidades que la alcabala no ofrece.
+    """
     id: UUID
     nombre: str
     slug: str
-    icono: Optional[str] = None
-    orden: int
-    requiere_texto_libre: bool
-
-    model_config = ConfigDict(from_attributes=True)
 
 
 class EventoAnprSalida(BaseModel):
@@ -41,8 +42,13 @@ class EventoAnprSalida(BaseModel):
 
 
 class ResolverEvento(BaseModel):
-    """Lo que manda el guardia al tocar un destino."""
-    destino_id: UUID
+    """
+    Lo que manda el guardia al tocar un destino.
+
+    Sin `destino_entidad_id` el destino se toma como "Otro" y entonces
+    `observaciones` es obligatorio: un registro sin destino no aporta nada.
+    """
+    destino_entidad_id: Optional[UUID] = None
     observaciones: Optional[str] = None
     # La cámara acierta ~98.5%; el guardia corrige el resto sin salir de la pantalla.
     placa_corregida: Optional[str] = None

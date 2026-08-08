@@ -33,7 +33,6 @@ from app.models.configuracion_correo import ConfiguracionCorreo
 
 # Modelos ANPR — control de acceso por lectura de placas en alcabalas
 from app.models.evento_anpr import EventoAnpr
-from app.models.destino_alcabala import DestinoAlcabala
 from app.models.camara_anpr import CamaraAnpr
 from app.models.pantalla_monitor import PantallaMonitor
 from app.models.emparejamiento_pantalla import EmparejamientoPantalla

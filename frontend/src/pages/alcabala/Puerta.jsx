@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Car, Camera, CheckCircle2, XCircle, AlertTriangle,
-  Pencil, Trash2, Loader2, WifiOff, Wifi,
+  Pencil, Trash2, Loader2, WifiOff, Wifi, Sun, Moon,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -24,17 +24,27 @@ import { cn } from '../../lib/utils';
  * veredicto que se muestra es informativo: el objetivo es acumular datos, no filtrar.
  */
 
-const COLORES_VEREDICTO = {
-  socio:            { etiqueta: 'SOCIO VIGENTE',    color: '#3b82f6', Icono: CheckCircle2 },
-  pase:             { etiqueta: 'PASE VIGENTE',     color: '#10b981', Icono: CheckCircle2 },
-  reingreso:        { etiqueta: 'YA ESTÁ ADENTRO',  color: '#f59e0b', Icono: AlertTriangle },
-  socio_vencido:    { etiqueta: 'MEMBRESÍA VENCIDA',color: '#ef4444', Icono: XCircle },
-  pase_invalido:    { etiqueta: 'PASE NO VÁLIDO',   color: '#ef4444', Icono: XCircle },
-  no_registrado:    { etiqueta: 'NO REGISTRADO',    color: '#94a3b8', Icono: AlertTriangle },
+// El color lo decide el backend (`semaforo`) para que este teléfono y el monitor de
+// la garita no puedan contradecirse nunca sobre si un vehículo pasa o no.
+const SEMAFORO = {
+  verde:    { color: '#16a34a', Icono: CheckCircle2,   rotulo: 'PUEDE PASAR' },
+  amarillo: { color: '#d97706', Icono: AlertTriangle,  rotulo: 'REVISAR' },
+  rojo:     { color: '#dc2626', Icono: XCircle,        rotulo: 'NO DEBE PASAR' },
 };
 
-const veredictoDe = (coincidencia) =>
-  COLORES_VEREDICTO[coincidencia] || COLORES_VEREDICTO.no_registrado;
+const ETIQUETAS = {
+  socio:         'SOCIO VIGENTE',
+  pase:          'PASE VIGENTE',
+  reingreso:     'YA ESTÁ ADENTRO',
+  socio_vencido: 'MEMBRESÍA VENCIDA',
+  pase_invalido: 'PASE NO VÁLIDO',
+  no_registrado: 'NO REGISTRADO',
+};
+
+const veredictoDe = (evento) => {
+  const s = SEMAFORO[evento?.semaforo] || SEMAFORO.amarillo;
+  return { ...s, etiqueta: ETIQUETAS[evento?.coincidencia] || 'NO REGISTRADO' };
+};
 
 /** Muestra la foto de la placa. Se descarga con sesión, no por URL pública. */
 const FotoPlaca = ({ eventoId }) => {
@@ -76,17 +86,17 @@ const TarjetaDeteccion = ({ evento, destinos, onResuelto, onDescartado }) => {
   const [editandoPlaca, setEditandoPlaca] = useState(false);
   const [placa, setPlaca] = useState(evento.placa);
 
-  const { etiqueta, color, Icono } = veredictoDe(evento.coincidencia);
+  const { etiqueta, color, Icono, rotulo } = veredictoDe(evento);
 
   const resolver = async (destino, observaciones = null) => {
     setEnviando(true);
     try {
       await anprService.resolver(evento.id, {
-        destinoId: destino.id,
+        destinoId: destino?.id || null,
         observaciones,
         placaCorregida: placa !== evento.placa ? placa : null,
       });
-      toast.success(`${placa} → ${destino.nombre}`);
+      toast.success(`${placa} → ${destino?.nombre || observaciones}`);
       onResuelto(evento.id);
     } catch (error) {
       toast.error(error?.response?.data?.detail || 'No se pudo registrar');
@@ -95,8 +105,9 @@ const TarjetaDeteccion = ({ evento, destinos, onResuelto, onDescartado }) => {
   };
 
   const tocarDestino = (destino) => {
-    if (destino.requiere_texto_libre) {
-      setDestinoLibre(destino);
+    // `destino` en nulo es el botón "Otro": pide el texto a mano.
+    if (!destino) {
+      setDestinoLibre({ nombre: 'Otro' });
       return;
     }
     resolver(destino);
@@ -164,7 +175,7 @@ const TarjetaDeteccion = ({ evento, destinos, onResuelto, onDescartado }) => {
             style={{ color, backgroundColor: `${color}1a` }}
           >
             <Icono className="h-3.5 w-3.5" />
-            {etiqueta}
+            {rotulo} · {etiqueta}
           </div>
 
           {atributos && (
@@ -188,7 +199,7 @@ const TarjetaDeteccion = ({ evento, destinos, onResuelto, onDescartado }) => {
             <Boton
               className="flex-1"
               disabled={!texto.trim()}
-              onClick={() => resolver(destinoLibre, texto.trim())}
+              onClick={() => resolver(null, texto.trim())}
             >
               Registrar
             </Boton>
@@ -213,6 +224,17 @@ const TarjetaDeteccion = ({ evento, destinos, onResuelto, onDescartado }) => {
                 {destino.nombre}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => tocarDestino(null)}
+              className={cn(
+                'min-h-[56px] rounded-xl border border-text-sec/20 bg-bg-low px-3',
+                'text-xs font-bold uppercase tracking-wide text-text-sec',
+                'transition-colors hover:bg-primary/10 active:bg-primary/20'
+              )}
+            >
+              Otro
+            </button>
           </div>
 
           <div className="mt-3 flex justify-end gap-2 border-t border-text-main/10 pt-3">
@@ -272,6 +294,15 @@ const Puerta = () => {
     setLastNotification(null);
   }, [lastNotification, setLastNotification]);
 
+  const cambiarTema = useCallback(async (tema) => {
+    try {
+      await anprService.cambiarTemaPantalla(tema);
+      toast.success(`Monitor en modo ${tema}`);
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || 'No se pudo cambiar el monitor');
+    }
+  }, []);
+
   const quitar = useCallback((id) => {
     setEventos((previos) => previos.filter((e) => e.id !== id));
   }, []);
@@ -281,12 +312,32 @@ const Puerta = () => {
       <Header titulo="Puerta" subtitle="Registro automático por placa" />
 
       <main className="mt-[-1rem] space-y-4 px-4 pb-24 lg:px-8">
-      <div className="flex items-center gap-2 px-1 text-[9px] font-black uppercase tracking-[0.2em] text-text-muted">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1 text-[9px] font-black uppercase tracking-[0.2em] text-text-muted">
         {isConnected ? (
           <><Wifi className="h-3.5 w-3.5 text-success" /> En línea con la cámara</>
         ) : (
           <><WifiOff className="h-3.5 w-3.5 text-error" /> Sin conexión — reintentando</>
         )}
+
+        {/* El TV puede estar colgado sin mando a mano; a pleno sol el fondo oscuro
+            no se lee. Desde aquí siempre se puede cambiar. */}
+        <span className="ml-auto flex items-center gap-1">
+          <span className="text-text-sec">Monitor:</span>
+          <button
+            type="button"
+            onClick={() => cambiarTema('claro')}
+            className="flex items-center gap-1 rounded-md px-2 py-1 text-text-sec transition-colors hover:bg-bg-high"
+          >
+            <Sun className="h-3.5 w-3.5" /> Claro
+          </button>
+          <button
+            type="button"
+            onClick={() => cambiarTema('oscuro')}
+            className="flex items-center gap-1 rounded-md px-2 py-1 text-text-sec transition-colors hover:bg-bg-high"
+          >
+            <Moon className="h-3.5 w-3.5" /> Oscuro
+          </button>
+        </span>
       </div>
 
       {cargando ? (

@@ -17,7 +17,7 @@ from typing import Any, Dict, Optional
 from uuid import UUID
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.vehiculo import Vehiculo
@@ -39,9 +39,35 @@ COINCIDENCIA_PASE_INVALIDO = "pase_invalido"
 COINCIDENCIA_NO_REGISTRADO = "no_registrado"
 
 
+# Semáforo: la lectura de un vistazo, a varios metros y con prisa. Se calcula en el
+# backend y no en cada pantalla para que el teléfono del guardia y el monitor no
+# puedan discrepar nunca sobre si un vehículo pasa o no.
+#
+#   verde    → registrado y en regla: pasa
+#   amarillo → no registrado, o algo que mirar: pasa, pero el guardia decide
+#   rojo     → no debe entrar
+SEMAFORO_VERDE = "verde"
+SEMAFORO_AMARILLO = "amarillo"
+SEMAFORO_ROJO = "rojo"
+
+_SEMAFORO_POR_COINCIDENCIA = {
+    COINCIDENCIA_SOCIO: SEMAFORO_VERDE,
+    COINCIDENCIA_PASE: SEMAFORO_VERDE,
+    COINCIDENCIA_REINGRESO: SEMAFORO_AMARILLO,
+    COINCIDENCIA_NO_REGISTRADO: SEMAFORO_AMARILLO,
+    COINCIDENCIA_SOCIO_VENCIDO: SEMAFORO_ROJO,
+    COINCIDENCIA_PASE_INVALIDO: SEMAFORO_ROJO,
+}
+
+
+def semaforo_de(coincidencia: Optional[str]) -> str:
+    """Color que corresponde a un veredicto, sin considerar infracciones."""
+    return _SEMAFORO_POR_COINCIDENCIA.get(coincidencia, SEMAFORO_AMARILLO)
+
+
 def normalizar_placa(valor: Optional[str]) -> str:
     """
-    Deja la placa en la forma canónica con la que se guarda y se compara.
+    Deja la placa en la forma canónica con la que se compara.
 
     Todas las fuentes (Gemini, cámara ANPR, carga por Excel, tecleo del guardia)
     tienen que pasar por aquí o las comparaciones fallan por un guion.
@@ -49,6 +75,19 @@ def normalizar_placa(valor: Optional[str]) -> str:
     if not valor:
         return ""
     return valor.strip().upper().replace(" ", "").replace("-", "")
+
+
+def _placa_sin_separadores(columna):
+    """
+    La misma normalización, pero aplicada en SQL sobre la columna.
+
+    Hace falta porque los datos existentes NO están normalizados: la importación por
+    Excel guarda la placa con `.strip().upper()` y conserva guiones y espacios, así
+    que un vehículo cargado como "AV-645" jamás casaría con el "AV645" que lee la
+    cámara. Sin esto, un socio perfectamente registrado aparece como desconocido en
+    la alcabala, que es el peor error posible en este sistema.
+    """
+    return func.replace(func.replace(func.upper(columna), "-", ""), " ", "")
 
 
 async def verificar_placa(
@@ -72,7 +111,7 @@ async def verificar_placa(
 
     # ── 1. ¿Ya está ingresado en alguna zona? ──────────────────────────────────
     q_activo = select(VehiculoPase).where(
-        VehiculoPase.placa == placa,
+        _placa_sin_separadores(VehiculoPase.placa) == placa,
         VehiculoPase.ingresado == True,
     )
     if zona_id:
@@ -86,6 +125,7 @@ async def verificar_placa(
             "ya_ingresado": True,
             "pase_valido": True,
             "coincidencia": COINCIDENCIA_REINGRESO,
+            "semaforo": SEMAFORO_AMARILLO,
             "tipo_pase": "REINGRESO",
             "tipo_pase_color": "#f59e0b",
             "nombre_portador": None,
@@ -98,9 +138,19 @@ async def verificar_placa(
         }
 
     # ── 2. Socio permanente ────────────────────────────────────────────────────
+    # Primero la comparación exacta, que aprovecha el índice de `placa`. Solo si no
+    # aparece nada se paga el coste de la normalizada, que no puede usarlo.
     vehiculo = (await db.execute(
         select(Vehiculo).where(Vehiculo.placa == placa, Vehiculo.activo == True)
     )).scalars().first()
+
+    if not vehiculo:
+        vehiculo = (await db.execute(
+            select(Vehiculo).where(
+                _placa_sin_separadores(Vehiculo.placa) == placa,
+                Vehiculo.activo == True,
+            )
+        )).scalars().first()
 
     if vehiculo and vehiculo.socio_id:
         socio = (await db.execute(
@@ -128,6 +178,7 @@ async def verificar_placa(
                     "ya_ingresado": False,
                     "pase_valido": False,
                     "coincidencia": COINCIDENCIA_SOCIO_VENCIDO,
+                    "semaforo": SEMAFORO_ROJO,
                     "tipo_pase": "SOCIO",
                     "tipo_pase_color": "#ef4444",
                     "nombre_portador": nombre,
@@ -145,6 +196,7 @@ async def verificar_placa(
                 "ya_ingresado": False,
                 "pase_valido": True,
                 "coincidencia": COINCIDENCIA_SOCIO,
+                "semaforo": SEMAFORO_VERDE,
                 "tipo_pase": "SOCIO PERMANENTE",
                 "tipo_pase_color": "#3b82f6",
                 "nombre_portador": nombre,
@@ -163,6 +215,16 @@ async def verificar_placa(
         .order_by(CodigoQR.created_at.desc())
     )).scalars().first()
 
+    if not qr:
+        qr = (await db.execute(
+            select(CodigoQR)
+            .where(
+                _placa_sin_separadores(CodigoQR.vehiculo_placa) == placa,
+                CodigoQR.activo == True,
+            )
+            .order_by(CodigoQR.created_at.desc())
+        )).scalars().first()
+
     if qr:
         vehiculo_id = str(vehiculo.id) if vehiculo else None
 
@@ -173,6 +235,7 @@ async def verificar_placa(
                 "ya_ingresado": False,
                 "pase_valido": False,
                 "coincidencia": COINCIDENCIA_PASE_INVALIDO,
+                "semaforo": SEMAFORO_ROJO,
                 "tipo_pase": qr.tipo.value.upper() if qr.tipo else "PASE",
                 "tipo_pase_color": "#ef4444",
                 "nombre_portador": qr.nombre_portador,
@@ -191,6 +254,7 @@ async def verificar_placa(
                 "ya_ingresado": False,
                 "pase_valido": False,
                 "coincidencia": COINCIDENCIA_PASE_INVALIDO,
+                "semaforo": SEMAFORO_ROJO,
                 "tipo_pase": "PASE AGOTADO",
                 "tipo_pase_color": "#ef4444",
                 "nombre_portador": qr.nombre_portador,
@@ -219,6 +283,7 @@ async def verificar_placa(
             "ya_ingresado": False,
             "pase_valido": True,
             "coincidencia": COINCIDENCIA_PASE,
+            "semaforo": SEMAFORO_VERDE,
             "tipo_pase": tipo_label,
             "tipo_pase_color": "#10b981",
             "nombre_portador": qr.nombre_portador,
@@ -237,6 +302,7 @@ async def verificar_placa(
         "ya_ingresado": False,
         "pase_valido": False,
         "coincidencia": COINCIDENCIA_NO_REGISTRADO,
+        "semaforo": SEMAFORO_AMARILLO,
         "tipo_pase": None,
         "tipo_pase_color": "#94a3b8",
         "nombre_portador": None,

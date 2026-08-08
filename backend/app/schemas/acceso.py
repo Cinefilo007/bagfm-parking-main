@@ -46,7 +46,7 @@ class AccesoRegistrar(BaseModel):
     # Por defecto 'qr' para que el flujo de escaneo, que es el que ya existía, no
     # tenga que cambiar en el frontend.
     origen_registro: OrigenRegistro = OrigenRegistro.qr
-    destino_id: Optional[UUID] = None
+    destino_entidad_id: Optional[UUID] = None
 
 class AccesoSalida(AccesoBase):
     id: UUID

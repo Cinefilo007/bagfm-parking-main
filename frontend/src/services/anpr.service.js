@@ -24,12 +24,18 @@ export const anprService = {
   },
 
   /** El guardia marca el destino y con eso queda registrado el acceso. */
-  async resolver(eventoId, { destinoId, observaciones = null, placaCorregida = null }) {
+  async resolver(eventoId, { destinoId = null, observaciones = null, placaCorregida = null }) {
     const { data } = await api.post(`/anpr/evento/${eventoId}/resolver`, {
-      destino_id: destinoId,
+      destino_entidad_id: destinoId,
       observaciones: observaciones,
       placa_corregida: placaCorregida,
     });
+    return data;
+  },
+
+  /** Cambia el tema del monitor de la garita desde el teléfono del guardia. */
+  async cambiarTemaPantalla(tema) {
+    const { data } = await api.post('/anpr/pantalla/tema', null, { params: { tema } });
     return data;
   },
 

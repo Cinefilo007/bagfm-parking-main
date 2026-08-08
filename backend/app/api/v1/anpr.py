@@ -22,11 +22,12 @@ from sqlalchemy.orm import selectinload
 from app.core.config import obtener_config
 from app.core.database import obtener_db
 from app.core.dependencias import obtener_usuario_actual, require_rol
+from app.core.notify_manager import manager
 from app.models.alcabala_evento import PuntoAcceso
 from app.models.camara_anpr import CamaraAnpr, generar_token, hashear_token
 from app.core.tokens import generar_codigo_corto
-from app.models.destino_alcabala import DestinoAlcabala
 from app.models.emparejamiento_pantalla import EmparejamientoPantalla
+from app.models.entidad_civil import EntidadCivil
 from app.models.enums import AccesoTipo, AnprEstado, OrigenRegistro, RolTipo
 from app.models.evento_anpr import EventoAnpr
 from app.models.pantalla_monitor import PantallaMonitor
@@ -369,13 +370,23 @@ async def listar_destinos(
     db: AsyncSession = Depends(obtener_db),
     usuario: Usuario = DEPENDENCY_ALCABALA,
 ):
-    """Catálogo de destinos que el guardia ve como botones."""
-    destinos = (await db.execute(
-        select(DestinoAlcabala)
-        .where(DestinoAlcabala.activo == True)
-        .order_by(DestinoAlcabala.orden, DestinoAlcabala.nombre)
+    """
+    Destinos que el guardia ve como botones: las entidades registradas en el sistema.
+
+    Se leen de `entidades_civiles` y no de un catálogo aparte para que dar de alta una
+    entidad la haga aparecer sola en la alcabala, sin un segundo mantenimiento que
+    alguien olvidaría.
+    """
+    entidades = (await db.execute(
+        select(EntidadCivil)
+        .where(EntidadCivil.activo == True)
+        .order_by(EntidadCivil.nombre)
     )).scalars().all()
-    return destinos
+
+    return [
+        DestinoSalida(id=e.id, nombre=e.nombre, slug=e.codigo_slug)
+        for e in entidades
+    ]
 
 
 @router.get("/pendientes", response_model=List[EventoAnprSalida])
@@ -904,12 +915,15 @@ async def resolver_evento(
     if evento.estado == AnprEstado.resuelto:
         raise HTTPException(status_code=409, detail="El evento ya fue resuelto")
 
-    destino = await db.get(DestinoAlcabala, datos.destino_id)
-    if not destino or not destino.activo:
-        raise HTTPException(status_code=400, detail="Destino inválido")
-
-    if destino.requiere_texto_libre and not (datos.observaciones or "").strip():
-        raise HTTPException(status_code=400, detail=f"'{destino.nombre}' requiere indicar el destino")
+    # Sin entidad el destino es "Otro", y entonces el texto libre es obligatorio: un
+    # registro que no dice a dónde fue el vehículo no sirve para detectar patrones.
+    destino = None
+    if datos.destino_entidad_id:
+        destino = await db.get(EntidadCivil, datos.destino_entidad_id)
+        if not destino or not destino.activo:
+            raise HTTPException(status_code=400, detail="Destino inválido")
+    elif not (datos.observaciones or "").strip():
+        raise HTTPException(status_code=400, detail="Indique el destino")
 
     if datos.placa_corregida:
         evento.placa = normalizar_placa(datos.placa_corregida)
@@ -923,7 +937,7 @@ async def resolver_evento(
             punto_acceso=punto.nombre if punto else "Alcabala",
             es_manual=False,
             origen_registro=OrigenRegistro.anpr,
-            destino_id=destino.id,
+            destino_entidad_id=destino.id if destino else None,
             observaciones=datos.observaciones,
             vehiculo_placa=evento.placa,
             vehiculo_marca=evento.marca_vehiculo,
@@ -940,7 +954,52 @@ async def resolver_evento(
     await db.commit()
     await db.refresh(evento)
 
+    # Se avisa al monitor de la garita para que muestre la confirmación. Sin esto no
+    # hay forma de saber desde la pantalla si el toque del guardia llegó a registrarse
+    # o se perdió, que es justo la duda que deja el sistema cuando algo va mal.
+    try:
+        await manager.broadcast(
+            {
+                "evento": "anpr_resuelto",
+                "evento_id": str(evento.id),
+                "placa": evento.placa,
+                "destino": destino.nombre if destino else (datos.observaciones or "Otro"),
+                "registrado_por": f"{usuario.nombre} {usuario.apellido}".strip(),
+            },
+            channels=[f"PUNTO_{evento.punto_acceso_id}"],
+        )
+    except Exception as e:
+        print(f"[ANPR] No se pudo avisar de la resolución {evento.id}: {e}")
+
     return _a_salida(evento)
+
+
+@router.post("/pantalla/tema")
+async def cambiar_tema_pantalla(
+    tema: str,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = DEPENDENCY_ALCABALA,
+):
+    """
+    Cambia el tema del monitor de la garita desde el teléfono del guardia.
+
+    Existe porque el televisor puede estar colgado sin mando ni ratón a mano, y a
+    pleno sol el fondo oscuro no se lee. Desde el teléfono siempre se puede.
+    """
+    if tema not in ("claro", "oscuro"):
+        raise HTTPException(status_code=400, detail="Tema inválido")
+
+    punto_id = (await db.execute(
+        select(PuntoAcceso.id).where(PuntoAcceso.usuario_id == usuario.id)
+    )).scalars().first()
+    if not punto_id:
+        raise HTTPException(status_code=400, detail="Su cuenta no está asignada a una alcabala")
+
+    await manager.broadcast(
+        {"evento": "pantalla_tema", "tema": tema},
+        channels=[f"PUNTO_{punto_id}"],
+    )
+    return {"tema": tema}
 
 
 @router.post("/evento/{evento_id}/descartar", response_model=EventoAnprSalida)
