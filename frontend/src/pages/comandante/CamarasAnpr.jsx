@@ -153,9 +153,12 @@ const ModalToken = ({ resultado, onCerrar }) => {
 
         <details className="mt-3">
           <summary className="cursor-pointer text-[11px] uppercase tracking-wide text-text-sec">
-            Ver URL completa
+            Ver token suelto y URL completa
           </summary>
-          <div className="mt-2">
+          <div className="mt-2 space-y-2">
+            {/* El token a secas hace falta para el simulador, que lo recibe como
+                argumento. Sin este campo hay que recortarlo de la ruta a mano. */}
+            <CampoCopiable etiqueta="Token (para el simulador)" valor={resultado.token} />
             <CampoCopiable etiqueta="URL completa" valor={d.completa} />
           </div>
         </details>
@@ -194,7 +197,7 @@ const GuiaConfiguracion = () => {
   const [abierta, setAbierta] = useState(false);
 
   return (
-    <Card elevation={1}>
+    <Card elevation={2} className="border-bg-high/10">
       <button
         type="button"
         onClick={() => setAbierta((v) => !v)}
@@ -348,7 +351,7 @@ const FormularioCamara = ({ camara, puntos, onGuardar, onCancelar, guardando }) 
   };
 
   return (
-    <Card elevation={3} className="border border-primary/30">
+    <Card elevation={2} className="border-primary/30">
       <form onSubmit={enviar} className="space-y-3">
         <h3 className="text-xs font-bold uppercase tracking-wide text-text-sec">
           {camara ? `Editar ${camara.nombre}` : 'Nueva cámara'}
@@ -361,14 +364,14 @@ const FormularioCamara = ({ camara, puntos, onGuardar, onCancelar, guardando }) 
           placeholder="Ej: ANPR Alcabala Principal — Entrada"
         />
 
-        <div>
-          <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-text-sec">
+        <div className="mb-4">
+          <label className="mb-1.5 block text-xs font-medium tracking-[0.05em] text-text-sec">
             Alcabala
           </label>
           <select
             value={form.punto_acceso_id}
             onChange={cambiar('punto_acceso_id')}
-            className="min-h-[44px] w-full rounded-xl border border-bg-high bg-bg-low px-3 text-sm text-text-main dark:border-white/10"
+            className="input-field"
           >
             {puntos.length === 0 && <option value="">No hay alcabalas registradas</option>}
             {puntos.map((p) => (
@@ -400,7 +403,7 @@ const FilaCamara = ({ camara, onEditar, onRotar, onRevocar, onEliminar, onActiva
   const viva = estaViva(camara.ultimo_evento_at);
 
   return (
-    <Card elevation={2} className={cn(!camara.activa && 'opacity-60')}>
+    <Card elevation={2} className={cn('border-bg-high/10', !camara.activa && 'opacity-60')}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -553,7 +556,7 @@ const CamarasAnpr = () => {
   };
 
   return (
-    <div className="space-y-4 pb-24">
+    <div className="min-h-screen bg-bg-app">
       <Header
         titulo="Cámaras ANPR"
         subtitle="Inventario y tokens de ingesta"
@@ -566,10 +569,11 @@ const CamarasAnpr = () => {
         }
       />
 
+      <main className="mt-[-1rem] space-y-4 px-4 pb-24 lg:px-8">
       <GuiaConfiguracion />
 
       {puntos.length === 0 && !cargando && (
-        <Card elevation={1} className="border border-warning/30">
+        <Card elevation={2} className="border-warning/30">
           <p className="text-xs text-text-sec">
             No hay alcabalas registradas. Cree primero los puntos de acceso en
             <strong> Mando → Alcabalas</strong>: cada cámara tiene que pertenecer a uno.
@@ -601,7 +605,7 @@ const CamarasAnpr = () => {
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       ) : camaras.length === 0 ? (
-        <Card elevation={1} className="py-16 text-center">
+        <Card elevation={2} className="border-bg-high/10 py-16 text-center">
           <Camera className="mx-auto h-10 w-10 text-text-sec/30" />
           <p className="mt-3 text-sm font-bold uppercase tracking-wide text-text-sec">
             Sin cámaras registradas
@@ -626,6 +630,8 @@ const CamarasAnpr = () => {
           ))}
         </div>
       )}
+
+      </main>
 
       {tokenNuevo && (
         <ModalToken resultado={tokenNuevo} onCerrar={() => setTokenNuevo(null)} />

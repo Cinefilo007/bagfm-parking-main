@@ -119,8 +119,8 @@ const TarjetaDeteccion = ({ evento, destinos, onResuelto, onDescartado }) => {
 
   return (
     <Card
-      elevation={3}
-      className="relative overflow-hidden"
+      elevation={2}
+      className="relative overflow-hidden border-bg-high/10"
       style={{ borderLeft: `6px solid ${color}` }}
     >
       {enviando && (
@@ -205,7 +205,7 @@ const TarjetaDeteccion = ({ evento, destinos, onResuelto, onDescartado }) => {
                 type="button"
                 onClick={() => tocarDestino(destino)}
                 className={cn(
-                  'min-h-[56px] rounded-xl border border-primary/20 bg-bg-high px-3',
+                  'min-h-[56px] rounded-xl border border-primary/20 bg-bg-low px-3',
                   'text-xs font-bold uppercase tracking-wide text-text-main',
                   'transition-colors hover:bg-primary/10 active:bg-primary/20'
                 )}
@@ -277,10 +277,11 @@ const Puerta = () => {
   }, []);
 
   return (
-    <div className="space-y-4 pb-24">
+    <div className="min-h-screen bg-bg-app">
       <Header titulo="Puerta" subtitle="Registro automático por placa" />
 
-      <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-text-sec">
+      <main className="mt-[-1rem] space-y-4 px-4 pb-24 lg:px-8">
+      <div className="flex items-center gap-2 px-1 text-[9px] font-black uppercase tracking-[0.2em] text-text-muted">
         {isConnected ? (
           <><Wifi className="h-3.5 w-3.5 text-success" /> En línea con la cámara</>
         ) : (
@@ -293,7 +294,7 @@ const Puerta = () => {
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       ) : eventos.length === 0 ? (
-        <Card elevation={1} className="py-16 text-center">
+        <Card elevation={2} className="border-bg-high/10 py-16 text-center">
           <Car className="mx-auto h-10 w-10 text-text-sec/30" />
           <p className="mt-3 text-sm font-bold uppercase tracking-wide text-text-sec">
             Esperando vehículos
@@ -315,6 +316,7 @@ const Puerta = () => {
           ))}
         </div>
       )}
+      </main>
     </div>
   );
 };

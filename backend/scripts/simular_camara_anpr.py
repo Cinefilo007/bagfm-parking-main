@@ -58,6 +58,21 @@ PLANTILLA_XML = """<?xml version="1.0" encoding="UTF-8"?>
 """
 
 
+def extraer_token(valor: str) -> str:
+    """
+    Acepta el token pelado, la ruta o la URL completa y devuelve solo el token.
+
+    El panel entrega la ruta ya armada, así que es natural pegarla entera aquí. Sin
+    esto, el script la codificaría como si fuera el token y el servidor respondería
+    un 404 que no dice en qué se falló. Un token nunca lleva '/' —es base64 url-safe—
+    así que quedarse con el último segmento es seguro.
+    """
+    valor = valor.strip().strip('"').strip("'")
+    if "/" in valor:
+        valor = valor.rstrip("/").rsplit("/", 1)[-1]
+    return valor
+
+
 def jpeg_falso(relleno: bytes, tamano: int) -> bytes:
     """JPEG mínimo válido en cabecera y cierre: basta para ejercitar el guardado."""
     return b"\xff\xd8\xff\xe0" + relleno * tamano + b"\xff\xd9"
@@ -92,7 +107,8 @@ def main() -> int:
     p = argparse.ArgumentParser(description="Simula un evento de cámara ANPR Hikvision")
     p.add_argument("--url", default="http://localhost:8000", help="Base del backend")
     p.add_argument("--token", required=True,
-                   help="Token de la cámara, el que da el panel al crearla o rotarlo")
+                   help="Token de la cámara. Acepta también la ruta o la URL completa "
+                        "que muestra el panel; se queda con el token.")
     p.add_argument("--punto", default="Alcabala",
                    help="Solo cosmético: va en el campo channelName del XML")
     p.add_argument("--placa", default="PRUEBA1")
@@ -124,8 +140,10 @@ def main() -> int:
     from urllib.parse import quote
     # El token identifica a la cámara y con ella su alcabala: la URL no lleva el
     # punto de acceso aparte.
-    destino = f"{args.url.rstrip('/')}/api/v1/anpr/ingesta/{quote(args.token, safe='')}"
+    token = extraer_token(args.token)
+    destino = f"{args.url.rstrip('/')}/api/v1/anpr/ingesta/{quote(token, safe='')}"
     print(f"POST {args.url.rstrip('/')}/api/v1/anpr/ingesta/<token>")
+    print(f"     token ...{token[-4:]}  ({len(token)} caracteres)")
     print(f"     placa={args.placa}  {len(cuerpo)} bytes\n")
 
     fallos = 0
