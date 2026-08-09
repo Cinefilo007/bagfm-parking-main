@@ -10,11 +10,14 @@ import { Card } from '../../components/ui/Card';
 import { Boton } from '../../components/ui/Boton';
 import { Input } from '../../components/ui/Input';
 import { Header } from '../../components/layout/Header';
+import { BotonAyuda } from '../../components/ui/BotonAyuda';
 import { anprService } from '../../services/anpr.service';
 import { TourGuiado } from '../../components/ui/TourGuiado';
 import { useTour } from '../../hooks/useTour';
 import { PASOS_PUERTA } from '../../components/alcabala/pasosTour';
 import { IdentificarConductor } from '../../components/alcabala/IdentificarConductor';
+import { SelectorDestino, ConmutadorModoDestinos } from '../../components/alcabala/SelectorDestino';
+import { leerModoDestinos, guardarModoDestinos } from '../../components/alcabala/modoDestinos';
 import { cn } from '../../lib/utils';
 
 /**
@@ -83,7 +86,15 @@ const FotoPlaca = ({ eventoId }) => {
   return <img src={url} alt="Placa detectada" className="h-20 w-full rounded-lg object-cover" />;
 };
 
-const TarjetaDeteccion = ({ evento, destinos, onResuelto, onDescartado, colapsadaInicial = false }) => {
+const TarjetaDeteccion = ({
+  evento,
+  destinos,
+  modoDestinos,
+  onResuelto,
+  onDescartado,
+  onActualizado,
+  colapsadaInicial = false,
+}) => {
   const [colapsada, setColapsada] = useState(colapsadaInicial);
   const [identificando, setIdentificando] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -134,10 +145,16 @@ const TarjetaDeteccion = ({ evento, destinos, onResuelto, onDescartado, colapsad
   const v = evento.vehiculo || {};
   const atributos = [v.tipo, v.color, v.marca].filter(Boolean).join(' · ');
 
+  // Un vehículo puede estar perfectamente registrado y aun así no saberse quién lo
+  // conduce: eso es lo normal en el parque interno y en las placas que se dieron de
+  // alta solo con la lectura de la cámara. Es justo el caso que el guardia debe poder
+  // ver de un vistazo para decidir si, con la fila tranquila, pide la cédula.
+  const conductorIdentificado = Boolean(evento.persona?.nombre);
+
   // Solo se ofrece pedir identificación en particulares y en los desconocidos. Los
   // de servicio y protocolares los conduce gente distinta cada día: atarles una
   // persona seria inventar un dato.
-  const puedeIdentificar = !v.uso || v.uso === 'particular';
+  const puedeIdentificar = (!v.uso || v.uso === 'particular') && !conductorIdentificado;
 
   return (
     <Card
@@ -190,9 +207,14 @@ const TarjetaDeteccion = ({ evento, destinos, onResuelto, onDescartado, colapsad
             {rotulo} · {etiqueta}
           </div>
 
-          {evento.persona?.nombre && (
+          {conductorIdentificado ? (
             <p className="mt-1 truncate text-xs font-bold uppercase text-text-main">
               {evento.persona.nombre}
+            </p>
+          ) : (
+            <p className="mt-1 flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-warning">
+              <IdCard className="h-3.5 w-3.5 shrink-0" />
+              {v.registrado ? 'Vehículo registrado · sin conductor' : 'Conductor sin identificar'}
             </p>
           )}
           {atributos && (
@@ -236,46 +258,42 @@ const TarjetaDeteccion = ({ evento, destinos, onResuelto, onDescartado, colapsad
       ) : identificando ? (
         <IdentificarConductor
           eventoId={eventoId}
-          onListo={() => { setIdentificando(false); onResuelto(null); }}
+          onListo={(ficha) => {
+            setIdentificando(false);
+            if (ficha) onActualizado(eventoId, ficha);
+          }}
           onCancelar={() => setIdentificando(false)}
         />
       ) : (
         <>
-          {/* Un toque cierra el registro. Botones grandes: se opera de pie y con prisa. */}
-          <div data-tour="destinos" className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {destinos.map((destino) => (
-              <button
-                key={destino.id}
-                type="button"
-                onClick={() => tocarDestino(destino)}
-                className={cn(
-                  'min-h-[56px] rounded-xl border border-primary/20 bg-bg-low px-3',
-                  'text-xs font-bold uppercase tracking-wide text-text-main',
-                  'transition-colors hover:bg-primary/10 active:bg-primary/20'
-                )}
-              >
-                {destino.nombre}
-              </button>
-            ))}
+          {/* Pedir la cédula va ARRIBA de los destinos, no debajo. Colgado al final de
+              una botonera de treinta entidades no lo veía nadie, y lo que no se ve no
+              se usa: el registro se quedaba lleno de placas sin dueño. */}
+          {puedeIdentificar && (
             <button
               type="button"
-              onClick={() => tocarDestino(null)}
+              data-tour="identificar"
+              onClick={() => setIdentificando(true)}
               className={cn(
-                'min-h-[56px] rounded-xl border border-text-sec/20 bg-bg-low px-3',
-                'text-xs font-bold uppercase tracking-wide text-text-sec',
-                'transition-colors hover:bg-primary/10 active:bg-primary/20'
+                'mt-3 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl',
+                'border-2 border-dashed border-primary/50 bg-primary/10 px-3',
+                'text-xs font-black uppercase tracking-widest text-primary',
+                'transition-colors hover:bg-primary/20 active:bg-primary/30'
               )}
             >
-              Otro
+              <IdCard className="h-4 w-4" /> Identificar al conductor
             </button>
-          </div>
+          )}
+
+          {/* Un toque cierra el registro. Botones grandes o búsqueda escrita, según
+              cómo prefiera trabajar el guardia de este teléfono. */}
+          <SelectorDestino
+            destinos={destinos}
+            modo={modoDestinos}
+            onElegir={tocarDestino}
+          />
 
           <div data-tour="secundarias" className="mt-3 flex flex-wrap justify-end gap-2 border-t border-text-main/10 pt-3">
-            {puedeIdentificar && (
-              <Boton variant="secundario" size="sm" onClick={() => setIdentificando(true)}>
-                <IdCard className="h-3.5 w-3.5" /> Pedir identificación
-              </Boton>
-            )}
             <Boton variant="ghost" size="sm" onClick={descartar}>
               <Trash2 className="h-3.5 w-3.5" /> Descartar
             </Boton>
@@ -291,6 +309,9 @@ const Puerta = () => {
   const [destinos, setDestinos] = useState([]);
   const [eventos, setEventos] = useState([]);
   const [cargando, setCargando] = useState(true);
+  // Preferencia del teléfono, no de la cuenta: la misma cuenta de alcabala la usan
+  // guardias distintos en cada relevo, pero el aparato suele ser el mismo.
+  const [modoDestinos, setModoDestinos] = useState(leerModoDestinos);
   const tour = useTour('alcabala-puerta');
   const audioRef = useRef(null);
 
@@ -353,18 +374,36 @@ const Puerta = () => {
     setEventos((previos) => previos.filter((e) => (e.evento_id || e.id) !== id));
   }, []);
 
+  // Tras identificar al conductor, el backend devuelve la ficha recalculada: la misma
+  // placa que estaba en ámbar como desconocida pasa a verde y con nombre. Se sustituye
+  // en el sitio para que el guardia vea el resultado de lo que acaba de hacer.
+  const actualizar = useCallback((id, ficha) => {
+    setEventos((previos) =>
+      previos.map((e) => ((e.evento_id || e.id) === id ? { ...e, ...ficha } : e))
+    );
+  }, []);
+
+  const cambiarModoDestinos = useCallback((modo) => {
+    setModoDestinos(modo);
+    guardarModoDestinos(modo);
+  }, []);
+
   return (
     <div className="min-h-screen bg-bg-app">
+      {/* En móvil la ayuda flota a la izquierda, en espejo del conmutador de tema que
+          flota a la derecha. En escritorio no cabe ahí —está la barra lateral— y sigue
+          siendo el botón con texto de la cabecera. */}
+      <BotonAyuda onClick={tour.abrir} />
+
       <Header
         titulo="Puerta"
         subtitle="Registro automático por placa"
+        sitioAyuda
         actionElement={
-          // El conmutador de tema es `fixed` arriba a la derecha y solo aparece en
-          // móvil, así que en pantallas chicas hay que dejarle sitio o se solapan.
           <Boton
             size="sm"
             variant="outline"
-            className="mr-12 border-primary/40 text-primary lg:mr-0"
+            className="hidden border-primary/40 text-primary lg:inline-flex"
             onClick={tour.abrir}
           >
             <GraduationCap className="h-4 w-4" /> Cómo funciona
@@ -380,9 +419,11 @@ const Puerta = () => {
           <><WifiOff className="h-3.5 w-3.5 text-error" /> Sin conexión — reintentando</>
         )}
 
+        <ConmutadorModoDestinos modo={modoDestinos} onCambiar={cambiarModoDestinos} />
+
         {/* El TV puede estar colgado sin mando a mano; a pleno sol el fondo oscuro
             no se lee. Desde aquí siempre se puede cambiar. */}
-        <span className="ml-auto flex items-center gap-1">
+        <span data-tour="tema-monitor" className="ml-auto flex items-center gap-1">
           <span className="text-text-sec">Monitor:</span>
           <button
             type="button"
@@ -423,8 +464,10 @@ const Puerta = () => {
               colapsadaInicial={eventos.length > 1 && i > 0}
               evento={evento}
               destinos={destinos}
+              modoDestinos={modoDestinos}
               onResuelto={quitar}
               onDescartado={quitar}
+              onActualizado={actualizar}
             />
           ))}
         </div>

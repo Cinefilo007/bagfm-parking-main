@@ -5,7 +5,7 @@ import {
   ShieldCheck, ClipboardList, Info, 
   UserPlus, CheckCircle2, ShieldAlert,
   Zap, Activity, ChevronRight, Shield,
-  Car, RefreshCw, Clock, GraduationCap
+  Car, RefreshCw, Clock, GraduationCap, IdCard
 } from 'lucide-react';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useAuthStore } from '../../store/auth.store';
@@ -14,6 +14,7 @@ import { Card, CardContent } from '../../components/ui/Card';
 import { Boton } from '../../components/ui/Boton';
 import { Badge } from '../../components/ui/Badge';
 import { Header } from '../../components/layout/Header';
+import { BotonAyuda } from '../../components/ui/BotonAyuda';
 import { Input } from '../../components/ui/Input';
 import { comandoService } from '../../services/comando.service';
 import { anprService } from '../../services/anpr.service';
@@ -32,7 +33,7 @@ const DashboardAlcabala = () => {
     
     const [situacion, setSituacion] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [stats, setStats] = useState({ entradas: 0, salidas: 0, infracciones: 0 });
+    const [stats, setStats] = useState({ entradas: 0, salidas: 0, infracciones: 0, identificados: 0 });
     const [pendientes, setPendientes] = useState(0);
     const tour = useTour('alcabala-dashboard');
 
@@ -130,8 +131,14 @@ const DashboardAlcabala = () => {
 
     return (
         <div className="p-4 md:p-6 space-y-6 pb-24 max-w-[1400px] mx-auto animate-in fade-in duration-500">
+            {/* La ayuda flota a la izquierda en móvil, igual que en Puerta, en espejo
+                del conmutador de tema que flota a la derecha. */}
+            <BotonAyuda onClick={tour.abrir} />
+
             {/* 1. Cabecera Principal - Identidad y Mando */}
-            <header className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-bg-card/30 p-4 md:p-6 rounded-2xl border border-white/5 backdrop-blur-sm">
+            {/* pl-14 en móvil: el botón flotante de ayuda cae justo sobre esta esquina
+                y sin el hueco taparía el escudo del punto de control. */}
+            <header className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-bg-card/30 p-4 pl-14 sm:pl-4 md:p-6 rounded-2xl border border-white/5 backdrop-blur-sm">
                 <div className="flex items-center gap-4">
                     <div className="p-3 bg-primary/10 rounded-xl shrink-0 border border-primary/20">
                         <Shield className="text-primary" size={28} />
@@ -152,7 +159,7 @@ const DashboardAlcabala = () => {
                   <button
                     onClick={tour.abrir}
                     title="Ver cómo funciona"
-                    className="flex items-center gap-2 h-11 px-4 mr-12 lg:mr-0 rounded-2xl bg-bg-card border border-primary/40 text-primary font-bold hover:bg-primary/10 transition-all"
+                    className="hidden lg:flex items-center gap-2 h-11 px-4 rounded-2xl bg-bg-card border border-primary/40 text-primary font-bold hover:bg-primary/10 transition-all"
                   >
                     <GraduationCap size={16} />
                     <span className="text-[10px] font-black uppercase tracking-widest">Cómo funciona</span>
@@ -168,13 +175,18 @@ const DashboardAlcabala = () => {
                 </div>
             </header>
             
-            {/* 2. Fila de KPIs - Estandarizados (Igual al Comandante) */}
+            {/* 2. Fila de KPIs - Estandarizados (Igual al Comandante)
+
+                El cuarto era un marcador fijo en cero ("Órdenes Táct.") que nunca se
+                llegó a conectar. En su lugar va lo único que mide el trabajo del
+                guardia y no el tránsito del punto: entradas y salidas suben solas
+                aunque nadie toque el sistema, los conductores identificados no. */}
             <div data-tour="stats" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
                     { label: 'Entradas Ciclo', valor: stats.entradas, icon: LogIn, color: 'text-primary' },
                     { label: 'Salidas Ciclo', valor: stats.salidas, icon: LogOut, color: 'text-warning' },
                     { label: 'Alertas Det.', valor: stats.infracciones, icon: AlertTriangle, color: stats.infracciones > 0 ? 'text-danger' : 'text-text-muted' },
-                    { label: 'Órdenes Táct.', valor: 0, icon: ClipboardList, color: 'text-sky-400' }
+                    { label: 'Conductores Ident.', valor: stats.identificados || 0, icon: IdCard, color: (stats.identificados || 0) > 0 ? 'text-sky-400' : 'text-text-muted' }
                 ].map((stat, i) => {
                     const Icon = stat.icon;
                     return (

@@ -1,9 +1,14 @@
 import React from 'react';
 
-export const Header = ({ titulo, subtitle, actionElement }) => {
+/**
+ * `sitioAyuda` reserva el hueco del botón flotante de ayuda, que en móvil se pone
+ * arriba a la izquierda y si no taparía el título. Es opcional porque solo lo
+ * necesitan las pantallas que llevan ese botón.
+ */
+export const Header = ({ titulo, subtitle, actionElement, sitioAyuda = false }) => {
   return (
     <header className="bg-bg-app border-b border-bg-high/10 py-8 px-4 md:px-8 mb-6">
-      <div className="container mx-auto flex items-center justify-between">
+      <div className={`container mx-auto flex items-center justify-between ${sitioAyuda ? 'pl-14 lg:pl-0' : ''}`}>
         <div>
           {subtitle && (
             <p className="text-primary font-mono text-[10px] font-bold uppercase tracking-[0.2em] mb-1 opacity-80">
