@@ -205,6 +205,7 @@ async def verificar_placa(
                     "vehiculo_marca": vehiculo.marca,
                     "vehiculo_modelo": vehiculo.modelo,
                     "vehiculo_color": vehiculo.color,
+                    "vehiculo_uso": vehiculo.uso_vehiculo.value if vehiculo.uso_vehiculo else None,
                     "mensaje": f"🚫 MEMBRESÍA {estado_msg}",
                     "alerta": "error",
                 }
@@ -226,6 +227,7 @@ async def verificar_placa(
                 "vehiculo_marca": vehiculo.marca,
                 "vehiculo_modelo": vehiculo.modelo,
                 "vehiculo_color": vehiculo.color,
+                "vehiculo_uso": vehiculo.uso_vehiculo.value if vehiculo.uso_vehiculo else None,
                 "mensaje": "✅ Socio registrado — Membresía vigente",
                 "alerta": "success",
             }
@@ -259,6 +261,7 @@ async def verificar_placa(
             "vehiculo_marca": vehiculo.marca,
             "vehiculo_modelo": vehiculo.modelo,
             "vehiculo_color": vehiculo.color,
+            "vehiculo_uso": vehiculo.uso_vehiculo.value if vehiculo.uso_vehiculo else None,
             "mensaje": (
                 f"✅ Vehículo de {entidad.nombre}" if entidad
                 else "⚠️ Vehículo registrado sin titular asignado"

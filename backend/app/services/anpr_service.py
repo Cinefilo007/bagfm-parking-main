@@ -506,6 +506,12 @@ class AnprService:
                 "marca": veredicto.get("vehiculo_marca") or evento.marca_vehiculo,
                 "foto_placa_url": f"{base}/placa" if evento.foto_placa_path else None,
                 "foto_escena_url": f"{base}/escena" if evento.foto_escena_path else None,
+                # `uso` decide si tiene sentido pedirle la identificación al
+                # conductor: los de servicio y protocolares los maneja gente distinta
+                # cada día, así que asociarles una persona sería falsear el dato.
+                "uso": veredicto.get("vehiculo_uso"),
+                "registrado": bool(veredicto.get("vehiculo_id")),
+                "vehiculo_id": veredicto.get("vehiculo_id"),
             },
             "persona": {
                 "nombre": veredicto.get("nombre_portador"),

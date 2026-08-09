@@ -48,6 +48,7 @@ from app.schemas.anpr import (
     PantallaConToken,
     PantallaCrear,
     PantallaEditar,
+    IdentificarConductor,
     PantallaSalida,
     ResolverEvento,
 )
@@ -389,7 +390,7 @@ async def listar_destinos(
     ]
 
 
-@router.get("/pendientes", response_model=List[EventoAnprSalida])
+@router.get("/pendientes")
 async def listar_pendientes(
     limite: int = 20,
     db: AsyncSession = Depends(obtener_db),
@@ -1000,6 +1001,99 @@ async def cambiar_tema_pantalla(
         channels=[f"PUNTO_{punto_id}"],
     )
     return {"tema": tema}
+
+
+@router.post("/evento/{evento_id}/identificar")
+async def identificar_conductor(
+    evento_id: UUID,
+    datos: IdentificarConductor,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = DEPENDENCY_ALCABALA,
+):
+    """
+    Asocia un conductor a la placa detectada, alimentando el registro poco a poco.
+
+    Es el camino por el que un vehículo desconocido deja de serlo: el guardia
+    fotografía la cédula, la IA saca los datos y aquí quedan atados a la placa. La
+    próxima vez que ese carro pase, la alcabala ya sabrá de quién es.
+
+    Se crea lo que falte —la persona, el vehículo, o ambos— y NUNCA se pisa lo que
+    ya existe: si la placa ya tenía titular, se respeta. Corregir un titular es una
+    decisión de gestión, no algo que deba pasar en una garita a las tres de la
+    mañana.
+    """
+    from app.models.vehiculo import Vehiculo
+    from app.models.enums import UsoVehiculo
+    from app.core.security import hashear_password
+    import secrets
+
+    evento = await db.get(EventoAnpr, evento_id)
+    if not evento:
+        raise HTTPException(status_code=404, detail="Detección no encontrada")
+
+    cedula = datos.cedula.strip().upper().replace(".", "").replace("-", "")
+    nombre = datos.nombre.strip().upper()
+    apellido = datos.apellido.strip().upper()
+
+    # ── La persona ────────────────────────────────────────────────────────────
+    persona = (await db.execute(
+        select(Usuario).where(Usuario.cedula == cedula)
+    )).scalars().first()
+
+    creada_persona = False
+    if not persona:
+        # Contraseña aleatoria que nadie conoce: esta persona no inicia sesión, solo
+        # existe como titular de un vehículo. Dejar el campo en blanco no es opción
+        # porque la columna no lo admite.
+        persona = Usuario(
+            cedula=cedula,
+            nombre=nombre,
+            apellido=apellido,
+            telefono=datos.telefono,
+            rol=RolTipo.SOCIO,
+            activo=True,
+            password_hash=hashear_password(secrets.token_urlsafe(24)),
+        )
+        db.add(persona)
+        await db.flush()
+        creada_persona = True
+
+    # ── El vehículo ───────────────────────────────────────────────────────────
+    vehiculo = (await db.execute(
+        select(Vehiculo).where(Vehiculo.placa == evento.placa)
+    )).scalars().first()
+
+    creado_vehiculo = False
+    if not vehiculo:
+        vehiculo = Vehiculo(
+            placa=evento.placa,
+            # Lo que vio la cámara es mejor que nada; se corrige después desde
+            # Parque Automotor si hace falta.
+            marca=(evento.marca_vehiculo or "POR DEFINIR")[:100],
+            modelo=(evento.tipo_vehiculo or "POR DEFINIR")[:100],
+            color=(evento.color_vehiculo or "POR DEFINIR")[:50],
+            uso_vehiculo=UsoVehiculo.particular,
+            socio_id=persona.id,
+            activo=True,
+        )
+        db.add(vehiculo)
+        creado_vehiculo = True
+    elif not vehiculo.socio_id:
+        vehiculo.socio_id = persona.id
+
+    await db.commit()
+
+    return {
+        "persona": {
+            "id": str(persona.id),
+            "nombre": persona.nombre,
+            "apellido": persona.apellido,
+            "cedula": persona.cedula,
+            "creada": creada_persona,
+        },
+        "vehiculo_creado": creado_vehiculo,
+        "placa": evento.placa,
+    }
 
 
 @router.post("/evento/{evento_id}/descartar", response_model=EventoAnprSalida)

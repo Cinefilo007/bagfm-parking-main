@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Car, Camera, CheckCircle2, XCircle, AlertTriangle,
-  Pencil, Trash2, Loader2, WifiOff, Wifi, Sun, Moon, GraduationCap,
+  Pencil, Trash2, Loader2, WifiOff, Wifi, Sun, Moon, GraduationCap, IdCard,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -14,6 +14,7 @@ import { anprService } from '../../services/anpr.service';
 import { TourGuiado } from '../../components/ui/TourGuiado';
 import { useTour } from '../../hooks/useTour';
 import { PASOS_PUERTA } from '../../components/alcabala/pasosTour';
+import { IdentificarConductor } from '../../components/alcabala/IdentificarConductor';
 import { cn } from '../../lib/utils';
 
 /**
@@ -44,9 +45,9 @@ const ETIQUETAS = {
   no_registrado: 'NO REGISTRADO',
 };
 
-const veredictoDe = (evento) => {
-  const s = SEMAFORO[evento?.semaforo] || SEMAFORO.amarillo;
-  return { ...s, etiqueta: ETIQUETAS[evento?.coincidencia] || 'NO REGISTRADO' };
+const veredictoDe = (f) => {
+  const s = SEMAFORO[f?.semaforo] || SEMAFORO.amarillo;
+  return { ...s, etiqueta: ETIQUETAS[f?.persona?.coincidencia] || 'NO REGISTRADO' };
 };
 
 /** Muestra la foto de la placa. Se descarga con sesión, no por URL pública. */
@@ -82,25 +83,28 @@ const FotoPlaca = ({ eventoId }) => {
   return <img src={url} alt="Placa detectada" className="h-20 w-full rounded-lg object-cover" />;
 };
 
-const TarjetaDeteccion = ({ evento, destinos, onResuelto, onDescartado }) => {
+const TarjetaDeteccion = ({ evento, destinos, onResuelto, onDescartado, colapsadaInicial = false }) => {
+  const [colapsada, setColapsada] = useState(colapsadaInicial);
+  const [identificando, setIdentificando] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [destinoLibre, setDestinoLibre] = useState(null);
   const [texto, setTexto] = useState('');
   const [editandoPlaca, setEditandoPlaca] = useState(false);
   const [placa, setPlaca] = useState(evento.placa);
+  const eventoId = evento.evento_id || evento.id;
 
   const { etiqueta, color, Icono, rotulo } = veredictoDe(evento);
 
   const resolver = async (destino, observaciones = null) => {
     setEnviando(true);
     try {
-      await anprService.resolver(evento.id, {
+      await anprService.resolver(eventoId, {
         destinoId: destino?.id || null,
         observaciones,
         placaCorregida: placa !== evento.placa ? placa : null,
       });
       toast.success(`${placa} → ${destino?.nombre || observaciones}`);
-      onResuelto(evento.id);
+      onResuelto(eventoId);
     } catch (error) {
       toast.error(error?.response?.data?.detail || 'No se pudo registrar');
       setEnviando(false);
@@ -119,17 +123,21 @@ const TarjetaDeteccion = ({ evento, destinos, onResuelto, onDescartado }) => {
   const descartar = async () => {
     setEnviando(true);
     try {
-      await anprService.descartar(evento.id);
-      onDescartado(evento.id);
+      await anprService.descartar(eventoId);
+      onDescartado(eventoId);
     } catch (error) {
       toast.error(error?.response?.data?.detail || 'No se pudo descartar');
       setEnviando(false);
     }
   };
 
-  const atributos = [evento.tipo_vehiculo, evento.color_vehiculo, evento.marca_vehiculo]
-    .filter(Boolean)
-    .join(' · ');
+  const v = evento.vehiculo || {};
+  const atributos = [v.tipo, v.color, v.marca].filter(Boolean).join(' · ');
+
+  // Solo se ofrece pedir identificación en particulares y en los desconocidos. Los
+  // de servicio y protocolares los conduce gente distinta cada día: atarles una
+  // persona seria inventar un dato.
+  const puedeIdentificar = !v.uso || v.uso === 'particular';
 
   return (
     <Card
@@ -146,7 +154,7 @@ const TarjetaDeteccion = ({ evento, destinos, onResuelto, onDescartado }) => {
 
       <div className="flex gap-4">
         <div className="w-32 shrink-0">
-          <FotoPlaca eventoId={evento.id} />
+          <FotoPlaca eventoId={eventoId} />
         </div>
 
         <div className="min-w-0 flex-1">
@@ -182,8 +190,13 @@ const TarjetaDeteccion = ({ evento, destinos, onResuelto, onDescartado }) => {
             {rotulo} · {etiqueta}
           </div>
 
+          {evento.persona?.nombre && (
+            <p className="mt-1 truncate text-xs font-bold uppercase text-text-main">
+              {evento.persona.nombre}
+            </p>
+          )}
           {atributos && (
-            <p className="mt-1 truncate text-xs uppercase text-text-sec">{atributos}</p>
+            <p className="mt-0.5 truncate text-xs uppercase text-text-sec">{atributos}</p>
           )}
         </div>
       </div>
@@ -210,6 +223,22 @@ const TarjetaDeteccion = ({ evento, destinos, onResuelto, onDescartado }) => {
             <Boton variant="ghost" onClick={() => setDestinoLibre(null)}>Volver</Boton>
           </div>
         </div>
+      ) : colapsada ? (
+        // Con cola, las tarjetas de atrás se muestran plegadas: la botonera entera
+        // por cada vehiculo obligaba a un scroll larguísimo para llegar al siguiente.
+        <button
+          type="button"
+          onClick={() => setColapsada(false)}
+          className="mt-3 w-full rounded-xl border border-primary/20 bg-bg-low py-3 text-xs font-bold uppercase tracking-wide text-primary"
+        >
+          Marcar destino
+        </button>
+      ) : identificando ? (
+        <IdentificarConductor
+          eventoId={eventoId}
+          onListo={() => { setIdentificando(false); onResuelto(null); }}
+          onCancelar={() => setIdentificando(false)}
+        />
       ) : (
         <>
           {/* Un toque cierra el registro. Botones grandes: se opera de pie y con prisa. */}
@@ -241,7 +270,12 @@ const TarjetaDeteccion = ({ evento, destinos, onResuelto, onDescartado }) => {
             </button>
           </div>
 
-          <div data-tour="secundarias" className="mt-3 flex justify-end gap-2 border-t border-text-main/10 pt-3">
+          <div data-tour="secundarias" className="mt-3 flex flex-wrap justify-end gap-2 border-t border-text-main/10 pt-3">
+            {puedeIdentificar && (
+              <Boton variant="secundario" size="sm" onClick={() => setIdentificando(true)}>
+                <IdCard className="h-3.5 w-3.5" /> Pedir identificación
+              </Boton>
+            )}
             <Boton variant="ghost" size="sm" onClick={descartar}>
               <Trash2 className="h-3.5 w-3.5" /> Descartar
             </Boton>
@@ -282,18 +316,25 @@ const Puerta = () => {
   useEffect(() => {
     if (lastNotification?.evento !== 'anpr_deteccion') return;
 
-    const nuevo = {
-      id: lastNotification.evento_id,
+    // El aviso trae la ficha ya armada por el servidor; si faltara, se pinta con
+    // los campos sueltos para no perder la detección.
+    const nuevo = lastNotification.ficha || {
+      evento_id: lastNotification.evento_id,
       placa: lastNotification.placa,
-      coincidencia: lastNotification.coincidencia,
-      tipo_vehiculo: lastNotification.tipo_vehiculo,
-      color_vehiculo: lastNotification.color_vehiculo,
-      marca_vehiculo: lastNotification.marca_vehiculo,
-      timestamp_recibido: lastNotification.timestamp,
+      semaforo: lastNotification.semaforo,
+      vehiculo: {
+        tipo: lastNotification.tipo_vehiculo,
+        color: lastNotification.color_vehiculo,
+        marca: lastNotification.marca_vehiculo,
+      },
+      persona: {
+        nombre: lastNotification.nombre_portador,
+        coincidencia: lastNotification.coincidencia,
+      },
     };
 
     setEventos((previos) =>
-      previos.some((e) => e.id === nuevo.id) ? previos : [nuevo, ...previos]
+      previos.some((e) => (e.evento_id || e.id) === nuevo.evento_id) ? previos : [nuevo, ...previos]
     );
     audioRef.current?.play?.().catch(() => {});
     setLastNotification(null);
@@ -309,7 +350,7 @@ const Puerta = () => {
   }, []);
 
   const quitar = useCallback((id) => {
-    setEventos((previos) => previos.filter((e) => e.id !== id));
+    setEventos((previos) => previos.filter((e) => (e.evento_id || e.id) !== id));
   }, []);
 
   return (
@@ -318,7 +359,14 @@ const Puerta = () => {
         titulo="Puerta"
         subtitle="Registro automático por placa"
         actionElement={
-          <Boton size="sm" variant="secundario" onClick={tour.abrir}>
+          // El conmutador de tema es `fixed` arriba a la derecha y solo aparece en
+          // móvil, así que en pantallas chicas hay que dejarle sitio o se solapan.
+          <Boton
+            size="sm"
+            variant="outline"
+            className="mr-12 border-primary/40 text-primary lg:mr-0"
+            onClick={tour.abrir}
+          >
             <GraduationCap className="h-4 w-4" /> Cómo funciona
           </Boton>
         }
@@ -369,9 +417,10 @@ const Puerta = () => {
         </Card>
       ) : (
         <div className="space-y-3">
-          {eventos.map((evento) => (
+          {eventos.map((evento, i) => (
             <TarjetaDeteccion
-              key={evento.id}
+              key={evento.evento_id || evento.id}
+              colapsadaInicial={eventos.length > 1 && i > 0}
               evento={evento}
               destinos={destinos}
               onResuelto={quitar}

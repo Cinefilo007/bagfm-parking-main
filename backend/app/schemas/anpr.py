@@ -41,6 +41,20 @@ class EventoAnprSalida(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class IdentificarConductor(BaseModel):
+    """
+    Datos del conductor leídos de su cédula.
+
+    Es opcional y solo tiene sentido en vehículos particulares: los de servicio y
+    protocolares los maneja gente distinta cada día, así que asociarles una persona
+    sería falsear el dato.
+    """
+    nombre: str = Field(min_length=2, max_length=100)
+    apellido: str = Field(min_length=2, max_length=100)
+    cedula: str = Field(min_length=4, max_length=50)
+    telefono: Optional[str] = Field(default=None, max_length=50)
+
+
 class ResolverEvento(BaseModel):
     """
     Lo que manda el guardia al tocar un destino.

@@ -152,7 +152,7 @@ const DashboardAlcabala = () => {
                   <button
                     onClick={tour.abrir}
                     title="Ver cómo funciona"
-                    className="flex items-center gap-2 h-11 px-4 rounded-2xl bg-bg-card border border-primary/20 text-primary hover:bg-primary/10 transition-all"
+                    className="flex items-center gap-2 h-11 px-4 mr-12 lg:mr-0 rounded-2xl bg-bg-card border border-primary/40 text-primary font-bold hover:bg-primary/10 transition-all"
                   >
                     <GraduationCap size={16} />
                     <span className="text-[10px] font-black uppercase tracking-widest">Cómo funciona</span>

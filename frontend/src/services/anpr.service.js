@@ -39,6 +39,23 @@ export const anprService = {
     return data;
   },
 
+  /** Asocia un conductor a la placa, alimentando el registro poco a poco. */
+  async identificarConductor(eventoId, { nombre, apellido, cedula, telefono = null }) {
+    const { data } = await api.post(`/anpr/evento/${eventoId}/identificar`, {
+      nombre, apellido, cedula, telefono,
+    });
+    return data;
+  },
+
+  /** Lee una cédula con la IA y devuelve los datos que logró extraer. */
+  async leerCedula(imagenBase64) {
+    const { data } = await api.post('/ia/extraer-datos', {
+      image_base64: imagenBase64,
+      tipo: 'cedula',
+    });
+    return data;
+  },
+
   /** Peatón, falso positivo o vehículo que se devolvió sin entrar. */
   async descartar(eventoId) {
     const { data } = await api.post(`/anpr/evento/${eventoId}/descartar`);
