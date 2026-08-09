@@ -136,9 +136,11 @@ const DashboardAlcabala = () => {
             <BotonAyuda onClick={tour.abrir} />
 
             {/* 1. Cabecera Principal - Identidad y Mando */}
-            {/* pl-14 en móvil: el botón flotante de ayuda cae justo sobre esta esquina
-                y sin el hueco taparía el escudo del punto de control. */}
-            <header className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-bg-card/30 p-4 pl-14 sm:pl-4 md:p-6 rounded-2xl border border-white/5 backdrop-blur-sm">
+            {/* El hueco para el botón flotante de ayuda se reserva a AMBOS lados, no
+                solo a la izquierda: con el relleno en un solo lado el contenido queda
+                centrado respecto al espacio sobrante y toda la cabecera se ve corrida
+                hacia la derecha. */}
+            <header className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-bg-card/30 p-4 px-14 sm:px-4 md:p-6 rounded-2xl border border-white/5 backdrop-blur-sm">
                 <div className="flex items-center gap-4">
                     <div className="p-3 bg-primary/10 rounded-xl shrink-0 border border-primary/20">
                         <Shield className="text-primary" size={28} />
