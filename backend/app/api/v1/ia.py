@@ -30,13 +30,19 @@ async def extraer_datos(
 ):
     """
     Endpoint táctico para extraer datos de documentos usando Gemini IA.
+
+    Responde 200 aunque la IA no haya podido leer: el motivo viaja en `error` y los
+    campos vienen vacíos. Devolver un 500 obligaría a cada pantalla a inventarse un
+    mensaje, y el operador siempre puede escribir los datos a mano — que es
+    justamente lo que hay que decirle en vez de un error genérico.
     """
     if not request.image_base64 or request.tipo not in ['cedula', 'vehiculo', 'odometro', 'surtidor']:
         raise HTTPException(status_code=400, detail="Faltan datos de imagen o tipo inválido")
 
     try:
         datos = await ia_service.extraer_datos_documento(request.image_base64, request.tipo)
-        return {"status": "success", "data": datos}
+        motivo = datos.pop("_error", None)
+        return {"status": "error" if motivo else "success", "error": motivo, "data": datos}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en el motor de IA: {str(e)}")
 
