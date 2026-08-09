@@ -5,7 +5,7 @@ import {
   ShieldCheck, ClipboardList, Info, 
   UserPlus, CheckCircle2, ShieldAlert,
   Zap, Activity, ChevronRight, Shield,
-  Car, RefreshCw, Clock
+  Car, RefreshCw, Clock, GraduationCap
 } from 'lucide-react';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useAuthStore } from '../../store/auth.store';
@@ -16,6 +16,10 @@ import { Badge } from '../../components/ui/Badge';
 import { Header } from '../../components/layout/Header';
 import { Input } from '../../components/ui/Input';
 import { comandoService } from '../../services/comando.service';
+import { anprService } from '../../services/anpr.service';
+import { TourGuiado } from '../../components/ui/TourGuiado';
+import { useTour } from '../../hooks/useTour';
+import { PASOS_ALCABALA } from '../../components/alcabala/pasosTour';
 import { toast } from 'react-hot-toast';
 import { cn } from '../../lib/utils';
 import LiveEventLog from '../../components/dashboard/LiveEventLog';
@@ -29,6 +33,8 @@ const DashboardAlcabala = () => {
     const [situacion, setSituacion] = useState(null);
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({ entradas: 0, salidas: 0, infracciones: 0 });
+    const [pendientes, setPendientes] = useState(0);
+    const tour = useTour('alcabala-dashboard');
 
     const fetchSituacion = React.useCallback(async (showLoading = false) => {
         if (showLoading) setLoading(true);
@@ -36,6 +42,15 @@ const DashboardAlcabala = () => {
             const data = await comandoService.getMiSituacion();
             setSituacion(data);
             if (data.stats) setStats(data.stats);
+
+            // Cuántos vehículos esperan que el guardia les marque destino. Va en el
+            // botón de Puerta para que se vea sin entrar.
+            try {
+                setPendientes((await anprService.getPendientes(50)).length);
+            } catch {
+                // Si falla, el botón se muestra sin número: no es motivo para
+                // tumbar el resumen del turno.
+            }
             
             // Sincronizar identidad con el store global para la barra lateral
             if (data.identificado && data.datos_guardia) {
@@ -133,18 +148,28 @@ const DashboardAlcabala = () => {
                 </div>
 
                 {/* Info del Profesional de Guardia (Derecha) */}
-                <div className="flex items-center gap-4 bg-primary/5 p-3 px-5 rounded-2xl border border-primary/20">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={tour.abrir}
+                    title="Ver cómo funciona"
+                    className="flex items-center gap-2 h-11 px-4 rounded-2xl bg-bg-card border border-primary/20 text-primary hover:bg-primary/10 transition-all"
+                  >
+                    <GraduationCap size={16} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Cómo funciona</span>
+                  </button>
+                  <div className="flex items-center gap-4 bg-primary/5 p-3 px-5 rounded-2xl border border-primary/20">
                     <div className="text-right">
                         <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Profesional de Guardia</p>
                         <p className="text-sm font-black text-text-main italic uppercase tracking-tight">
                             {situacion?.datos_guardia?.grado || 'S1'} {situacion?.datos_guardia?.nombre} {situacion?.datos_guardia?.apellido}
                         </p>
                     </div>
+                  </div>
                 </div>
             </header>
             
             {/* 2. Fila de KPIs - Estandarizados (Igual al Comandante) */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div data-tour="stats" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
                     { label: 'Entradas Ciclo', valor: stats.entradas, icon: LogIn, color: 'text-primary' },
                     { label: 'Salidas Ciclo', valor: stats.salidas, icon: LogOut, color: 'text-warning' },
@@ -169,24 +194,50 @@ const DashboardAlcabala = () => {
                 })}
             </div>
 
-            {/* 3. Acciones de Registro - Centradas y en una sola línea */}
-            <div className="flex flex-col items-center justify-center py-4 gap-6">
-                <div className="flex flex-row items-center gap-4 w-full max-w-2xl">
-                    <button 
-                        onClick={() => handleIniciarEscaneo('entrada')}
-                        className="flex-1 flex items-center justify-center gap-4 bg-primary text-bg-app h-16 md:h-20 rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-tactica outline-none px-6"
-                    >
-                        <LogIn size={28} strokeWidth={3} />
-                        <span className="text-sm md:text-base font-black uppercase tracking-widest italic">Entrada</span>
-                    </button>
+            {/* 3. Acciones. La cámara es el flujo normal y ocupa el sitio principal;
+                   el QR pasa a ser el respaldo, que es lo que ahora es de verdad. */}
+            <div className="flex flex-col items-center justify-center gap-4 py-4">
+                <button
+                    data-tour="puerta"
+                    onClick={() => navigate('/alcabala/puerta')}
+                    className="w-full max-w-2xl flex items-center gap-5 bg-primary text-bg-app rounded-2xl px-6 py-5 hover:scale-[1.01] active:scale-[0.99] transition-all shadow-tactica outline-none text-left"
+                >
+                    <Car size={40} strokeWidth={2.5} className="shrink-0" />
+                    <div className="min-w-0 flex-1">
+                        <div className="text-base md:text-xl font-black uppercase tracking-widest italic">
+                            Puerta
+                        </div>
+                        <div className="text-[10px] md:text-xs font-bold uppercase tracking-wide opacity-80">
+                            La cámara lee la placa · usted marca el destino
+                        </div>
+                    </div>
+                    {pendientes > 0 && (
+                        <span className="shrink-0 rounded-full bg-bg-app/25 px-4 py-2 text-lg font-black tabular-nums">
+                            {pendientes}
+                        </span>
+                    )}
+                </button>
 
-                    <button 
-                        onClick={() => handleIniciarEscaneo('salida')}
-                        className="flex-1 flex items-center justify-center gap-4 bg-bg-card border-2 border-warning/30 text-warning h-16 md:h-20 rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-all outline-none px-6"
-                    >
-                        <LogOut size={28} strokeWidth={3} />
-                        <span className="text-sm md:text-base font-black uppercase tracking-widest italic">Salida</span>
-                    </button>
+                <div data-tour="qr" className="w-full max-w-2xl">
+                    <p className="mb-2 text-center text-[10px] font-black uppercase tracking-widest text-text-muted">
+                        Solo si el vehículo trae pase o la cámara no lo detecta
+                    </p>
+                    <div className="flex flex-row items-center gap-3">
+                        <button
+                            onClick={() => handleIniciarEscaneo('entrada')}
+                            className="flex-1 flex items-center justify-center gap-3 bg-bg-card border-2 border-primary/30 text-primary h-14 rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-all outline-none px-4"
+                        >
+                            <LogIn size={20} strokeWidth={3} />
+                            <span className="text-xs font-black uppercase tracking-widest italic">QR Entrada</span>
+                        </button>
+                        <button
+                            onClick={() => handleIniciarEscaneo('salida')}
+                            className="flex-1 flex items-center justify-center gap-3 bg-bg-card border-2 border-warning/30 text-warning h-14 rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-all outline-none px-4"
+                        >
+                            <LogOut size={20} strokeWidth={3} />
+                            <span className="text-xs font-black uppercase tracking-widest italic">QR Salida</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -197,7 +248,7 @@ const DashboardAlcabala = () => {
                 <div className="space-y-4 flex flex-col h-[500px]">
                     <div className="flex items-center gap-3 px-2">
                         <Activity size={18} className="text-primary" />
-                        <h3 className="text-xs font-black text-text-main uppercase tracking-[0.4em] italic">Bitácora en tiempo real</h3>
+                        <h3 data-tour="bitacora" className="text-xs font-black text-text-main uppercase tracking-[0.4em] italic">Bitácora en tiempo real</h3>
                     </div>
                     
                     <div className="flex-1 overflow-hidden pr-2">
@@ -241,6 +292,13 @@ const DashboardAlcabala = () => {
                     </div>
                 </div>
             </div>
+
+            <TourGuiado
+                pasos={PASOS_ALCABALA}
+                clave="alcabala-dashboard"
+                abierto={tour.abierto}
+                onCerrar={tour.cerrar}
+            />
         </div>
     );
 };

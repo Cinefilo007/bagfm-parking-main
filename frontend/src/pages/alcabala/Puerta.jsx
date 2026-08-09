@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Car, Camera, CheckCircle2, XCircle, AlertTriangle,
-  Pencil, Trash2, Loader2, WifiOff, Wifi, Sun, Moon,
+  Pencil, Trash2, Loader2, WifiOff, Wifi, Sun, Moon, GraduationCap,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -11,6 +11,9 @@ import { Boton } from '../../components/ui/Boton';
 import { Input } from '../../components/ui/Input';
 import { Header } from '../../components/layout/Header';
 import { anprService } from '../../services/anpr.service';
+import { TourGuiado } from '../../components/ui/TourGuiado';
+import { useTour } from '../../hooks/useTour';
+import { PASOS_PUERTA } from '../../components/alcabala/pasosTour';
 import { cn } from '../../lib/utils';
 
 /**
@@ -131,6 +134,7 @@ const TarjetaDeteccion = ({ evento, destinos, onResuelto, onDescartado }) => {
   return (
     <Card
       elevation={2}
+      data-tour="tarjeta"
       className="relative overflow-hidden border-bg-high/10"
       style={{ borderLeft: `6px solid ${color}` }}
     >
@@ -209,7 +213,7 @@ const TarjetaDeteccion = ({ evento, destinos, onResuelto, onDescartado }) => {
       ) : (
         <>
           {/* Un toque cierra el registro. Botones grandes: se opera de pie y con prisa. */}
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <div data-tour="destinos" className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
             {destinos.map((destino) => (
               <button
                 key={destino.id}
@@ -237,7 +241,7 @@ const TarjetaDeteccion = ({ evento, destinos, onResuelto, onDescartado }) => {
             </button>
           </div>
 
-          <div className="mt-3 flex justify-end gap-2 border-t border-text-main/10 pt-3">
+          <div data-tour="secundarias" className="mt-3 flex justify-end gap-2 border-t border-text-main/10 pt-3">
             <Boton variant="ghost" size="sm" onClick={descartar}>
               <Trash2 className="h-3.5 w-3.5" /> Descartar
             </Boton>
@@ -253,6 +257,7 @@ const Puerta = () => {
   const [destinos, setDestinos] = useState([]);
   const [eventos, setEventos] = useState([]);
   const [cargando, setCargando] = useState(true);
+  const tour = useTour('alcabala-puerta');
   const audioRef = useRef(null);
 
   const cargar = useCallback(async () => {
@@ -309,10 +314,18 @@ const Puerta = () => {
 
   return (
     <div className="min-h-screen bg-bg-app">
-      <Header titulo="Puerta" subtitle="Registro automático por placa" />
+      <Header
+        titulo="Puerta"
+        subtitle="Registro automático por placa"
+        actionElement={
+          <Boton size="sm" variant="secundario" onClick={tour.abrir}>
+            <GraduationCap className="h-4 w-4" /> Cómo funciona
+          </Boton>
+        }
+      />
 
       <main className="mt-[-1rem] space-y-4 px-4 pb-24 lg:px-8">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1 text-[9px] font-black uppercase tracking-[0.2em] text-text-muted">
+      <div data-tour="estado-camara" className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1 text-[9px] font-black uppercase tracking-[0.2em] text-text-muted">
         {isConnected ? (
           <><Wifi className="h-3.5 w-3.5 text-success" /> En línea con la cámara</>
         ) : (
@@ -367,6 +380,12 @@ const Puerta = () => {
           ))}
         </div>
       )}
+        <TourGuiado
+          pasos={PASOS_PUERTA}
+          clave="alcabala-puerta"
+          abierto={tour.abierto}
+          onCerrar={tour.cerrar}
+        />
       </main>
     </div>
   );
