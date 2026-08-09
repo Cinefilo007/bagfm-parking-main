@@ -792,7 +792,12 @@ class AccesoService:
 
         query = select(Acceso)
         if punto_nombre:
-            query = query.where(func.trim(Acceso.punto_acceso) == punto_nombre.strip())
+            # Misma normalización que el contador del turno: si aquí entra un acceso
+            # que allí no cuenta, el guardia ve la fila en su bitácora y el KPI en
+            # cero, y no hay forma de explicarle por qué.
+            query = query.where(
+                func.lower(func.trim(Acceso.punto_acceso)) == punto_nombre.strip().lower()
+            )
 
         # Contar total
         count_query = select(func.count()).select_from(query.subquery())

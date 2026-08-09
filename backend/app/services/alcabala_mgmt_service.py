@@ -285,36 +285,53 @@ class AlcabalaService:
         Calcula entradas y salidas para un punto.
         - tactico=True: Desde las 08:30 AM del ciclo actual.
         - tactico=False: Desde las 00:00 AM del día actual.
+
+        Cuenta TODOS los accesos del punto, vengan del escáner QR o de la cámara ANPR:
+        `accesos` es una sola bitácora y `origen_registro` solo dice por dónde entró el
+        dato. Si el número no cuadra con lo que se ve en la bitácora, el sospechoso es
+        el emparejamiento por nombre de punto o el corte del ciclo — para eso está
+        `scripts/diagnostico_kpi_turno.py`.
         """
         ahora_vet = datetime.now(VET)
-        
+
         if tactico:
             fecha_t = obtener_fecha_tactica()
             # Inicio del ciclo: fecha_t a las 08:30 AM VET
             inicio_ciclo_vet = datetime.combine(fecha_t, time(8, 30)).replace(tzinfo=VET)
-            inicio_utc = inicio_ciclo_vet.astimezone(timezone.utc).replace(tzinfo=None)
         else:
             # Inicio del día calendario: hoy a las 00:00 AM VET
-            inicio_dia_vet = datetime.combine(ahora_vet.date(), time(0, 0)).replace(tzinfo=VET)
-            inicio_utc = inicio_dia_vet.astimezone(timezone.utc).replace(tzinfo=None)
+            inicio_ciclo_vet = datetime.combine(ahora_vet.date(), time(0, 0)).replace(tzinfo=VET)
+
+        # Aware, no naive. `accesos.timestamp` es timestamptz: un corte sin zona lo
+        # interpreta Postgres en la zona de la SESIÓN, y si esa sesión no está en UTC
+        # el corte se desplaza y se pierden los accesos de la mañana (comprobado: 2 de
+        # 3 con la sesión en America/Caracas). Con zona explícita da igual la que use.
+        inicio_utc = inicio_ciclo_vet.astimezone(timezone.utc)
+
+        # El nombre del punto se compara normalizado. `accesos.punto_acceso` es texto
+        # libre copiado en el momento del registro, así que una diferencia de espacios
+        # o de mayúsculas basta para que un acceso salga en la bitácora del punto pero
+        # no en su contador, que es justo el descuadre que no hay forma de explicarle
+        # a un guardia.
+        mismo_punto = func.lower(func.trim(Acceso.punto_acceso)) == punto_nombre.strip().lower()
 
         q_ent = select(func.count(Acceso.id)).filter(
-            func.trim(Acceso.punto_acceso) == punto_nombre.strip(),
+            mismo_punto,
             Acceso.tipo == "entrada",
             Acceso.timestamp >= inicio_utc
         )
         q_sal = select(func.count(Acceso.id)).filter(
-            func.trim(Acceso.punto_acceso) == punto_nombre.strip(),
+            mismo_punto,
             Acceso.tipo == "salida",
             Acceso.timestamp >= inicio_utc
         )
-        
+
         entradas = (await db.execute(q_ent)).scalar() or 0
         salidas = (await db.execute(q_sal)).scalar() or 0
-        
+
         # Últimos 5 eventos en este rango
         query_hist = select(Acceso).filter(
-            func.trim(Acceso.punto_acceso) == punto_nombre.strip(),
+            mismo_punto,
             Acceso.timestamp >= inicio_utc
         ).order_by(Acceso.timestamp.desc()).limit(5)
         
