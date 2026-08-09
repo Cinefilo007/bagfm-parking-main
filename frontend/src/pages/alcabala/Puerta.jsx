@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Car, Camera, CheckCircle2, XCircle, AlertTriangle,
-  Pencil, Trash2, Loader2, WifiOff, Wifi, Sun, Moon, GraduationCap, IdCard,
+  Pencil, Trash2, Loader2, WifiOff, Wifi, Sun, Moon, GraduationCap, IdCard, ScanLine,
+  LogIn, LogOut,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -102,9 +103,22 @@ const TarjetaDeteccion = ({
   const [texto, setTexto] = useState('');
   const [editandoPlaca, setEditandoPlaca] = useState(false);
   const [placa, setPlaca] = useState(evento.placa);
+  // El sentido que se va a registrar. Sale de lo que dijo el backend y el guardia lo
+  // puede cambiar: en la alcabala de carril compartido el sistema propone, no decide.
+  // `desconocida` se muestra como entrada, que es el caso mayoritario, pero marcada
+  // como suposición para que se vea que hay que mirarla.
+  const [sentido, setSentido] = useState(
+    evento.direccion === 'salida' ? 'salida' : 'entrada'
+  );
   const eventoId = evento.evento_id || evento.id;
 
   const { etiqueta, color, Icono, rotulo } = veredictoDe(evento);
+  const saliendo = sentido === 'salida';
+
+  // Cuando el sentido lo fija la puerta donde está la cámara es un hecho; en cualquier
+  // otro caso es una suposición y se marca, para que el guardia sepa cuál de las dos
+  // cosas está viendo antes de cerrar el registro.
+  const sentidoSeguro = evento.sentido_origen === 'camara';
 
   const resolver = async (destino, observaciones = null) => {
     setEnviando(true);
@@ -113,8 +127,11 @@ const TarjetaDeteccion = ({
         destinoId: destino?.id || null,
         observaciones,
         placaCorregida: placa !== evento.placa ? placa : null,
+        sentidoCorregido: sentido !== evento.direccion ? sentido : null,
       });
-      toast.success(`${placa} → ${destino?.nombre || observaciones}`);
+      toast.success(
+        saliendo ? `${placa} → salida registrada` : `${placa} → ${destino?.nombre || observaciones}`
+      );
       onResuelto(eventoId);
     } catch (error) {
       toast.error(error?.response?.data?.detail || 'No se pudo registrar');
@@ -145,6 +162,10 @@ const TarjetaDeteccion = ({
   const v = evento.vehiculo || {};
   const atributos = [v.tipo, v.color, v.marca].filter(Boolean).join(' · ');
 
+  // Qué vieron las dos cámaras del par (delantera y trasera del mismo paso). Las
+  // detecciones anteriores a que existieran los roles no lo traen.
+  const lectura = evento.lectura || {};
+
   // Un vehículo puede estar perfectamente registrado y aun así no saberse quién lo
   // conduce: eso es lo normal en el parque interno y en las placas que se dieron de
   // alta solo con la lectura de la cámara. Es justo el caso que el guardia debe poder
@@ -154,7 +175,12 @@ const TarjetaDeteccion = ({
   // Solo se ofrece pedir identificación en particulares y en los desconocidos. Los
   // de servicio y protocolares los conduce gente distinta cada día: atarles una
   // persona seria inventar un dato.
-  const puedeIdentificar = (!v.uso || v.uso === 'particular') && !conductorIdentificado;
+  //
+  // Y nunca al salir: parar a alguien que ya se va para pedirle la cédula es la peor
+  // versión de esto — molesta al visitante y tapona la puerta por un dato que se pudo
+  // tomar a la entrada.
+  const puedeIdentificar =
+    (!v.uso || v.uso === 'particular') && !conductorIdentificado && !saliendo;
 
   return (
     <Card
@@ -199,13 +225,47 @@ const TarjetaDeteccion = ({
             </button>
           )}
 
-          <div
-            className="mt-1 inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide"
-            style={{ color, backgroundColor: `${color}1a` }}
-          >
-            <Icono className="h-3.5 w-3.5" />
-            {rotulo} · {etiqueta}
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            <span
+              className="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide"
+              style={{ color, backgroundColor: `${color}1a` }}
+            >
+              <Icono className="h-3.5 w-3.5" />
+              {rotulo} · {etiqueta}
+            </span>
+
+            {/* Entrando o saliendo. Donde la puerta es de un solo sentido el backend
+                lo da por hecho; en el carril compartido esto es una propuesta y el
+                guardia la cambia con un toque, viendo el vehículo. */}
+            <button
+              type="button"
+              onClick={() => setSentido(saliendo ? 'entrada' : 'salida')}
+              title="Cambiar entre entrada y salida"
+              className={cn(
+                'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-black uppercase tracking-wide',
+                saliendo
+                  ? 'bg-warning/15 text-warning'
+                  : 'bg-primary/15 text-primary'
+              )}
+            >
+              {saliendo ? <LogOut className="h-3.5 w-3.5" /> : <LogIn className="h-3.5 w-3.5" />}
+              {saliendo ? 'Saliendo' : 'Entrando'}{sentidoSeguro ? '' : '?'}
+            </button>
           </div>
+
+          {/* Las dos cámaras del par leyeron distinto. Se muestra la de más confianza
+              y la otra queda a un toque: es más rápido y menos propenso a error que
+              teclear la placa entera con un conductor esperando. */}
+          {lectura.dudosa && lectura.alterna && placa !== lectura.alterna && (
+            <button
+              type="button"
+              onClick={() => setPlaca(lectura.alterna)}
+              className="mt-1 flex w-full items-center gap-1.5 rounded-md bg-warning/10 px-2 py-1 text-left text-[10px] font-bold uppercase tracking-wide text-warning"
+            >
+              <ScanLine className="h-3.5 w-3.5 shrink-0" />
+              La otra cámara leyó {lectura.alterna} — tocar para usarla
+            </button>
+          )}
 
           {conductorIdentificado ? (
             <p className="mt-1 truncate text-xs font-bold uppercase text-text-main">
@@ -219,6 +279,16 @@ const TarjetaDeteccion = ({
           )}
           {atributos && (
             <p className="mt-0.5 truncate text-xs uppercase text-text-sec">{atributos}</p>
+          )}
+
+          {/* Solo una de las dos cámaras vio este vehículo. En una moto es lo normal
+              —lleva una sola placa— pero en un carro significa que la otra cámara no
+              leyó: placa tapada, sucia, o el equipo empezando a fallar. */}
+          {lectura.una_sola_camara && (
+            <p className="mt-0.5 flex items-center gap-1 text-[10px] uppercase tracking-wide text-text-sec">
+              <Camera className="h-3 w-3 shrink-0 opacity-60" />
+              Leída por una sola cámara{lectura.rol ? ` (${lectura.rol})` : ''}
+            </p>
           )}
         </div>
       </div>
@@ -253,7 +323,7 @@ const TarjetaDeteccion = ({
           onClick={() => setColapsada(false)}
           className="mt-3 w-full rounded-xl border border-primary/20 bg-bg-low py-3 text-xs font-bold uppercase tracking-wide text-primary"
         >
-          Marcar destino
+          {saliendo ? 'Registrar salida' : 'Marcar destino'}
         </button>
       ) : identificando ? (
         <IdentificarConductor
@@ -285,13 +355,31 @@ const TarjetaDeteccion = ({
             </button>
           )}
 
-          {/* Un toque cierra el registro. Botones grandes o búsqueda escrita, según
-              cómo prefiera trabajar el guardia de este teléfono. */}
-          <SelectorDestino
-            destinos={destinos}
-            modo={modoDestinos}
-            onElegir={tocarDestino}
-          />
+          {/* En una salida no hay destino que preguntar: el vehículo se va. Pedirlo
+              obligaba al guardia a inventarse uno para poder cerrar la tarjeta. */}
+          {saliendo ? (
+            <button
+              type="button"
+              data-tour="destinos"
+              onClick={() => resolver(null, null)}
+              className={cn(
+                'mt-4 flex min-h-[64px] w-full items-center justify-center gap-2 rounded-xl',
+                'border border-warning/30 bg-warning/10 px-3',
+                'text-sm font-black uppercase tracking-widest text-warning',
+                'transition-colors hover:bg-warning/20 active:bg-warning/30'
+              )}
+            >
+              <LogOut className="h-5 w-5" /> Registrar salida
+            </button>
+          ) : (
+            /* Un toque cierra el registro. Botones grandes o búsqueda escrita, según
+               cómo prefiera trabajar el guardia de este teléfono. */
+            <SelectorDestino
+              destinos={destinos}
+              modo={modoDestinos}
+              onElegir={tocarDestino}
+            />
+          )}
 
           <div data-tour="secundarias" className="mt-3 flex flex-wrap justify-end gap-2 border-t border-text-main/10 pt-3">
             <Boton variant="ghost" size="sm" onClick={descartar}>
@@ -331,6 +419,19 @@ const Puerta = () => {
   }, []);
 
   useEffect(() => { cargar(); }, [cargar]);
+
+  // La segunda cámara del par no abre tarjeta nueva: refresca la que ya está en
+  // pantalla. Puede haber cambiado la placa —si esa cámara leyó con más confianza— o
+  // haber aparecido el aviso de que las dos lecturas no coinciden.
+  useEffect(() => {
+    if (lastNotification?.evento !== 'anpr_actualizado') return;
+
+    const { evento_id: id, ficha } = lastNotification;
+    setEventos((previos) =>
+      previos.map((e) => ((e.evento_id || e.id) === id ? { ...e, ...(ficha || {}) } : e))
+    );
+    setLastNotification(null);
+  }, [lastNotification, setLastNotification]);
 
   // Cada detección que llega por WebSocket se antepone a la lista. El backend ya
   // deduplicó los disparos repetidos del mismo vehículo, así que aquí no hace falta.

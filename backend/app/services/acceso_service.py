@@ -1,3 +1,4 @@
+from typing import Optional
 from uuid import UUID
 from datetime import datetime, timezone
 from sqlalchemy import func, or_
@@ -18,7 +19,7 @@ from app.models.alcabala_evento import LotePaseMasivo
 from app.models.asignacion_zona import AsignacionZona
 from app.models.zona_estacionamiento import ZonaEstacionamiento
 from app.models.puesto_estacionamiento import PuestoEstacionamiento
-from app.models.enums import AccesoTipo, MembresiaEstado, InfraccionEstado, QRTipo, TipoAccesoPase, RolTipo
+from app.models.enums import AccesoTipo, MembresiaEstado, InfraccionEstado, QRTipo, TipoAccesoPase, RolTipo, OrigenRegistro
 from app.schemas.acceso import AccesoValidar, AccesoRegistrar, ResultadoValidacion, EventoTactico
 from app.services.membresia_service import membresia_service
 from app.services.zona_service import zona_service
@@ -786,6 +787,66 @@ class AccesoService:
                 print(f"⚠️ ERROR no crítico enviando notificación: {str(e)}")
 
         return nuevo_acceso
+
+    async def cerrar_estancia_abierta(
+        self,
+        db: AsyncSession,
+        placa: str,
+        registrado_por_id: UUID,
+    ) -> Optional[Acceso]:
+        """
+        Cierra la estancia anterior de una placa que aparece entrando sin haber salido.
+
+        Existe por un hueco FÍSICO, no de software: la cámara de la puerta de salida de
+        una alcabala apunta al frente del vehículo, y las motos llevan una sola placa y
+        va atrás. Una moto que sale por ahí no la ve nadie.
+
+        Si esa misma placa vuelve a entrar, la salida ocurrió — solo que no se detectó.
+        Dejarla sin cerrar llenaría de vehículos fantasma el listado de quién está
+        dentro, que es justo el dato que el mando quiere sacar de todo esto.
+
+        Lo que NO se hace es inventar la hora. El registro se marca con
+        `origen_registro = deducido` y lo dice en las observaciones, para que nadie
+        confunda estas salidas con las que vio una cámara. Se devuelve el acceso creado,
+        o None si no había nada que cerrar.
+        """
+        placa = normalizar_placa(placa)
+        if not placa:
+            return None
+
+        ultimo = (await db.execute(
+            select(Acceso)
+            .where(_placa_sin_separadores(Acceso.vehiculo_placa) == placa)
+            .order_by(Acceso.timestamp.desc())
+            .limit(1)
+        )).scalars().first()
+
+        # Sin historial, o ya salió: no hay estancia abierta.
+        if not ultimo or ultimo.tipo != AccesoTipo.entrada:
+            return None
+
+        cierre = Acceso(
+            tipo=AccesoTipo.salida,
+            # Por dónde salió no se sabe; se atribuye al punto por el que entró, que es
+            # lo único que consta. La observación deja claro que es una reconstrucción.
+            punto_acceso=ultimo.punto_acceso,
+            registrado_por=registrado_por_id,
+            es_manual=False,
+            origen_registro=OrigenRegistro.deducido,
+            usuario_id=ultimo.usuario_id,
+            vehiculo_id=ultimo.vehiculo_id,
+            vehiculo_placa=ultimo.vehiculo_placa,
+            vehiculo_marca=ultimo.vehiculo_marca,
+            vehiculo_modelo=ultimo.vehiculo_modelo,
+            vehiculo_color=ultimo.vehiculo_color,
+            observaciones=(
+                "Salida no detectada por la cámara. Se cierra al reaparecer el vehículo "
+                "entrando; la hora es la de esa reaparición, no la de la salida real."
+            ),
+        )
+        db.add(cierre)
+        await db.flush()
+        return cierre
 
     async def obtener_historial_tactico(self, db: AsyncSession, page: int, size: int, punto_nombre: str = None) -> dict:
         """Obtiene la bitácora de eventos paginada"""

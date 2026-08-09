@@ -16,12 +16,13 @@ que encontrar la cámara buscando por el hash del token que viene en la URL.
 """
 import uuid
 
-from sqlalchemy import Column, String, Boolean, Integer, DateTime, ForeignKey
+from sqlalchemy import Column, String, Boolean, Integer, DateTime, ForeignKey, Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
+from app.models.enums import CamaraRol, CamaraSentido
 
 # Compartidos con las pantallas de garita. Se reexportan para no romper los imports
 # que ya apuntaban aquí.
@@ -35,6 +36,28 @@ class CamaraAnpr(Base):
 
     nombre = Column(String(150), nullable=False)
     punto_acceso_id = Column(UUID(as_uuid=True), ForeignKey("puntos_acceso.id", ondelete="RESTRICT"), nullable=False, index=True)
+
+    # Qué extremo del vehículo mira. En cada alcabala hay dos cámaras viendo el mismo
+    # paso: una la placa delantera y otra la trasera. Arranca en `unica` para que las
+    # que ya estaban instaladas sigan funcionando igual hasta que alguien las clasifique.
+    # `create_constraint=True` no es adorno: sin él, SQLAlchemy 2.0 deja la columna
+    # como un VARCHAR que acepta cualquier texto y el enum no protege nada.
+    rol = Column(
+        SQLEnum(CamaraRol, name="camara_rol", native_enum=False, create_constraint=True),
+        default=CamaraRol.unica,
+        server_default=CamaraRol.unica.value,
+        nullable=False,
+    )
+
+    # Si esta cámara vigila una puerta de un solo sentido, aquí queda dicho y no hay
+    # nada que deducir. Arranca en `mixto`, que es el comportamiento de siempre:
+    # hacer caso a lo que diga la cámara en su campo `direction`.
+    sentido = Column(
+        SQLEnum(CamaraSentido, name="camara_sentido", native_enum=False, create_constraint=True),
+        default=CamaraSentido.mixto,
+        server_default=CamaraSentido.mixto.value,
+        nullable=False,
+    )
 
     # Datos de inventario. Sirven para que quien vaya a la garita sepa a qué equipo
     # va a conectarse sin tener que abrir el NVR.

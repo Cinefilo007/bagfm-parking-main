@@ -28,7 +28,7 @@ from app.models.camara_anpr import CamaraAnpr, generar_token, hashear_token
 from app.core.tokens import generar_codigo_corto
 from app.models.emparejamiento_pantalla import EmparejamientoPantalla
 from app.models.entidad_civil import EntidadCivil
-from app.models.enums import AccesoTipo, AnprEstado, OrigenRegistro, RolTipo
+from app.models.enums import AccesoTipo, AnprDireccion, AnprEstado, OrigenRegistro, RolTipo
 from app.models.evento_anpr import EventoAnpr
 from app.models.pantalla_monitor import PantallaMonitor
 from app.models.usuario import Usuario
@@ -916,14 +916,27 @@ async def resolver_evento(
     if evento.estado == AnprEstado.resuelto:
         raise HTTPException(status_code=409, detail="El evento ya fue resuelto")
 
+    # El guardia puede corregir el sentido antes de registrar: en la alcabala de carril
+    # compartido el sistema propone y él confirma con lo que está viendo.
+    if datos.sentido_corregido and datos.sentido_corregido != evento.direccion:
+        evento.direccion = datos.sentido_corregido
+        evento.sentido_origen = "guardia"
+
+    es_salida = evento.direccion == AnprDireccion.salida
+
     # Sin entidad el destino es "Otro", y entonces el texto libre es obligatorio: un
     # registro que no dice a dónde fue el vehículo no sirve para detectar patrones.
+    #
+    # En una SALIDA no se pide: el vehículo se va, no va a ningún sitio de la base.
+    # Exigírselo obligaba al guardia a inventarse un destino para poder cerrar la
+    # tarjeta, y ese dato inventado ensuciaba justo el análisis que el destino existe
+    # para alimentar.
     destino = None
     if datos.destino_entidad_id:
         destino = await db.get(EntidadCivil, datos.destino_entidad_id)
         if not destino or not destino.activo:
             raise HTTPException(status_code=400, detail="Destino inválido")
-    elif not (datos.observaciones or "").strip():
+    elif not es_salida and not (datos.observaciones or "").strip():
         raise HTTPException(status_code=400, detail="Indique el destino")
 
     if datos.placa_corregida:
@@ -939,10 +952,20 @@ async def resolver_evento(
     usuario_placa = veredicto.get("usuario_id")
     vehiculo_placa_id = veredicto.get("vehiculo_id")
 
+    # Un vehículo que entra sin haber salido dejó una estancia abierta. Pasa de verdad:
+    # la cámara de una de las puertas de salida apunta al frente y no ve la placa de las
+    # motos, que la llevan atrás. Se cierra antes de registrar la entrada nueva, para
+    # que el listado de quién está dentro no acumule vehículos que ya se fueron.
+    cierre_deducido = None
+    if not es_salida:
+        cierre_deducido = await acceso_service.cerrar_estancia_abierta(
+            db, evento.placa, usuario.id
+        )
+
     acceso = await acceso_service.registrar_acceso(
         db,
         AccesoRegistrar(
-            tipo=AccesoTipo.salida if evento.direccion.value == "salida" else AccesoTipo.entrada,
+            tipo=AccesoTipo.salida if es_salida else AccesoTipo.entrada,
             punto_acceso=punto.nombre if punto else "Alcabala",
             es_manual=False,
             origen_registro=OrigenRegistro.anpr,
@@ -964,6 +987,11 @@ async def resolver_evento(
     evento.resuelto_at = func.now()
     await db.commit()
     await db.refresh(evento)
+
+    if cierre_deducido is not None:
+        # Queda en el log para poder medir el tamaño real del hueco: si esto aparece a
+        # todas horas, la cámara de salida no está viendo lo que debería.
+        print(f"[ANPR] {evento.placa}: se cerró una estancia abierta (salida no detectada)")
 
     # Se avisa al monitor de la garita para que muestre la confirmación. Sin esto no
     # hay forma de saber desde la pantalla si el toque del guardia llegó a registrarse

@@ -3,7 +3,7 @@ from uuid import UUID
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.enums import AnprDireccion, AnprEstado
+from app.models.enums import AnprDireccion, AnprEstado, CamaraRol, CamaraSentido
 
 
 class DestinoSalida(BaseModel):
@@ -23,7 +23,12 @@ class EventoAnprSalida(BaseModel):
     punto_acceso_id: UUID
     placa: str
     placa_confianza: Optional[int] = None
+    # Lo que aportó la otra cámara del par (ver services/anpr_service.py).
+    camara_rol: Optional[str] = None
+    placa_alterna: Optional[str] = None
+    confirmada_por_rol: Optional[str] = None
     direccion: AnprDireccion
+    sentido_origen: Optional[str] = None
     tipo_vehiculo: Optional[str] = None
     color_vehiculo: Optional[str] = None
     marca_vehiculo: Optional[str] = None
@@ -66,6 +71,9 @@ class ResolverEvento(BaseModel):
     observaciones: Optional[str] = None
     # La cámara acierta ~98.5%; el guardia corrige el resto sin salir de la pantalla.
     placa_corregida: Optional[str] = None
+    # Igual con el sentido: en la alcabala de carril compartido el sistema propone y el
+    # guardia confirma. Solo se manda cuando lo cambia.
+    sentido_corregido: Optional[AnprDireccion] = None
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -75,6 +83,13 @@ class ResolverEvento(BaseModel):
 class CamaraCrear(BaseModel):
     nombre: str = Field(min_length=3, max_length=150)
     punto_acceso_id: UUID
+    # Qué extremo del vehículo mira. En cada alcabala hay dos cámaras sobre el mismo
+    # paso; sin esto no se puede distinguir una moto —que lleva una sola placa— de una
+    # cámara que dejó de leer.
+    rol: CamaraRol = CamaraRol.unica
+    # Qué registra por su sitio en la alcabala: puerta de entrada, de salida, o carril
+    # compartido (`mixto`), que es el que obliga a deducir el sentido.
+    sentido: CamaraSentido = CamaraSentido.mixto
     modelo: Optional[str] = Field(default=None, max_length=100)
     serial: Optional[str] = Field(default=None, max_length=100)
     ip_lan: Optional[str] = Field(default=None, max_length=45)
@@ -84,6 +99,8 @@ class CamaraCrear(BaseModel):
 class CamaraEditar(BaseModel):
     nombre: Optional[str] = Field(default=None, min_length=3, max_length=150)
     punto_acceso_id: Optional[UUID] = None
+    rol: Optional[CamaraRol] = None
+    sentido: Optional[CamaraSentido] = None
     modelo: Optional[str] = Field(default=None, max_length=100)
     serial: Optional[str] = Field(default=None, max_length=100)
     ip_lan: Optional[str] = Field(default=None, max_length=45)
@@ -96,6 +113,8 @@ class CamaraSalida(BaseModel):
     nombre: str
     punto_acceso_id: UUID
     punto_nombre: Optional[str] = None
+    rol: CamaraRol = CamaraRol.unica
+    sentido: CamaraSentido = CamaraSentido.mixto
     modelo: Optional[str] = None
     serial: Optional[str] = None
     ip_lan: Optional[str] = None

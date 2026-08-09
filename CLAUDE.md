@@ -31,7 +31,22 @@ la cámara ve sola; el guardia solo agrega el destino con un toque.
 
 | Equipo | Rol |
 |---|---|
-| 2 bullets **"ANPR Camera"** de Hikvision | Las que leen placas, una por alcabala. **NO son la DS-TCG406-E** del PDF: son bullets DeepinView. Modelo exacto **pendiente de confirmar**. |
+| 5 bullets **"ANPR Camera"** de Hikvision | Las que leen placas. **NO son la DS-TCG406-E** del PDF: son bullets DeepinView. Modelo exacto **pendiente de confirmar**. Reparto: ver abajo. |
+
+**Cómo están repartidas las cámaras** (decide todo el flujo de entradas y salidas):
+
+| Alcabala | Puerta | Cámaras |
+|---|---|---|
+| La de puertas separadas | Entrada | 2: placa delantera + placa trasera |
+| La de puertas separadas | Salida | 1, apuntando al **frente** — ver el aviso de abajo |
+| La de puerta única | Carril compartido | 2: delantera + trasera, para ambos sentidos |
+
+> **Pendiente en la garita:** la cámara de la puerta de salida mira al frente del
+> vehículo, y en Venezuela las motos llevan una sola placa y va **atrás**. Tal como
+> está, ninguna moto queda registrada al salir. Se arregla girándola o pasándola al
+> otro lado para que vea el vehículo alejándose: leería motos y carros por igual,
+> porque los carros llevan las dos placas. Es un cambio de montaje, no una compra.
+> Mientras tanto, el hueco lo tapa el cierre deducido (más abajo).
 | `iDS-2CD7A86G2/V-XZHSY` | Variante `/V` = protección perimetral. **No lee placas ni hace reconocimiento facial.** |
 | `DS-7608NXI-K2/8P` | NVR AcuSense. Aquí vive el reconocimiento facial (descartado en Fase 1). |
 
@@ -77,6 +92,38 @@ lista blanca) necesita WireGuard en el VPS + un router saliente en cada alcabala
 - **`/anpr/pendientes` devuelve la ficha recalculada**, no el veredicto guardado al
   detectar: un vehículo dado de alta después de pasar debe dejar de salir como
   desconocido.
+- **Cada alcabala tiene DOS cámaras sobre el mismo paso** (`camaras_anpr.rol`:
+  `delantera` / `trasera` / `unica`, migración `b1c2rol3d4e5`). Un vehículo llega dos
+  veces y una **moto una sola**, porque lleva una sola placa. El dedupe fusiona las dos
+  lecturas en una tarjeta: la de mayor confianza manda y la otra queda en
+  `placa_alterna`, a un toque del guardia. Se admite **un carácter de diferencia, pero
+  solo entre roles opuestos**: las dos cámaras ven la misma placa con luz y ángulo
+  distintos, mientras que dentro del mismo rol "AV641" y "AV645" son dos vehículos
+  reales y fusionarlos borraría el registro de uno. Que no llegue la segunda lectura se
+  guarda (`confirmada_por_rol` en nulo) y la tarjeta lo dice: o es una moto, o una
+  cámara dejó de leer.
+- **El sentido lo fija la puerta, no el firmware** (`camaras_anpr.sentido`: `entrada` /
+  `salida` / `mixto`, migración `c2d3sal4e5f6`). El campo `direction` que manda la
+  cámara depende de la versión y de cómo esté trazada la zona de detección; el lado de
+  la garita donde está atornillado el equipo, no. Solo en el carril compartido se
+  recurre al firmware, y si tampoco lo dice queda `desconocida` — se prefiere que se
+  note antes que inventar un sentido, porque de esto depende saber quién está dentro.
+  `eventos_anpr.sentido_origen` guarda de dónde salió (`camara` / `firmware` /
+  `sin_dato` / `guardia`), y la tarjeta marca con `?` lo que es una suposición.
+- **Una salida no lleva destino.** Exigírselo obligaba al guardia a inventarse uno para
+  poder cerrar la tarjeta, y ese dato inventado ensuciaba justo el análisis que el
+  destino existe para alimentar. Tampoco se ofrece identificar al conductor al salir.
+- **Las salidas deducidas (`origen_registro = deducido`, migración `d3e4ded5f6a7`)
+  tapan un hueco FÍSICO, no de software.** La cámara de la puerta de salida apunta al
+  frente del vehículo y las motos llevan la placa atrás: una moto que sale por ahí no
+  la ve nadie. Cuando esa placa reaparece entrando sin haber salido, la salida existió
+  y se registra — pero **la hora no es real** y por eso se marca aparte. Lo correcto es
+  reorientar esa cámara para que lea la placa trasera; esto es el paliativo mientras
+  tanto. Ojo: `origen_registro` se creó como VARCHAR(6) y `deducido` no cabía; la
+  migración amplía la columna a 12.
+- **Los enums VARCHAR necesitan `create_constraint=True` explícito.** En SQLAlchemy 2.0
+  vale `False` por defecto, así que sin él la columna queda como un VARCHAR suelto que
+  acepta cualquier cosa — comprobado: admitía el rol `lateral`.
 - **`resolver_evento` consulta `verificar_placa` antes de registrar el acceso** y guarda
   `usuario_id`/`vehiculo_id`. Sin eso el acceso quedaba con la placa suelta y la bitácora
   mostraba a todo el mundo como no identificado, incluso a quien se acababa de
@@ -123,9 +170,12 @@ rellenados contra el registro madre.
 toda placa termine en el registro madre. Y retirar las columnas duplicadas
 (`vehiculo_placa`, `vehiculo_marca`…) cuando todo consulte por `vehiculo_id`.
 
-**El QR se conserva** como respaldo: la cámara no cubre peatones, motos sin placa
-delantera ni eventos con preinscripción, falla ~1.5% de lecturas, y si se cae la red es
-lo único que queda.
+**El QR se conserva** como respaldo: la cámara no cubre peatones ni eventos con
+preinscripción, falla ~1.5% de lecturas, y si se cae la red es lo único que queda.
+
+Las **motos** sí quedaron cubiertas al instalarse la segunda cámara de cada alcabala:
+en Venezuela llevan una sola placa y va **atrás**, así que las lee la cámara trasera y
+el sistema lo registra como lectura de una sola cámara en vez de tomarlo por una avería.
 
 ## Configuración
 
@@ -147,6 +197,18 @@ python backend/scripts/simular_camara_anpr.py --url https://api.bagfm.app --toke
 
 Construye el mismo multipart que manda Hikvision. Con `--repetir 5` se comprueba la
 deduplicación. El token sale del panel de Cámaras ANPR al crear la cámara o rotarla.
+
+**El par de cámaras** se prueba lanzándolo dos veces seguidas, una por token, dentro de
+los 30 segundos de la ventana de dedupe:
+
+```bash
+# la trasera lee bien, la delantera confunde la L con un 1: debe salir UNA sola tarjeta
+python backend/scripts/simular_camara_anpr.py --token <TOKEN_TRASERA>   --placa AC255LB
+python backend/scripts/simular_camara_anpr.py --token <TOKEN_DELANTERA> --placa AC2551B
+```
+
+Una **moto** es simplemente una sola de las dos llamadas: la tarjeta debe salir igual y
+avisar de que la leyó una sola cámara.
 
 **Lección aprendida:** varias veces se dio por verificado un camino que no se había
 ejercitado (CORS bloqueaba la petición, el bundle era viejo, la medición estaba anclada
@@ -177,11 +239,17 @@ medir en el navegador con `mcp__Claude_Browser__` ha sido lo único fiable.
 QR, semáforo, modo claro, admin de cámaras y pantallas, saneamiento de duplicados, tour
 guiado, identificación opcional del conductor (cámara con guías dentro del navegador,
 recorte al marco antes de subir), destinos en botonera o en lista con búsqueda a
-elección del guardia, KPI de conductores identificados por turno.
+elección del guardia, KPI de conductores identificados por turno, par de cámaras
+delantera/trasera con fusión de las dos lecturas.
 
 **Pendiente:**
 0. **Meta de identificaciones por guardia**: el KPI ya cuenta; falta que el Comandante
    pueda fijar un mínimo por turno y verlo comparado entre garitas.
+0.b **Salidas, fase B**: en el carril compartido, deducir el sentido por el último
+   movimiento de la placa (si consta dentro → sale). Hoy ahí el sentido sale del
+   firmware, y si no lo manda queda `desconocida` y el guardia lo confirma a mano.
+   Antes de escribirlo conviene mirar qué proporción de eventos llega con sentido:
+   `SELECT direccion, sentido_origen, count(*) FROM eventos_anpr GROUP BY 1,2;`
 1. **Modelo exacto de la cámara** — bloquea decidir cómo se controlará el brazo.
 2. **Fase 2**: WireGuard + control del brazo. El cliente ISAPI está escrito tras el flag
    `hikvision_control_activo`.

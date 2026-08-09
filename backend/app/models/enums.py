@@ -54,6 +54,11 @@ class OrigenRegistro(str, enum.Enum):
     qr = "qr"                # el guardia escaneó un código QR
     anpr = "anpr"            # lo detectó la cámara de lectura de placas
     manual = "manual"        # lo tecleó el guardia
+    # El sistema cerró una estancia que se quedó abierta: el vehículo aparece entrando
+    # otra vez sin haber salido nunca, así que la salida existió y no se detectó. La
+    # HORA de estos registros no es real y por eso se marcan aparte — sin esto, o se
+    # acumulan vehículos fantasma dentro de la base, o se falsean horas de salida.
+    deducido = "deducido"
 
 class AnprDireccion(str, enum.Enum):
     entrada = "entrada"
@@ -65,6 +70,39 @@ class AnprEstado(str, enum.Enum):
     resuelto = "resuelto"      # ya generó un registro en `accesos`
     descartado = "descartado"  # falso positivo, peatón, vehículo que se devolvió
     duplicado = "duplicado"    # misma placa y punto dentro de la ventana de dedupe
+
+class CamaraSentido(str, enum.Enum):
+    """
+    Qué registra una cámara por su sitio en la alcabala.
+
+    Una alcabala tiene la puerta de entrada y la de salida separadas: ahí el sentido lo
+    dice la puerta y no hay nada que deducir. La otra tiene un solo carril compartido
+    por el que se entra y se sale, y esas cámaras van en `mixto`.
+
+    La geografía manda sobre el firmware a propósito. El campo `direction` que envía la
+    cámara depende de la versión y de cómo esté configurada la zona de detección; el
+    lado de la garita en el que está atornillado el equipo, no.
+    """
+    entrada = "entrada"
+    salida = "salida"
+    mixto = "mixto"      # el mismo carril sirve para entrar y para salir
+
+
+class CamaraRol(str, enum.Enum):
+    """
+    Qué extremo del vehículo mira cada cámara.
+
+    En cada alcabala hay dos: una lee la placa delantera y otra la trasera, y las dos
+    ven el mismo paso. Saber cuál es cuál importa por dos motivos:
+
+      - Una moto lleva una sola placa, así que solo una de las dos la va a leer. Sin el
+        rol, "llegó una sola lectura" es indistinguible de "una cámara está fallando".
+      - Cuando ambas leen, la segunda confirma a la primera. Si discrepan en un
+        carácter, saber de dónde vino cada lectura es lo que permite explicarlo.
+    """
+    delantera = "delantera"
+    trasera = "trasera"
+    unica = "unica"        # instalación de una sola cámara, o rol sin definir todavía
 
 class InfraccionTipo(str, enum.Enum):
     mal_estacionado = "mal_estacionado"

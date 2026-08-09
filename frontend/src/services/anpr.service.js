@@ -23,12 +23,23 @@ export const anprService = {
     return data;
   },
 
-  /** El guardia marca el destino y con eso queda registrado el acceso. */
-  async resolver(eventoId, { destinoId = null, observaciones = null, placaCorregida = null }) {
+  /**
+   * El guardia marca el destino y con eso queda registrado el acceso.
+   *
+   * En una salida no hay destino que marcar —el vehículo se va— y basta con
+   * `sentidoCorregido` o con el sentido que ya trae la detección.
+   */
+  async resolver(eventoId, {
+    destinoId = null,
+    observaciones = null,
+    placaCorregida = null,
+    sentidoCorregido = null,
+  }) {
     const { data } = await api.post(`/anpr/evento/${eventoId}/resolver`, {
       destino_entidad_id: destinoId,
       observaciones: observaciones,
       placa_corregida: placaCorregida,
+      sentido_corregido: sentidoCorregido,
     });
     return data;
   },

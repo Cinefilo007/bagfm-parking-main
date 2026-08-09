@@ -35,11 +35,33 @@ class EventoAnpr(Base):
     placa = Column(String(20), nullable=False, index=True)
     placa_confianza = Column(Integer, nullable=True)   # 0-100 si la cámara lo reporta
     pais_placa = Column(String(50), nullable=True)
+
+    # ── Las dos cámaras del mismo paso ────────────────────────────────────────
+    # En cada alcabala una cámara lee la placa delantera y otra la trasera, así que un
+    # mismo vehículo llega dos veces. Se conserva UNA detección y aquí queda lo que
+    # aportó la otra.
+    #
+    # `camara_rol` se copia en vez de leerse por la relación: la cámara puede
+    # reclasificarse o retirarse del inventario, y entonces el histórico diría que una
+    # lectura vino de un rol que no era el de aquel día.
+    camara_rol = Column(String(20), nullable=True)
+    # La lectura de la otra cámara cuando NO coincide letra por letra. Con esto el
+    # guardia puede corregir de un toque en vez de teclear la placa entera.
+    placa_alterna = Column(String(20), nullable=True)
+    # Rol de la cámara que vio el mismo vehículo, coincidiera o no. Su ausencia es el
+    # dato interesante: o era una moto (una sola placa) o una cámara no está leyendo.
+    confirmada_por_rol = Column(String(20), nullable=True)
+    confirmada_at = Column(DateTime(timezone=True), nullable=True)
     direccion = Column(
         SQLEnum(AnprDireccion, name="anpr_direccion", native_enum=False),
         default=AnprDireccion.desconocida,
         nullable=False,
     )
+    # De dónde salió ese sentido: `camara` cuando lo fija la puerta donde está
+    # atornillada, `firmware` cuando lo dijo el propio equipo, `guardia` cuando alguien
+    # lo corrigió a mano. Sin esto no hay forma de saber si un histórico de salidas es
+    # fiable o son todas suposiciones.
+    sentido_origen = Column(String(20), nullable=True)
 
     # Atributos del vehículo que la propia cámara reconoce (no requieren al guardia)
     tipo_vehiculo = Column(String(50), nullable=True)

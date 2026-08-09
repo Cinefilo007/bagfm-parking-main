@@ -358,6 +358,8 @@ const FormularioCamara = ({ camara, puntos, onGuardar, onCancelar, guardando }) 
   const [form, setForm] = useState({
     nombre: camara?.nombre || '',
     punto_acceso_id: camara?.punto_acceso_id || puntos[0]?.id || '',
+    rol: camara?.rol || 'unica',
+    sentido: camara?.sentido || 'mixto',
     modelo: camara?.modelo || '',
     serial: camara?.serial || '',
     ip_lan: camara?.ip_lan || '',
@@ -415,6 +417,42 @@ const FormularioCamara = ({ camara, puntos, onGuardar, onCancelar, guardando }) 
           </select>
         </div>
 
+        {/* En cada alcabala hay dos camaras sobre el mismo paso. Decir cual mira
+            que extremo es lo que permite cruzar sus dos lecturas y, sobre todo,
+            distinguir una moto —que lleva una sola placa— de una camara averiada. */}
+        <div className="mb-4">
+          <label className="mb-1.5 block text-xs font-medium tracking-[0.05em] text-text-sec">
+            Qué placa lee
+          </label>
+          <select value={form.rol} onChange={cambiar('rol')} className="input-field">
+            <option value="delantera">Placa delantera</option>
+            <option value="trasera">Placa trasera</option>
+            <option value="unica">Única cámara del punto</option>
+          </select>
+          <p className="mt-1 text-[11px] text-text-sec">
+            Si la alcabala tiene las dos, marque una de cada tipo: así el sistema sabe
+            que las dos lecturas son del mismo vehículo y avisa cuando falta una.
+          </p>
+        </div>
+
+        {/* El sentido lo fija la puerta donde esta la camara, no lo que diga su
+            firmware: el campo `direction` cambia con la version y con como este
+            trazada la zona de deteccion, y el sitio donde esta atornillada no. */}
+        <div className="mb-4">
+          <label className="mb-1.5 block text-xs font-medium tracking-[0.05em] text-text-sec">
+            Qué registra
+          </label>
+          <select value={form.sentido} onChange={cambiar('sentido')} className="input-field">
+            <option value="entrada">Solo entradas — puerta de entrada</option>
+            <option value="salida">Solo salidas — puerta de salida</option>
+            <option value="mixto">Entradas y salidas — carril compartido</option>
+          </select>
+          <p className="mt-1 text-[11px] text-text-sec">
+            En una puerta de un solo sentido el registro queda garantizado. En un carril
+            compartido el sistema propone el sentido y el guardia lo confirma.
+          </p>
+        </div>
+
         <div className="grid gap-3 sm:grid-cols-3">
           <Input label="Modelo" value={form.modelo} onChange={cambiar('modelo')} placeholder="iDS-2CD7A46G0/P" />
           <Input label="Serial" value={form.serial} onChange={cambiar('serial')} />
@@ -444,6 +482,18 @@ const FilaCamara = ({ camara, onEditar, onRotar, onRevocar, onEliminar, onActiva
           <div className="flex items-center gap-2">
             <Camera className="h-4 w-4 shrink-0 text-primary" />
             <h3 className="truncate text-sm font-bold text-text-main">{camara.nombre}</h3>
+            {/* Qué extremo mira. Se ve en la lista para poder comprobar de un vistazo
+                que cada alcabala tiene una delantera y una trasera, y no dos iguales. */}
+            {camara.rol && camara.rol !== 'unica' && (
+              <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-primary">
+                {camara.rol === 'delantera' ? 'Delantera' : 'Trasera'}
+              </span>
+            )}
+            {camara.sentido && camara.sentido !== 'mixto' && (
+              <span className="rounded bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-sky-400">
+                {camara.sentido === 'entrada' ? 'Entradas' : 'Salidas'}
+              </span>
+            )}
             {!camara.activa && (
               <span className="rounded bg-text-sec/20 px-1.5 py-0.5 text-[10px] font-bold uppercase text-text-sec">
                 Desactivada

@@ -27,7 +27,7 @@ from app.models.alcabala_evento import PuntoAcceso
 from app.models.entidad_civil import EntidadCivil
 from app.models.infraccion import Infraccion
 from app.models.camara_anpr import CamaraAnpr, hashear_token
-from app.models.enums import AnprDireccion, AnprEstado, InfraccionEstado
+from app.models.enums import AnprDireccion, AnprEstado, CamaraRol, CamaraSentido, InfraccionEstado
 from app.models.evento_anpr import EventoAnpr
 from app.services.placa_lookup import (
     verificar_placa, normalizar_placa, semaforo_de, SEMAFORO_ROJO,
@@ -204,6 +204,33 @@ def _parsear_direccion(valor: Optional[str]) -> AnprDireccion:
     return _DIRECCIONES.get((valor or "").strip().lower(), AnprDireccion.desconocida)
 
 
+def _resolver_sentido(
+    camara: CamaraAnpr, valor_firmware: Optional[str]
+) -> Tuple[AnprDireccion, str]:
+    """
+    ¿Este vehículo está entrando o saliendo? Devuelve (sentido, de dónde salió).
+
+    Manda el sitio donde está atornillada la cámara. Una alcabala tiene la puerta de
+    entrada separada de la de salida: ahí no hay nada que deducir, y confiar en el
+    firmware sería peor, porque el campo `direction` depende de la versión y de cómo
+    esté trazada la zona de detección — cosas que cambian cuando alguien entra al NVR a
+    tocar una configuración.
+
+    Solo cuando la cámara vigila un carril compartido (`mixto`) se recurre a lo que
+    diga el equipo. Y si tampoco lo dice, queda `desconocida`: preferimos que se note a
+    inventarnos un sentido, porque de esto depende saber quién está dentro de la base.
+    """
+    if camara.sentido == CamaraSentido.entrada:
+        return AnprDireccion.entrada, "camara"
+    if camara.sentido == CamaraSentido.salida:
+        return AnprDireccion.salida, "camara"
+
+    del_firmware = _parsear_direccion(valor_firmware)
+    if del_firmware != AnprDireccion.desconocida:
+        return del_firmware, "firmware"
+    return AnprDireccion.desconocida, "sin_dato"
+
+
 def _parsear_fecha(valor: Optional[str]) -> Optional[datetime]:
     """Lee el dateTime ISO-8601 de la cámara. Devuelve None si no es interpretable."""
     if not valor:
@@ -269,6 +296,42 @@ def _guardar_foto(contenido: Optional[bytes], subcarpeta: str) -> Optional[str]:
     return f"{PREFIJO_ARCHIVO}{ruta}"
 
 
+def _misma_placa(a: Optional[str], b: Optional[str]) -> bool:
+    """
+    ¿Son la misma placa, admitiendo un carácter de diferencia?
+
+    Las dos cámaras de la alcabala leen el mismo vehículo con luz y ángulo distintos, y
+    confundir un 5 con una S, un 0 con una O o un 1 con una I es lo corriente. Exigir
+    igualdad exacta hacía que el mismo carro apareciera como dos tarjetas y se
+    registrara dos veces.
+
+    Se exige la MISMA longitud: una placa a la que le falta un carácter es una lectura
+    incompleta, y darla por buena contra otra placa real es peor que no fusionar. Y se
+    admite un solo carácter: a dos de distancia existen placas legítimamente distintas
+    en la base.
+    """
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    if len(a) != len(b):
+        return False
+    return sum(1 for x, y in zip(a, b) if x != y) == 1
+
+
+def _es_el_otro_extremo(rol_previo: Optional[str], rol_nuevo: Optional[str]) -> bool:
+    """
+    ¿Las dos lecturas vienen de las cámaras que miran extremos opuestos del vehículo?
+
+    Solo entre ellas tiene sentido perdonar un carácter de diferencia: es el mismo paso
+    visto desde delante y desde detrás. Entre dos disparos de la misma cámara, o cuando
+    los roles no están configurados (`unica`), una placa distinta se toma por lo que
+    parece — otro vehículo.
+    """
+    pareja = {CamaraRol.delantera.value, CamaraRol.trasera.value}
+    return rol_previo in pareja and rol_nuevo in pareja and rol_previo != rol_nuevo
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Servicio
 # ──────────────────────────────────────────────────────────────────────────────
@@ -298,23 +361,91 @@ class AnprService:
             return None
         return camara
 
-    async def _es_duplicado(self, db: AsyncSession, punto_id, placa: str) -> bool:
+    async def _buscar_gemelo(
+        self, db: AsyncSession, punto_id, placa: str, rol: Optional[str]
+    ) -> Optional[EventoAnpr]:
         """
-        ¿Es un disparo repetido del mismo vehículo?
+        La detección viva que corresponde al mismo vehículo, si la hay.
 
-        La cámara usa LPR multi-cuadro y emite varios eventos por paso. Sin esto, un
-        solo vehículo le llenaría la pantalla al guardia con cuatro tarjetas iguales.
+        Cubre dos cosas que parecen una sola:
+
+          - El disparo repetido. La cámara usa LPR multi-cuadro y emite varios eventos
+            por paso; sin esto un solo vehículo le llenaría la pantalla al guardia.
+          - La OTRA cámara del par. En cada alcabala hay dos mirando el mismo paso, una
+            a la placa delantera y otra a la trasera, así que cada vehículo llega dos
+            veces (una moto, que lleva una sola placa, llega una sola vez).
+
+        Por igualdad exacta siempre. Y además se admite **un carácter de diferencia**,
+        pero SOLO entre lecturas de roles distintos: las dos cámaras ven la misma placa
+        con luz y ángulo distintos y confundir un 5 con una S o un 1 con una I es lo
+        corriente, así que exigirles igualdad dejaba al guardia con dos tarjetas del
+        mismo carro.
+
+        Esa tolerancia no se aplica entre lecturas del MISMO rol, ni cuando los roles no
+        están configurados. El motivo es que "AV641" y "AV645" pueden ser dos vehículos
+        de verdad: sin la señal de que vienen de cámaras que miran extremos opuestos del
+        mismo paso, fusionarlas sería borrar el registro de uno de los dos.
         """
         ventana = datetime.now(timezone.utc) - timedelta(seconds=config.anpr_dedupe_segundos)
-        previo = (await db.execute(
-            select(EventoAnpr.id).where(
+
+        # Se traen los candidatos del punto en la ventana y se comparan en Python: son
+        # unos pocos —lo que quepa en 30 segundos de fila— y la distancia de edición no
+        # se puede indexar de todos modos.
+        candidatos = (await db.execute(
+            select(EventoAnpr).where(
                 EventoAnpr.punto_acceso_id == punto_id,
-                EventoAnpr.placa == placa,
                 EventoAnpr.timestamp_recibido >= ventana,
                 EventoAnpr.estado != AnprEstado.duplicado,
-            ).limit(1)
-        )).scalars().first()
-        return previo is not None
+            ).order_by(EventoAnpr.timestamp_recibido.desc()).limit(20)
+        )).scalars().all()
+
+        for previo in candidatos:
+            if previo.placa == placa or previo.placa_alterna == placa:
+                return previo
+
+            if not _es_el_otro_extremo(previo.camara_rol, rol):
+                continue
+            # Un evento que ya tiene su pareja no absorbe una tercera lectura distinta:
+            # a esas alturas lo que está pasando es que viene otro vehículo detrás.
+            if previo.confirmada_por_rol:
+                continue
+            if _misma_placa(previo.placa, placa):
+                return previo
+
+        return None
+
+    def _fusionar_lectura(
+        self,
+        gemelo: EventoAnpr,
+        placa: str,
+        confianza: Optional[int],
+        rol: Optional[str],
+    ) -> None:
+        """
+        Incorpora al evento vivo lo que aportó la segunda cámara.
+
+        Si las dos leyeron lo mismo, la segunda lectura solo confirma. Si difieren, se
+        queda como principal la de MAYOR confianza y la otra pasa a `placa_alterna`,
+        para que el guardia pueda cambiarla de un toque en vez de teclear la placa
+        entera con un conductor esperando.
+        """
+        if rol:
+            gemelo.confirmada_por_rol = rol
+        gemelo.confirmada_at = datetime.now(timezone.utc)
+
+        if placa == gemelo.placa:
+            # Dos cámaras coinciden: la lectura vale más de lo que dice cada una sola.
+            if confianza is not None:
+                gemelo.placa_confianza = max(gemelo.placa_confianza or 0, confianza)
+            return
+
+        nueva_gana = (confianza or 0) > (gemelo.placa_confianza or 0)
+        if nueva_gana:
+            gemelo.placa_alterna = gemelo.placa
+            gemelo.placa = placa
+            gemelo.placa_confianza = confianza
+        else:
+            gemelo.placa_alterna = placa
 
     async def registrar_evento(
         self,
@@ -339,7 +470,27 @@ class AnprService:
             print("[ANPR] Evento sin placa legible; se descarta.")
             return None
 
-        duplicado = await self._es_duplicado(db, punto.id, placa)
+        confianza = _entero(datos.get("confidenceLevel"))
+        rol = camara.rol.value if camara.rol else None
+        sentido, sentido_origen = _resolver_sentido(camara, datos.get("direction"))
+
+        # ¿Ya hay una detección viva de este mismo vehículo? Puede venir de un disparo
+        # repetido de esta cámara o de la otra del par (delantera/trasera).
+        gemelo = await self._buscar_gemelo(db, punto.id, placa, rol)
+        duplicado = gemelo is not None
+
+        if gemelo is not None:
+            # Lo que aporta esta segunda lectura se incorpora a la detección que el
+            # guardia ya tiene en pantalla, en vez de abrirle otra tarjeta.
+            placa_antes = gemelo.placa
+            self._fusionar_lectura(gemelo, placa, confianza, rol)
+
+            # Si la lectura de esta cámara desbancó a la anterior por tener más
+            # confianza, el veredicto guardado era el de la placa peor leída. Se
+            # recalcula: dejarlo sería mostrarle al guardia el semáforo de otro carro.
+            if gemelo.placa != placa_antes:
+                nuevo = await verificar_placa(db, gemelo.placa)
+                gemelo.coincidencia = nuevo.get("coincidencia")
 
         # En un duplicado no se guardan las fotos: son del mismo vehículo que ya se
         # fotografió hace segundos y multiplicarían el disco sin aportar nada.
@@ -357,10 +508,12 @@ class AnprService:
             camara_id=camara.id,
             camara_serial=datos.get("serialNumber") or datos.get("macAddress"),
             canal=_entero(datos.get("channelID")),
+            camara_rol=rol,
             placa=placa,
-            placa_confianza=_entero(datos.get("confidenceLevel")),
+            placa_confianza=confianza,
             pais_placa=datos.get("country"),
-            direccion=_parsear_direccion(datos.get("direction")),
+            direccion=sentido,
+            sentido_origen=sentido_origen,
             # Se prefiere siempre el bloque vehicleInfo: es el que trae la clase real
             # del vehículo y su color, no los genéricos del nivel de arriba.
             tipo_vehiculo=vehiculo.get("vehicleType") or datos.get("vehicleType"),
@@ -400,6 +553,16 @@ class AnprService:
                 # tiene que llegar igual: es la que desatasca la fila.
                 print(f"[ANPR] No se pudo construir la ficha de {evento.id}: {e}")
             await self._notificar(evento, punto, veredicto, ficha)
+        else:
+            # La segunda cámara no abre tarjeta nueva, pero sí puede haber cambiado la
+            # que el guardia tiene delante: otra placa por mayor confianza, o el aviso
+            # de que las dos lecturas no coinciden. Sin este aviso, la pantalla seguiría
+            # mostrando la primera lectura como si nada hubiera pasado.
+            await db.refresh(gemelo)
+            try:
+                await self._notificar_actualizacion(db, gemelo, punto)
+            except Exception as e:
+                print(f"[ANPR] No se pudo avisar de la fusión de {gemelo.id}: {e}")
 
         return evento
 
@@ -493,6 +656,10 @@ class AnprService:
             "evento_id": str(evento.id),
             "placa": evento.placa,
             "direccion": evento.direccion.value if evento.direccion else None,
+            # De dónde salió ese sentido. La pantalla lo usa para saber si presentarlo
+            # como un hecho (lo fija la puerta) o como una propuesta que el guardia
+            # debería confirmar (carril compartido).
+            "sentido_origen": evento.sentido_origen,
             "timestamp": evento.timestamp_recibido,
             "estado": evento.estado.value if evento.estado else None,
             "semaforo": semaforo,
@@ -523,7 +690,53 @@ class AnprService:
             },
             "destinos_recientes": await self._destinos_recientes(db, evento.placa),
             "infracciones": infracciones,
+            # Qué vieron las dos cámaras del par. El guardia necesita saber cuándo la
+            # placa que tiene delante es segura y cuándo conviene mirarla dos veces.
+            "lectura": {
+                "rol": evento.camara_rol,
+                "confirmada_por": evento.confirmada_por_rol,
+                # Las dos cámaras leyeron y no coincidieron: se muestra la de más
+                # confianza y esta es la otra, para corregir de un toque.
+                "alterna": evento.placa_alterna,
+                "dudosa": bool(evento.placa_alterna),
+                # Solo una cámara vio el vehículo. Puede ser una moto —lleva una sola
+                # placa— o una placa tapada, o una cámara que dejó de leer.
+                "una_sola_camara": evento.confirmada_por_rol is None,
+                "confianza": evento.placa_confianza,
+            },
         }
+
+    async def _notificar_actualizacion(
+        self, db: AsyncSession, evento: EventoAnpr, punto: PuntoAcceso
+    ) -> None:
+        """
+        Avisa de que una detección YA en pantalla cambió al llegar la otra lectura.
+
+        No es una detección nueva: el guardia tiene esa tarjeta delante y lo que cambia
+        es la placa —si la segunda cámara leyó con más confianza— o el aviso de que las
+        dos lecturas no coinciden. Va como evento propio para que la pantalla lo
+        sustituya en el sitio en vez de apilar otra tarjeta.
+        """
+        ficha = None
+        try:
+            ficha = await self.construir_ficha(db, evento)
+        except Exception as e:
+            # El aviso viaja igual con lo mínimo: la placa corregida importa más que
+            # los datos de adorno, y la pantalla se recompone al recargar.
+            print(f"[ANPR] No se pudo reconstruir la ficha fusionada {evento.id}: {e}")
+
+        await manager.broadcast(
+            {
+                "evento": "anpr_actualizado",
+                "ficha": ficha,
+                "evento_id": str(evento.id),
+                "placa": evento.placa,
+                "placa_alterna": evento.placa_alterna,
+                "confirmada_por_rol": evento.confirmada_por_rol,
+            },
+            channels=[f"PUNTO_{punto.id}"],
+            roles=["COMANDANTE"],
+        )
 
     async def _notificar(
         self,
