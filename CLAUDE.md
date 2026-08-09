@@ -60,6 +60,7 @@ lista blanca) necesita WireGuard en el VPS + un router saliente en cada alcabala
 | `services/anpr_service.py` | Parseo tolerante del evento Hikvision, dedupe, `construir_ficha()` (lo que ven ambas pantallas). |
 | `api/v1/anpr.py` | Ingesta sin sesión + operación del guardia + admin de cámaras y pantallas + emparejamiento. |
 | `api/v1/vehiculos.py` | Saneamiento de fichas duplicadas (`/duplicados`, `/fusionar-en/`). |
+| `services/ia_service.py` | Lectura de documentos con Gemini (cédula, circulación, odómetro, surtidor). Llama al SDK **en un hilo aparte** y reintenta con espera creciente. |
 
 ### Decisiones que conviene no revertir sin leer el porqué
 
@@ -76,6 +77,23 @@ lista blanca) necesita WireGuard en el VPS + un router saliente en cada alcabala
 - **`/anpr/pendientes` devuelve la ficha recalculada**, no el veredicto guardado al
   detectar: un vehículo dado de alta después de pasar debe dejar de salir como
   desconocido.
+- **`resolver_evento` consulta `verificar_placa` antes de registrar el acceso** y guarda
+  `usuario_id`/`vehiculo_id`. Sin eso el acceso quedaba con la placa suelta y la bitácora
+  mostraba a todo el mundo como no identificado, incluso a quien se acababa de
+  identificar con la cédula.
+- **En la bitácora ya no se dice "Socio Desconocido"** sino `CONDUCTOR NO IDENTIFICADO`:
+  "socio" era el vocabulario de cuando el sistema servía solo a los clubes. Cuando el
+  acceso no tiene persona atada pero la placa sí tiene titular hoy, el historial lo
+  resuelve por placa — identificar a alguien arregla también su pasado.
+- **La identificación del conductor se sella en la detección**
+  (`eventos_anpr.conductor_identificado_at/_por` + `conductor_usuario_id`, migración
+  `a7d8ide9f0a1`). El vehículo no recuerda cuándo ni gracias a quién dejó de ser anónimo,
+  y sin eso no se puede medir el turno de un guardia.
+- **La IA de documentos corre en un hilo aparte y con reintentos.** El SDK de Gemini es
+  bloqueante: llamarlo dentro de un `async def` congelaba el bucle de eventos, y en
+  ráfaga (varias fotos seguidas) se sumaban los 429 de cuota. El motivo del fallo viaja
+  al frontend en `error` (`cuota`, `servicio`, `clave`, `lectura`) para que la pantalla
+  pueda decir la verdad en vez de "no se pudo leer".
 
 ## Roles y pantallas
 
@@ -143,15 +161,27 @@ medir en el navegador con `mcp__Claude_Browser__` ha sido lo único fiable.
   JSX no cuenta como uso**. Sacar los iconos a `const` en vez de desestructurarlos en el
   parámetro.
 - `Dashboard.jsx` de alcabala tiene **3 errores de lint preexistentes**; no son regresión.
-- El tour guiado ancla en atributos `data-tour`, no en clases CSS.
+- El tour guiado ancla en atributos `data-tour`, no en clases CSS. Su globo se coloca
+  midiendo su altura real y **siempre dentro de la ventana**: cuando el elemento
+  resaltado es más alto que la pantalla —la tarjeta de un vehículo con la botonera
+  abierta— el cálculo anterior lo dejaba fuera (medido: `top −187` en una ventana de
+  600) y el guardia se quedaba con la penumbra y ningún control, como si la pantalla
+  se hubiera congelado.
+- En modo claro, `bg-low` es el fondo de los campos de formulario. Un panel que también
+  use `bg-low` deja los campos invisibles: los contenedores de formulario van sobre
+  `bg-card`.
 
 ## Estado y pendientes
 
 **Funcionando:** ingesta ANPR, pantalla de Puerta, monitor de TV con emparejamiento por
 QR, semáforo, modo claro, admin de cámaras y pantallas, saneamiento de duplicados, tour
-guiado, identificación opcional del conductor.
+guiado, identificación opcional del conductor (cámara con guías dentro del navegador,
+recorte al marco antes de subir), destinos en botonera o en lista con búsqueda a
+elección del guardia, KPI de conductores identificados por turno.
 
 **Pendiente:**
+0. **Meta de identificaciones por guardia**: el KPI ya cuenta; falta que el Comandante
+   pueda fijar un mínimo por turno y verlo comparado entre garitas.
 1. **Modelo exacto de la cámara** — bloquea decidir cómo se controlará el brazo.
 2. **Fase 2**: WireGuard + control del brazo. El cliente ISAPI está escrito tras el flag
    `hikvision_control_activo`.

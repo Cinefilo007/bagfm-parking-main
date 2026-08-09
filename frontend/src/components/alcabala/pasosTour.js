@@ -27,7 +27,8 @@ export const PASOS_ALCABALA = [
     titulo: 'Cómo va su turno',
     texto:
       'Cuántos vehículos han entrado y salido desde que empezó su guardia, y si hay ' +
-      'alguna alerta que atender.',
+      'alguna alerta que atender. El último número son los conductores que USTED ' +
+      'identificó en este turno: es lo único que no sube solo.',
   },
   {
     selector: '[data-tour="bitacora"]',
@@ -48,12 +49,37 @@ export const PASOS_PUERTA = [
       'no hay conexión, avise: nada se va a registrar hasta que vuelva.',
   },
   {
+    selector: '[data-tour="tema-monitor"]',
+    titulo: 'El televisor de la garita',
+    texto:
+      'El monitor grande no tiene mando. Desde aquí usted le cambia los colores: ' +
+      '"claro" cuando le pega el sol y no se lee, "oscuro" de noche para que no ' +
+      'encandile. Solo cambia cómo se ve; no afecta a nada de lo que registra.',
+  },
+  {
+    selector: '[data-tour="modo-destinos"]',
+    titulo: 'Trabaje como le sea más cómodo',
+    texto:
+      'Los destinos se le pueden mostrar de dos maneras: "botones", con todos a la ' +
+      'vista para tocar uno; o "buscar", donde escribe las primeras letras y aparece ' +
+      'el que quiere. Elija la suya, este teléfono se acuerda.',
+  },
+  {
     selector: '[data-tour="tarjeta"]',
     titulo: 'Cada vehículo que llega',
     texto:
       'Aparece la foto de la placa y, si el vehículo está registrado, de quién es. ' +
       'El color le dice de un vistazo: verde puede pasar, amarillo revíselo, rojo no ' +
       'debe entrar.',
+  },
+  {
+    selector: '[data-tour="identificar"]',
+    titulo: 'Cuando la fila esté tranquila',
+    texto:
+      'Si dice "conductor sin identificar", nadie sabe todavía quién maneja ese ' +
+      'carro. Con calma, pídale la cédula, tóquele aquí y fotografíela: el sistema ' +
+      'saca los datos solo. Nunca lo haga con la fila encima — es opcional a ' +
+      'propósito.',
   },
   {
     selector: '[data-tour="destinos"]',
