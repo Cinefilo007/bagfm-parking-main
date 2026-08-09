@@ -23,6 +23,7 @@ from app.schemas.acceso import AccesoValidar, AccesoRegistrar, ResultadoValidaci
 from app.services.membresia_service import membresia_service
 from app.services.zona_service import zona_service
 from app.services.notificacion_service import notificacion_service
+from app.services.placa_lookup import _placa_sin_separadores, normalizar_placa
 from app.core.security import decodificar_token
 
 class AccesoService:
@@ -742,7 +743,7 @@ class AccesoService:
                 
                 if zona_id:
                     # 1. Determinar Nombre del Conductor
-                    nombre_socio = "Socio Desconocido"
+                    nombre_socio = "CONDUCTOR NO IDENTIFICADO"
                     if final_usuario_id:
                         u_notif = await db.get(Usuario, final_usuario_id)
                         if u_notif:
@@ -808,10 +809,16 @@ class AccesoService:
             u_query = select(Usuario).where(Usuario.id == acc.usuario_id)
             u = (await db.execute(u_query)).scalar_one_or_none()
             
-            usuario_nombre = "Socio Desconocido"
+            # "Socio" era el vocabulario de cuando el sistema servía solo al club de
+            # fútbol y al de pádel. Hoy por la alcabala entra de todo —proveedores,
+            # visitas de la pizzería, vehículos internos de la base— y llamarlos socios
+            # es sencillamente falso. Lo que el registro dice de verdad es que ese
+            # acceso no tiene una persona atada, que es justo lo que la identificación
+            # del conductor viene a resolver.
+            usuario_nombre = "CONDUCTOR NO IDENTIFICADO"
             vehiculo_str = "SIN VEHÍCULO"
             es_pase_temporal = False
-            
+
             # 1. Resolver Nombre y Tipo (Mejorado v2.5)
             if u:
                 usuario_nombre = f"{u.nombre} {u.apellido}"
@@ -822,7 +829,21 @@ class AccesoService:
                 qr_db = await db.get(CodigoQR, acc.qr_id)
                 if qr_db and qr_db.nombre_portador:
                     usuario_nombre = f"{qr_db.nombre_portador} (PASE)"
-            
+            elif acc.vehiculo_placa:
+                # Accesos de la cámara anteriores a que se guardara el titular, y los
+                # de una placa identificada DESPUÉS de pasar: el acceso quedó sin
+                # usuario, pero hoy el vehículo ya tiene dueño. Resolverlo aquí hace
+                # que identificar a un conductor arregle también su historial, en vez
+                # de dejarlo como desconocido para siempre.
+                titular = (await db.execute(
+                    select(Usuario)
+                    .join(Vehiculo, Vehiculo.socio_id == Usuario.id)
+                    .where(_placa_sin_separadores(Vehiculo.placa) == normalizar_placa(acc.vehiculo_placa))
+                    .limit(1)
+                )).scalars().first()
+                if titular:
+                    usuario_nombre = f"{titular.nombre} {titular.apellido}"
+
             # 2. Resolver Vehículo (Mejorado v2.5)
             if acc.vehiculo_id:
                 v = await db.get(Vehiculo, acc.vehiculo_id)

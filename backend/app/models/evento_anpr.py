@@ -71,6 +71,16 @@ class EventoAnpr(Base):
     resuelto_por = Column(UUID(as_uuid=True), ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
     resuelto_at = Column(DateTime(timezone=True), nullable=True)
 
+    # Identificación del conductor: quién la hizo, cuándo y a qué persona se ató la
+    # placa. Se guarda en la detección y no solo en `vehiculos.socio_id` porque el
+    # dato que hace falta medir es el TRABAJO del turno: cuántos conductores
+    # identificó este guardia entre las 08:30 de hoy y las de mañana. Mirando el
+    # vehículo eso no se puede saber, porque el vehículo no recuerda cuándo ni quién
+    # lo identificó.
+    conductor_identificado_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    conductor_identificado_por = Column(UUID(as_uuid=True), ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    conductor_usuario_id = Column(UUID(as_uuid=True), ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+
     # XML original de la cámara. Ocupa poco y permite reprocesar detecciones si más
     # adelante se descubre que se estaba ignorando un campo útil.
     payload_raw = Column(Text, nullable=True)

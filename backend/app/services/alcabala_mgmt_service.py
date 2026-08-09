@@ -254,6 +254,32 @@ class AlcabalaService:
             for p, g in rows
         ]
 
+    async def contar_identificaciones_turno(self, db: AsyncSession, usuario_id: UUID) -> int:
+        """
+        Cuántos conductores identificó este guardia desde que empezó el ciclo (08:30).
+
+        Es la única parte del sistema que mide el trabajo de una persona y no el
+        tránsito de un punto, y por eso se cuenta por operador y no por alcabala: dos
+        guardias que se relevan en la misma garita tienen turnos distintos.
+
+        No mide calidad ni obliga a nada: identificar es opcional a propósito, porque
+        en hora pico parar la fila cuesta más de lo que aporta el dato. Sirve para que
+        un turno entero sin una sola identificación se note.
+        """
+        from app.models.evento_anpr import EventoAnpr
+
+        fecha_t = obtener_fecha_tactica()
+        inicio_ciclo_vet = datetime.combine(fecha_t, time(8, 30)).replace(tzinfo=VET)
+        # Aware, no naive: la columna es timestamptz y asyncpg no acepta la mezcla.
+        inicio_utc = inicio_ciclo_vet.astimezone(timezone.utc)
+
+        return (await db.execute(
+            select(func.count(EventoAnpr.id)).where(
+                EventoAnpr.conductor_identificado_por == usuario_id,
+                EventoAnpr.conductor_identificado_at >= inicio_utc,
+            )
+        )).scalar() or 0
+
     async def obtener_metricas_punto(self, db: AsyncSession, punto_nombre: str, tactico: bool = True):
         """
         Calcula entradas y salidas para un punto.
@@ -300,7 +326,7 @@ class AlcabalaService:
             # Rehidratar datos básicos para el dashboard
             u_h = await db.get(Usuario, h.usuario_id) if h.usuario_id else None
             
-            socio_nombre = "Socio Desconocido"
+            socio_nombre = "CONDUCTOR NO IDENTIFICADO"
             vehiculo_str = "PEATÓN"
             
             if u_h:

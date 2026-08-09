@@ -157,7 +157,7 @@ async def get_situacion_actual(db: AsyncSession):
             "id": acc.id,
             "tipo": acc.tipo, # entrada / salida
             "timestamp": acc.timestamp.isoformat(),
-            "usuario": f"{u.nombre} {u.apellido}" if u else "Socio Desconocido",
+            "usuario": f"{u.nombre} {u.apellido}" if u else "CONDUCTOR NO IDENTIFICADO",
             "vehiculo": vehiculo_str,
             "punto": acc.punto_acceso,
             "es_manual": acc.es_manual

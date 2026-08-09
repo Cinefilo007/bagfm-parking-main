@@ -931,6 +931,14 @@ async def resolver_evento(
 
     punto = await db.get(PuntoAcceso, evento.punto_acceso_id)
 
+    # A quién pertenece la placa. Sin esta consulta el acceso se guardaba solo con la
+    # placa suelta y la bitácora mostraba a todo el mundo como no identificado, hasta
+    # cuando el vehículo tenía titular — incluido el que el guardia acababa de
+    # identificar con la cédula un minuto antes.
+    veredicto = await verificar_placa(db, evento.placa)
+    usuario_placa = veredicto.get("usuario_id")
+    vehiculo_placa_id = veredicto.get("vehiculo_id")
+
     acceso = await acceso_service.registrar_acceso(
         db,
         AccesoRegistrar(
@@ -940,6 +948,8 @@ async def resolver_evento(
             origen_registro=OrigenRegistro.anpr,
             destino_entidad_id=destino.id if destino else None,
             observaciones=datos.observaciones,
+            usuario_id=UUID(usuario_placa) if usuario_placa else None,
+            vehiculo_id=UUID(vehiculo_placa_id) if vehiculo_placa_id else None,
             vehiculo_placa=evento.placa,
             vehiculo_marca=evento.marca_vehiculo,
             vehiculo_modelo=evento.tipo_vehiculo,
@@ -1081,7 +1091,25 @@ async def identificar_conductor(
     elif not vehiculo.socio_id:
         vehiculo.socio_id = persona.id
 
+    # Queda anotado en la detección quién identificó, cuándo y a quién. Es lo que
+    # después permite contarle al guardia su trabajo del turno y al mando comparar
+    # entre garitas; sin esto solo se sabría que el vehículo tiene dueño, no cuándo
+    # ni gracias a quién.
+    evento.conductor_identificado_at = func.now()
+    evento.conductor_identificado_por = usuario.id
+    evento.conductor_usuario_id = persona.id
+
     await db.commit()
+    await db.refresh(evento)
+
+    # La ficha recalculada: la placa que hace un momento era desconocida ahora tiene
+    # titular y semáforo verde. Se devuelve para que la tarjeta del guardia lo refleje
+    # sin recargar, que es lo que hace visible que el esfuerzo sirvió de algo.
+    ficha = None
+    try:
+        ficha = await anpr_service.construir_ficha(db, evento)
+    except Exception as e:
+        print(f"[ANPR] No se pudo reconstruir la ficha de {evento.id}: {e}")
 
     return {
         "persona": {
@@ -1093,6 +1121,7 @@ async def identificar_conductor(
         },
         "vehiculo_creado": creado_vehiculo,
         "placa": evento.placa,
+        "ficha": ficha,
     }
 
 

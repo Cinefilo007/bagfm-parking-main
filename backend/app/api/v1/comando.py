@@ -129,6 +129,10 @@ async def obtener_situacion_actual(
         "stats": {
             **stats_data,
             "infracciones": 0, # TODO: Integrar con servicio de infracciones cuando esté disponible
+            # Conductores que ESTE guardia identificó en su turno. Es lo único que
+            # mide iniciativa y no tránsito: entradas y salidas suben solas aunque
+            # nadie toque el sistema.
+            "identificados": await alcabala_service.contar_identificaciones_turno(db, usuario.id),
         }
     }
 
