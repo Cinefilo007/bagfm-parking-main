@@ -27,13 +27,13 @@ import { cn } from '../../lib/utils';
 const CLAVE_TEMA = 'monitor_tema';
 
 /**
- * Cuánto se queda una detección en pantalla antes de volver a "esperando".
+ * Cuánto dura el aviso verde de "acceso concedido".
  *
- * Dejarla hasta que llegue el siguiente vehículo hacía imposible distinguir un dato
- * fresco de uno de hace media hora, y el cambio de una detección a otra pasaba
- * desapercibido. Volver al estado de espera hace que cada llegada se note.
+ * Solo el aviso. La ficha del vehículo NO caduca por tiempo: se queda hasta que el
+ * guardia resuelva o descarte, porque mientras tanto es justo lo que necesita tener
+ * delante para decidir.
  */
-const SEGUNDOS_EN_PANTALLA = 25;
+const SEGUNDOS_CONFIRMACION = 10;
 
 /**
  * El color lo decide el backend. Aquí solo se pinta.
@@ -359,10 +359,24 @@ const Monitor = () => {
   const sesion = useNotifications();
   const pantalla = usePantallaSocket(tokenPantalla);
 
-  // La detección que se muestra en grande va aparte de las anteriores: la primera
-  // caduca sola y las otras se acumulan en la franja de abajo.
-  const [actual, setActual] = useState(null);
-  const [anteriores, setAnteriores] = useState([]);
+  // Las dos listas van en un solo estado. Estaban separadas y el paso de una a otra
+  // se hacía llamando a `setAnteriores` DENTRO del updater de `setActual`; eso es
+  // impuro, React invoca los updaters dos veces para delatarlo, y el resultado eran
+  // detecciones duplicadas en el historial. Con un único estado la transición es un
+  // cálculo puro.
+  const [pila, setPila] = useState({ actual: null, anteriores: [] });
+  const { actual, anteriores } = pila;
+
+  /** Baja la detección indicada al historial, sin repetirla si ya está. */
+  const bajarAlHistorial = useCallback((eventoId) => {
+    setPila((p) => {
+      if (!p.actual || (eventoId && p.actual.evento_id !== eventoId)) return p;
+      return {
+        actual: null,
+        anteriores: [p.actual, ...p.anteriores.filter((f) => f.evento_id !== p.actual.evento_id)].slice(0, 3),
+      };
+    });
+  }, []);
   const [titulo, setTitulo] = useState('Alcabala');
   const [reloj, setReloj] = useState(new Date());
   const [confirmacion, setConfirmacion] = useState(null);
@@ -403,21 +417,14 @@ const Monitor = () => {
         lista = await anprService.getMonitor(4);
       }
 
-      // Al encender la pantalla, lo recuperado va al historial y NO al panel grande:
-      // mostrar como "actual" una detección de hace media hora sería mentir. Solo si
-      // la última es tan reciente que aún estaría en pantalla, se pone de actual.
-      const [primera, ...resto] = lista;
-      const frescura = primera
-        ? (Date.now() - new Date(primera.timestamp).getTime()) / 1000
-        : Infinity;
-
-      if (primera && frescura < SEGUNDOS_EN_PANTALLA) {
-        setActual(primera);
-        setAnteriores(resto.slice(0, 3));
-      } else {
-        setActual(null);
-        setAnteriores(lista.slice(0, 3));
-      }
+      // Arriba va la detección que sigue esperando decisión; las ya resueltas van
+      // al historial. Al encender la pantalla eso deja delante justo lo que le falta
+      // por atender al guardia.
+      const pendiente = lista.find((f) => f.estado === 'pendiente') || null;
+      setPila({
+        actual: pendiente,
+        anteriores: lista.filter((f) => f !== pendiente).slice(0, 3),
+      });
     } catch (error) {
       if (esPantalla && error?.response?.status === 401) {
         pantallaToken.borrar();
@@ -451,17 +458,17 @@ const Monitor = () => {
     if (aviso.evento === 'anpr_resuelto') {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setConfirmacion({ placa: aviso.placa, destino: aviso.destino });
-       
-      setActual((previa) => {
-        if (previa && previa.evento_id === aviso.evento_id) {
-          setAnteriores((prev) => [previa, ...prev].slice(0, 3));
-          return null;
-        }
-        return previa;
-      });
+      bajarAlHistorial(aviso.evento_id);
       limpiarAviso();
-      const t = setTimeout(() => setConfirmacion(null), 4000);
-      return () => clearTimeout(t);
+      return undefined;
+    }
+
+    // El guardia descartó la detección: se retira sin aviso verde, porque no hubo
+    // acceso que confirmar.
+    if (aviso.evento === 'anpr_descartado') {
+      bajarAlHistorial(aviso.evento_id);
+      limpiarAviso();
+      return undefined;
     }
 
     // El guardia cambió el tema desde su teléfono.
@@ -489,28 +496,30 @@ const Monitor = () => {
     };
 
      
-    setActual((previa) => {
-      if (previa?.evento_id === ficha.evento_id) return previa;
-      // La que estaba en grande baja al historial en vez de desaparecer.
-      if (previa) setAnteriores((prev) => [previa, ...prev].slice(0, 3));
-      return ficha;
+    // La que estaba en grande baja al historial en vez de desaparecer.
+    setPila((p) => {
+      if (p.actual?.evento_id === ficha.evento_id) return p;
+      const previas = p.actual
+        ? [p.actual, ...p.anteriores.filter((f) => f.evento_id !== p.actual.evento_id)]
+        : p.anteriores;
+      return {
+        actual: ficha,
+        anteriores: previas.filter((f) => f.evento_id !== ficha.evento_id).slice(0, 3),
+      };
     });
     limpiarAviso();
     return undefined;
-  }, [aviso, esPantalla, pantalla, sesion, cambiarTema]);
+  }, [aviso, esPantalla, pantalla, sesion, cambiarTema, bajarAlHistorial]);
 
-  // Caducidad de la detección en pantalla. El temporizador se rearma con cada
-  // vehículo nuevo, así que la cuenta siempre corre desde la última llegada.
+  // El aviso verde se retira solo. Va en su propio efecto y dependiendo solo de
+  // `confirmacion`: cuando el temporizador vivía dentro del efecto de los avisos, la
+  // limpieza lo cancelaba en cada repintado —y el reloj repinta cada segundo—, así
+  // que nunca llegaba a dispararse y el aviso se quedaba pegado para siempre.
   useEffect(() => {
-    if (!actual) return undefined;
-
-    const t = setTimeout(() => {
-      setActual(null);
-      setAnteriores((prev) => [actual, ...prev].slice(0, 3));
-    }, SEGUNDOS_EN_PANTALLA * 1000);
-
+    if (!confirmacion) return undefined;
+    const t = setTimeout(() => setConfirmacion(null), SEGUNDOS_CONFIRMACION * 1000);
     return () => clearTimeout(t);
-  }, [actual]);
+  }, [confirmacion]);
 
   if (necesitaEmparejar) {
     return <EmparejarPantalla onEmparejada={guardarToken} />;

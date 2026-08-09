@@ -1023,6 +1023,21 @@ async def descartar_evento(
     evento.resuelto_at = func.now()
     await db.commit()
     await db.refresh(evento)
+
+    # El monitor de la garita tiene que enterarse: la ficha se queda en pantalla
+    # hasta que el acceso se resuelve o se descarta, y esto es lo segundo.
+    try:
+        await manager.broadcast(
+            {
+                "evento": "anpr_descartado",
+                "evento_id": str(evento.id),
+                "placa": evento.placa,
+            },
+            channels=[f"PUNTO_{evento.punto_acceso_id}"],
+        )
+    except Exception as e:
+        print(f"[ANPR] No se pudo avisar del descarte {evento.id}: {e}")
+
     return _a_salida(evento)
 
 
