@@ -31,7 +31,7 @@ la cámara ve sola; el guardia solo agrega el destino con un toque.
 
 | Equipo | Rol |
 |---|---|
-| 5 bullets **"ANPR Camera"** de Hikvision | Las que leen placas. **NO son la DS-TCG406-E** del PDF: son bullets DeepinView. Modelo exacto **pendiente de confirmar**. Reparto: ver abajo. |
+| 5 × **`DS-TCG406-E`** | Las que leen placas. **Confirmado el 10-08-2026** leyendo la web de una de ellas (Configuración → Información del dispositivo), no del PDF de la oferta: se identifica como `IP CAPTURE CAMERA`, serie `DS-TCG406-E 20241203AIFT6378265`, firmware `V5.3.2 240918`, web `V5.3.2.83595 build 240813`. **1 canal · 3 entradas de alarma · 1 salida de alarma.** Reparto: ver abajo. |
 
 **Cómo están repartidas las cámaras** (decide todo el flujo de entradas y salidas):
 
@@ -50,10 +50,26 @@ la cámara ve sola; el guardia solo agrega el destino con un toque.
 | `iDS-2CD7A86G2/V-XZHSY` | Variante `/V` = protección perimetral. **No lee placas ni hace reconocimiento facial.** |
 | `DS-7608NXI-K2/8P` | NVR AcuSense. Aquí vive el reconocimiento facial (descartado en Fase 1). |
 
-**Consecuencia abierta:** las funciones de barrera de la serie TCG (relés dedicados,
-Wiegand, apertura offline por lista blanca) **no se pueden dar por hechas**. La Fase 2
-probablemente necesite una tarjeta de relé cableada a la salida de alarma, o control
-desde la plataforma por túnel WireGuard. Confirmar antes de comprar los brazos.
+**Lo que el modelo confirmado cambia:** sí son de la serie TCG, así que la Fase 2 **no
+necesita comprar una tarjeta de relé**. Cada cámara trae **una salida de alarma** (visto
+en su propia pantalla, no supuesto del datasheet), y esa salida es lo que se cablea al
+brazo. Ojo con la aritmética: es **una salida por cámara**, y sobre cada paso hay dos
+cámaras — el brazo lo gobierna una sola de las dos, que conviene que sea la que lee mejor
+en ese sentido.
+
+Eso deja la Fase 2 partida en dos problemas que antes se confundían en uno:
+
+- **Pulsar el brazo**: resuelto por hardware. La cámara dispara su salida de alarma ella
+  sola, sin servidor y sin red. Funciona aunque se caiga internet, que es justo lo que
+  hace falta en una alcabala.
+- **Decidir a quién se le abre**: sigue necesitando WireGuard. Que el brazo obedezca al
+  semáforo del backend —o que la lista blanca de la cámara se mantenga sola— exige llegar
+  a la cámara desde el VPS, y hoy no se puede.
+
+**Por verificar en la garita, antes de comprar los brazos:** que el firmware `V5.3.2` exponga
+la lista blanca y la vinculación *placa reconocida → salida de alarma* en el menú (la serie
+la soporta, pero esta versión concreta no está comprobada), y que las 5 cámaras sean el mismo
+modelo — la que se inspeccionó es una sola.
 
 ## Arquitectura del flujo ANPR
 
@@ -73,6 +89,7 @@ lista blanca) necesita WireGuard en el VPS + un router saliente en cada alcabala
 |---|---|
 | `services/placa_lookup.py` | **Fuente única de verdad** sobre qué significa una placa. La usan ANPR, el flujo Gemini del parquero y la búsqueda manual. Devuelve `coincidencia` y `semaforo`. |
 | `services/anpr_service.py` | Parseo tolerante del evento Hikvision, dedupe, `construir_ficha()` (lo que ven ambas pantallas). |
+| `services/anpr_diagnostico.py` | Las ingestas que **no** llegaron a ser detección. En memoria, no en base: sirve para poner una cámara a transmitir, no es auditoría. Separa "token mal copiado" de "IP bloqueada" de "formato equivocado", que desde el panel se veían igual. Se consulta en Cámaras ANPR → Diagnóstico. |
 | `api/v1/anpr.py` | Ingesta sin sesión + operación del guardia + admin de cámaras y pantallas + emparejamiento. |
 | `api/v1/vehiculos.py` | Saneamiento de fichas duplicadas (`/duplicados`, `/fusionar-en/`). |
 | `services/ia_service.py` | Lectura de documentos con Gemini (cédula, circulación, odómetro, surtidor). Llama al SDK **en un hilo aparte** y reintenta con espera creciente. |
@@ -250,9 +267,12 @@ delantera/trasera con fusión de las dos lecturas.
    firmware, y si no lo manda queda `desconocida` y el guardia lo confirma a mano.
    Antes de escribirlo conviene mirar qué proporción de eventos llega con sentido:
    `SELECT direccion, sentido_origen, count(*) FROM eventos_anpr GROUP BY 1,2;`
-1. **Modelo exacto de la cámara** — bloquea decidir cómo se controlará el brazo.
+1. ~~**Modelo exacto de la cámara**~~ — **resuelto**: `DS-TCG406-E`, ver Hardware real.
+   Queda comprobar en el menú del firmware `V5.3.2` que la lista blanca y la vinculación
+   con la salida de alarma estén expuestas.
 2. **Fase 2**: WireGuard + control del brazo. El cliente ISAPI está escrito tras el flag
-   `hikvision_control_activo`.
+   `hikvision_control_activo`. Ya no bloquea una compra: el relé viene en la cámara y lo
+   que falta es la ruta de vuelta VPS → cámara.
 3. **Analítica del Comandante**: `GET /anpr/analitica` y su vista. Es la finalidad del
    sistema (recurrencia por placa, horas pico, placas recurrentes sin registro).
 4. Terminar la unificación de las tres tablas de vehículos.

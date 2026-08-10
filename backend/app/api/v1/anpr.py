@@ -53,6 +53,7 @@ from app.schemas.anpr import (
     ResolverEvento,
 )
 from app.services.acceso_service import acceso_service
+from app.services import anpr_diagnostico
 from app.services.anpr_service import anpr_service
 from app.services.placa_lookup import normalizar_placa, verificar_placa
 from app.services.storage_local import leer_imagen
@@ -141,29 +142,85 @@ async def recibir_evento_anpr(
     Responde 204 aunque el evento no traiga una placa legible: devolver un error haría
     que la cámara reintentara en bucle algo que nunca va a mejorar.
     """
+    # Datos del intento que sirven para diagnosticar aunque no lleguemos a autenticar.
+    # Todo lo que se anota aquí lo trae la petición: nada obliga a leerse el cuerpo.
+    content_type = request.headers.get("content-type", "")
+    largo = request.headers.get("content-length")
+    tamano = int(largo) if largo and largo.isdigit() else None
+
     camara = await anpr_service.autenticar_camara(db, token)
     if not camara:
         # Mismo 404 para token inválido y para cámara desactivada: no se le confirma a
         # quien prueba tokens que uno de ellos existió alguna vez.
+        #
+        # El cuerpo NO se lee en este caso, aunque el extracto ayudaría a depurar: la
+        # petición no está autenticada y leerla dejaría que cualquiera haga que el
+        # servidor se guarde en memoria lo que le mande.
+        anpr_diagnostico.registrar_rechazo(
+            anpr_diagnostico.TOKEN_INVALIDO,
+            ip=_ip_origen(request),
+            content_type=content_type,
+            tamano=tamano,
+            pista_token=token[-4:] if token else None,
+            detalle="Ninguna cámara activa tiene ese token. Revise que la ruta se copió "
+                    "entera, o rote el token y vuelva a cargarlo en la cámara.",
+        )
         raise HTTPException(status_code=404, detail="No encontrado")
 
     if not _ip_autorizada(request):
+        anpr_diagnostico.registrar_rechazo(
+            anpr_diagnostico.IP_RECHAZADA,
+            ip=_ip_origen(request),
+            content_type=content_type,
+            tamano=tamano,
+            pista_token=camara.token_pista,
+            camara_nombre=camara.nombre,
+            detalle="El token es correcto y la cámara transmite: solo la bloquea "
+                    "ANPR_IP_ALLOWLIST. Ahí va la IP pública de la alcabala, no la LAN "
+                    "de la cámara — y si el proveedor la da dinámica, cambia sola.",
+        )
         raise HTTPException(status_code=403, detail="Origen no autorizado")
 
-    largo = request.headers.get("content-length")
-    if largo and largo.isdigit() and int(largo) > MAX_CUERPO_BYTES:
+    if tamano is not None and tamano > MAX_CUERPO_BYTES:
+        anpr_diagnostico.registrar_rechazo(
+            anpr_diagnostico.CUERPO_ENORME,
+            ip=_ip_origen(request),
+            content_type=content_type,
+            tamano=tamano,
+            camara_nombre=camara.nombre,
+            detalle=f"El límite son {MAX_CUERPO_BYTES} bytes. Baje la resolución de las "
+                    f"fotos de captura en la cámara.",
+        )
         raise HTTPException(status_code=413, detail="Evento demasiado grande")
 
     cuerpo = await request.body()
     if len(cuerpo) > MAX_CUERPO_BYTES:
+        anpr_diagnostico.registrar_rechazo(
+            anpr_diagnostico.CUERPO_ENORME,
+            ip=_ip_origen(request),
+            content_type=content_type,
+            tamano=len(cuerpo),
+            camara_nombre=camara.nombre,
+            detalle=f"El límite son {MAX_CUERPO_BYTES} bytes. Baje la resolución de las "
+                    f"fotos de captura en la cámara.",
+        )
         raise HTTPException(status_code=413, detail="Evento demasiado grande")
 
     punto_db = await db.get(PuntoAcceso, camara.punto_acceso_id)
     if not punto_db:
+        anpr_diagnostico.registrar_rechazo(
+            anpr_diagnostico.SIN_ALCABALA,
+            ip=_ip_origen(request),
+            content_type=content_type,
+            tamano=len(cuerpo),
+            camara_nombre=camara.nombre,
+            detalle="La cámara apunta a un punto de acceso que ya no existe. Vuelva a "
+                    "asignarle su alcabala desde este panel.",
+        )
         raise HTTPException(status_code=409, detail="La cámara no tiene alcabala asignada")
 
     await anpr_service.registrar_evento(
-        db, camara, punto_db, request.headers.get("content-type", ""), cuerpo
+        db, camara, punto_db, content_type, cuerpo
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -337,6 +394,41 @@ async def eliminar_camara(
     await db.delete(camara)
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/diagnostico-ingesta")
+async def diagnostico_ingesta(
+    limite: int = 20,
+    usuario: Usuario = DEPENDENCY_ADMIN,
+):
+    """
+    Los POST de cámara que no llegaron a convertirse en una detección.
+
+    Es la herramienta para poner una cámara nueva a transmitir. Sin esto, "la cámara no
+    aparece" tenía cuatro causas indistinguibles desde el panel —token mal copiado, IP
+    fuera de la allowlist, formato de subida equivocado, o que la cámara ni siquiera está
+    enviando— y separarlas obligaba a entrar al VPS a leer los logs del contenedor.
+
+    Que la lista salga **vacía** también es un resultado, y de los útiles: significa que
+    al servidor no le está llegando nada, así que el problema está en la cámara o en el
+    camino, no aquí.
+    """
+    return {
+        "intentos": anpr_diagnostico.ultimos(min(max(limite, 1), anpr_diagnostico.MAX_INTENTOS)),
+        # Se dice en la respuesta para que el panel pueda advertirlo: esto vive en la
+        # memoria del proceso, así que un despliegue lo borra y con varios workers cada
+        # uno lleva su propia lista.
+        "volatil": True,
+        "maximo": anpr_diagnostico.MAX_INTENTOS,
+    }
+
+
+@router.delete("/diagnostico-ingesta")
+async def limpiar_diagnostico_ingesta(
+    usuario: Usuario = DEPENDENCY_ADMIN,
+):
+    """Vacía la lista para que lo que aparezca después sea sin duda de la prueba en curso."""
+    return {"borrados": anpr_diagnostico.limpiar()}
 
 
 @router.get("/puntos-acceso")

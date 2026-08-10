@@ -3,6 +3,7 @@ import {
   Camera, Plus, KeyRound, RotateCcw, Trash2, Copy, Check,
   Loader2, ShieldAlert, Pencil, X, Wifi, WifiOff, Power,
   ChevronDown, ChevronRight, BookOpen, TriangleAlert, Monitor as MonitorIcon,
+  Activity, RefreshCw,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -265,6 +266,21 @@ const GuiaConfiguracion = () => {
             </div>
           </div>
 
+          <div className="rounded-lg bg-bg-low p-3 text-xs leading-relaxed text-text-sec">
+            <p className="font-bold text-text-main">Las cámaras de la base son DS-TCG406-E.</p>
+            <p className="mt-1">
+              No son cámaras de vigilancia con ANPR añadido: son <strong>cámaras de captura
+              de tráfico</strong> y se presentan como <Ruta>IP CAPTURE CAMERA</Ruta>. La
+              lectura de placas ya viene activa de fábrica, así que el trabajo no es
+              encenderla sino <strong>decirle a dónde mandar lo que lee</strong>.
+            </p>
+            <p className="mt-1">
+              Los nombres de menú de abajo son los del firmware <Ruta>V5.3.2</Ruta>. Si
+              alguno no coincide, busque por lo que hace: lo que se persigue en cada paso
+              está dicho, y eso no cambia entre versiones.
+            </p>
+          </div>
+
           <div className="space-y-3">
             <Paso numero="1" titulo="Red — Configuración → Red → Configuración básica">
               <p>
@@ -282,33 +298,20 @@ const GuiaConfiguracion = () => {
               </p>
             </Paso>
 
-            <Paso numero="3" titulo="Activar el ANPR — Configuración → Evento → Tráfico rodado">
-              <p>También aparece como <em>Road Traffic</em> o <em>Evento inteligente</em>.</p>
+            <Paso numero="3" titulo="La lectura — Configuración → Captura / Parámetros de captura">
+              <p>
+                En estas cámaras el ANPR no está bajo Evento sino en su propia sección de
+                captura. Puede aparecer como <em>Configuración inteligente</em>.
+              </p>
               <ul className="ml-4 list-disc space-y-0.5">
-                <li>Tipo de detección: <strong>Detección de vehículos / ANPR</strong></li>
-                <li>Región: <strong>Venezuela</strong> — sin esto no lee bien la placa venezolana</li>
+                <li>Región / país de la placa: <strong>Venezuela</strong> — sin esto la lectura empeora mucho</li>
+                <li>Modo de disparo: <strong>por vídeo</strong>, no por bucle inductivo (no hay bucle enterrado)</li>
                 <li>Dibuje el carril y la línea de disparo sobre la imagen</li>
-                <li>Modo de disparo: <strong>por vídeo</strong></li>
                 <li>Marque los atributos de <strong>tipo y color</strong> de vehículo</li>
               </ul>
             </Paso>
 
-            <Paso numero="4" titulo="Vinculación — misma pantalla, pestaña Vinculación / Linkage">
-              <p>
-                Marque <strong>“Notificar al centro de vigilancia”</strong> y, si aparece,
-                <strong> “Cargar a HTTP Listening”</strong>. Sin esto la cámara detecta
-                pero no envía nada, y es el olvido más común.
-              </p>
-            </Paso>
-
-            <Paso numero="5" titulo="Captura — parámetros de captura de la misma pantalla">
-              <p>
-                Elija <strong>“imagen de escena + imagen de primer plano”</strong> para que
-                lleguen las dos fotos: el recorte de la placa y el vehículo completo.
-              </p>
-            </Paso>
-
-            <Paso numero="6" titulo="El destino — Configuración → Red → Configuración avanzada → HTTP Listening">
+            <Paso numero="4" titulo="El destino — Configuración → Red → Configuración avanzada → HTTP Listening">
               <p>
                 Aquí van los datos que le entrega esta pantalla al crear la cámara o rotar
                 su token: host, puerto, protocolo y ruta, <strong>en campos separados</strong>.
@@ -318,26 +321,59 @@ const GuiaConfiguracion = () => {
                 también a qué alcabala pertenece. Por eso una detección solo le llega al
                 guardia de esa alcabala.
               </p>
+              <p>
+                Si el firmware ofrece además una página de <Ruta>Post PRS</Ruta> o
+                “publicar resultados”, <strong>no es esa</strong>: sirve para plataformas de
+                terceros con protocolos propios. Aquí se espera el HTTP Listening de
+                siempre, que manda el <Ruta>EventNotificationAlert</Ruta> en XML con las
+                fotos adjuntas.
+              </p>
+            </Paso>
+
+            <Paso numero="5" titulo="Vinculación — que la lectura dispare el envío">
+              <p>
+                En la pestaña de <strong>Vinculación / Linkage</strong> de la captura, marque
+                <strong> “Notificar al centro de vigilancia”</strong> y, si aparece,
+                <strong> “Cargar a HTTP Listening”</strong>. Sin esto la cámara lee la placa
+                y no la manda a ningún sitio: es el olvido más común y desde fuera se ve
+                igual que una cámara apagada.
+              </p>
+            </Paso>
+
+            <Paso numero="6" titulo="Fotos — parámetros de captura de la misma pantalla">
+              <p>
+                Elija <strong>“imagen de escena + imagen de primer plano”</strong> para que
+                lleguen las dos fotos: el recorte de la placa y el vehículo completo. Si el
+                evento supera los 12 MB el servidor lo rechaza, así que no suba la
+                resolución más de lo necesario.
+              </p>
             </Paso>
 
             <Paso numero="7" titulo="Comprobar">
               <p>
                 Pase un vehículo y vea si la cámara aparece como <strong>Transmitiendo</strong>
-                en la lista de abajo. Para probar sin ir a la garita, desde el servidor:
+                en la lista de abajo. Si no aparece, abra el <strong>Diagnóstico</strong> que
+                está justo debajo de esta guía: ahí se ve si el envío llegó y por qué se
+                descartó. Para probar sin ir a la garita, desde el servidor:
               </p>
               <div className="mt-1">
                 <CampoCopiable
                   etiqueta="Simulador (usa el token que le dio esta pantalla)"
-                  valor={`python scripts/simular_camara_anpr.py --url ${origenApi()} --token <TOKEN> --placa PRUEBA1`}
+                  valor={`python scripts/simular_camara_anpr.py --url ${origenApi()} --token=<TOKEN> --placa PRUEBA1`}
                 />
               </div>
+              <p className="mt-1">
+                El <Ruta>=</Ruta> del <Ruta>--token=</Ruta> no es un adorno: hay tokens que
+                empiezan por guion y sin él el script los toma por una opción suya.
+              </p>
             </Paso>
           </div>
 
           <div className="rounded-lg bg-bg-low p-3 text-xs leading-relaxed text-text-sec">
             <p className="font-bold text-text-main">Si no llega nada</p>
             <ul className="ml-4 mt-1 list-disc space-y-0.5">
-              <li>¿Quedó marcada la vinculación del paso 4?</li>
+              <li>Mire primero el <strong>Diagnóstico</strong>: distingue “no llegó” de “llegó y se descartó”.</li>
+              <li>¿Quedó marcada la vinculación del paso 5?</li>
               <li>¿La cámara está <strong>activa</strong> y con token en esta pantalla?</li>
               <li>¿La ruta lleva el token completo? Un carácter de menos da 404.</li>
               <li>
@@ -348,6 +384,181 @@ const GuiaConfiguracion = () => {
               </li>
             </ul>
           </div>
+        </div>
+      )}
+    </Card>
+  );
+};
+
+/**
+ * Qué significa cada motivo de rechazo y qué hacer con él.
+ *
+ * El texto va aquí y no en el backend porque es lo que se lee estando en la garita: un
+ * motivo en clave (`token_invalido`) obliga a saberse el sistema por dentro, y quien
+ * está montando la cámara normalmente no es quien lo escribió.
+ */
+const MOTIVOS = {
+  token_invalido: {
+    titulo: 'Token que no existe',
+    color: 'text-danger',
+    que_hacer: 'La ruta de la cámara no coincide con ninguna cámara activa. Rote el token y vuelva a cargarlo.',
+  },
+  ip_rechazada: {
+    titulo: 'IP bloqueada',
+    color: 'text-warning',
+    que_hacer: 'La cámara transmite bien: la frena ANPR_IP_ALLOWLIST en el servidor.',
+  },
+  cuerpo_enorme: {
+    titulo: 'Evento demasiado grande',
+    color: 'text-warning',
+    que_hacer: 'Baje la resolución de las fotos de captura en la cámara.',
+  },
+  sin_alcabala: {
+    titulo: 'Cámara sin alcabala',
+    color: 'text-danger',
+    que_hacer: 'Vuelva a asignarle su punto de acceso desde esta misma pantalla.',
+  },
+  sin_placa: {
+    titulo: 'Llegó, pero sin placa',
+    color: 'text-warning',
+    que_hacer: 'La cámara alcanza el servidor. Lo que falla es el formato: revise el modo de subida.',
+  },
+};
+
+/**
+ * Las ingestas que no prosperaron.
+ *
+ * Existe porque "la cámara no aparece" tenía cuatro causas que desde el panel se veían
+ * exactamente igual, y separarlas obligaba a entrar al VPS a leer los logs del
+ * contenedor — justo lo que no se puede hacer de pie en la garita.
+ */
+const DiagnosticoIngesta = () => {
+  const [abierto, setAbierto] = useState(false);
+  const [datos, setDatos] = useState(null);
+  const [cargando, setCargando] = useState(false);
+
+  const cargar = useCallback(async () => {
+    setCargando(true);
+    try {
+      setDatos(await anprService.getDiagnosticoIngesta());
+    } catch {
+      toast.error('No se pudo leer el diagnóstico');
+    } finally {
+      setCargando(false);
+    }
+  }, []);
+
+  // Se consulta al desplegar y no al montar la pantalla: mientras esté cerrado no hay
+  // nada que mirar, y la lista de cámaras ya carga sola al entrar.
+  useEffect(() => { if (abierto) cargar(); }, [abierto, cargar]);
+
+  const limpiar = async () => {
+    try {
+      await anprService.limpiarDiagnosticoIngesta();
+      toast.success('Lista vacía. Haga pasar un vehículo y vuelva a consultar.');
+      cargar();
+    } catch {
+      toast.error('No se pudo limpiar');
+    }
+  };
+
+  const intentos = datos?.intentos || [];
+
+  return (
+    <Card elevation={2} className="border-bg-high/10">
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        className="flex w-full items-center gap-2 text-left"
+      >
+        {abierto ? <ChevronDown className="h-4 w-4 text-primary" /> : <ChevronRight className="h-4 w-4 text-primary" />}
+        <Activity className="h-4 w-4 text-primary" />
+        <span className="text-xs font-bold uppercase tracking-wide text-text-main">
+          Diagnóstico: envíos que no se registraron
+        </span>
+      </button>
+
+      {abierto && (
+        <div className="mt-4 space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Boton size="sm" variant="secundario" onClick={cargar} disabled={cargando}>
+              {cargando
+                ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
+              Actualizar
+            </Boton>
+            <Boton size="sm" variant="secundario" onClick={limpiar} disabled={cargando}>
+              <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Limpiar antes de probar
+            </Boton>
+          </div>
+
+          {intentos.length === 0 ? (
+            <div className="rounded-lg bg-bg-low p-3 text-xs leading-relaxed text-text-sec">
+              <p className="font-bold text-text-main">No hay envíos rechazados.</p>
+              <p className="mt-1">
+                Si además la cámara aparece como <strong>sin transmitir</strong>, entonces
+                al servidor no le está llegando nada y el problema está antes: la cámara no
+                envía, o no llega a salir de la alcabala. Empiece por comprobar que la
+                vinculación quedó marcada y que el equipo tiene salida a internet.
+              </p>
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {intentos.map((i, idx) => {
+                const m = MOTIVOS[i.motivo] || { titulo: i.motivo, color: 'text-text-main', que_hacer: '' };
+                return (
+                  <li key={`${i.momento}-${idx}`} className="rounded-lg bg-bg-low p-3">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                      <span className={cn('text-xs font-bold', m.color)}>{m.titulo}</span>
+                      <span className="font-mono text-[10px] text-text-sec">
+                        {formatearFecha(i.momento)}
+                      </span>
+                    </div>
+
+                    <p className="mt-1 text-[11px] leading-relaxed text-text-sec">
+                      {m.que_hacer}
+                    </p>
+
+                    <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-text-sec">
+                      {i.camara_nombre && <span>Cámara: <strong className="text-text-main">{i.camara_nombre}</strong></span>}
+                      {i.pista_token && <span>Token ••••{i.pista_token}</span>}
+                      {i.ip && <span>Desde {i.ip}</span>}
+                      {i.content_type && <span className="font-mono">{i.content_type}</span>}
+                      {i.tamano != null && <span>{i.tamano} bytes</span>}
+                    </div>
+
+                    {/* Las etiquetas del XML son lo que resuelve el caso difícil: si están
+                        pero no hay licensePlate, la cámara envía bien y solo cambia el
+                        nombre del campo. */}
+                    {i.etiquetas?.length > 0 && (
+                      <p className="mt-1.5 break-all font-mono text-[10px] text-text-sec">
+                        Etiquetas recibidas: {i.etiquetas.join(', ')}
+                      </p>
+                    )}
+
+                    {i.extracto && (
+                      <details className="mt-1.5">
+                        <summary className="cursor-pointer text-[10px] uppercase tracking-wide text-text-sec">
+                          Ver lo que llegó
+                        </summary>
+                        <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded bg-bg-card p-2 font-mono text-[10px] text-text-main">
+                          {i.extracto}
+                        </pre>
+                      </details>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {datos?.volatil && (
+            <p className="text-[10px] leading-relaxed text-text-sec">
+              Esta lista vive en la memoria del servidor: se borra al desplegar y guarda
+              los últimos {datos.maximo}. No es un registro de auditoría, es una
+              herramienta para dejar la cámara transmitiendo.
+            </p>
+          )}
         </div>
       )}
     </Card>
@@ -454,7 +665,7 @@ const FormularioCamara = ({ camara, puntos, onGuardar, onCancelar, guardando }) 
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <Input label="Modelo" value={form.modelo} onChange={cambiar('modelo')} placeholder="iDS-2CD7A46G0/P" />
+          <Input label="Modelo" value={form.modelo} onChange={cambiar('modelo')} placeholder="DS-TCG406-E" />
           <Input label="Serial" value={form.serial} onChange={cambiar('serial')} />
           <Input label="IP en la LAN" value={form.ip_lan} onChange={cambiar('ip_lan')} placeholder="192.168.1.64" />
         </div>
@@ -814,6 +1025,7 @@ const CamarasAnpr = () => {
 
       <main className="mt-[-1rem] space-y-4 px-4 pb-24 lg:px-8">
       <GuiaConfiguracion />
+      <DiagnosticoIngesta />
 
       {puntos.length === 0 && !cargando && (
         <Card elevation={2} className="border-warning/30">

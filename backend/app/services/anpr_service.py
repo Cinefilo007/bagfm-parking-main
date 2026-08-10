@@ -29,6 +29,7 @@ from app.models.infraccion import Infraccion
 from app.models.camara_anpr import CamaraAnpr, hashear_token
 from app.models.enums import AnprDireccion, AnprEstado, CamaraRol, CamaraSentido, InfraccionEstado
 from app.models.evento_anpr import EventoAnpr
+from app.services import anpr_diagnostico
 from app.services.placa_lookup import (
     verificar_placa, normalizar_placa, semaforo_de, SEMAFORO_ROJO,
 )
@@ -467,7 +468,28 @@ class AnprService:
 
         placa = normalizar_placa(datos.get("licensePlate") or datos.get("plateNumber"))
         if not placa:
-            print("[ANPR] Evento sin placa legible; se descarta.")
+            # Se anota con las etiquetas que sí traía el XML, porque son las que separan
+            # los dos casos que desde fuera parecen el mismo. Si la lista viene llena, la
+            # cámara está enviando bien y lo que falla es el nombre del campo de la placa
+            # —firmware distinto, o subiendo en un formato que no es el de HTTP
+            # Listening—. Si viene vacía, lo que llegó no era XML siquiera.
+            anpr_diagnostico.registrar_rechazo(
+                anpr_diagnostico.SIN_PLACA,
+                content_type=content_type,
+                tamano=len(cuerpo),
+                camara_nombre=camara.nombre,
+                detalle=(
+                    "Llegó un evento sin placa: se encontró XML pero ninguna etiqueta "
+                    "licensePlate ni plateNumber."
+                    if xml else
+                    "Llegó un POST que no traía XML. Revise el formato de subida "
+                    "configurado en la cámara: aquí se espera HTTP Listening con "
+                    "notificación XML, no un envío de solo imagen."
+                ),
+                cuerpo=cuerpo if not imagenes else (xml or cuerpo),
+                etiquetas=sorted(datos.keys()),
+            )
+            print(f"[ANPR] {camara.nombre}: evento sin placa legible; se descarta.")
             return None
 
         confianza = _entero(datos.get("confidenceLevel"))

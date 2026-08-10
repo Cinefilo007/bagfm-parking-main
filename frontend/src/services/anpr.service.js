@@ -124,6 +124,25 @@ export const anprService = {
     await api.delete(`/anpr/camaras/${camaraId}`);
   },
 
+  /**
+   * Los POST de cámara que no llegaron a convertirse en una detección.
+   *
+   * Es lo que se mira al poner una cámara nueva a transmitir: separa "el token está
+   * mal" de "la IP está bloqueada" de "el formato de subida no es el que esperamos".
+   * Que salga vacío también dice algo, y es lo más importante: al servidor no le está
+   * llegando nada, así que el problema está en la cámara o en el camino.
+   */
+  async getDiagnosticoIngesta(limite = 20) {
+    const { data } = await api.get('/anpr/diagnostico-ingesta', { params: { limite } });
+    return data;
+  },
+
+  /** Vacía la lista, para que lo que aparezca después sea de la prueba en curso. */
+  async limpiarDiagnosticoIngesta() {
+    const { data } = await api.delete('/anpr/diagnostico-ingesta');
+    return data;
+  },
+
   // ── Emparejamiento de pantallas (desde el teléfono del guardia) ───────────
 
   /** Qué código es y a qué alcabala iría, para mostrarlo antes de confirmar. */
