@@ -1,5 +1,5 @@
 # Usar imagen oficial de Python ligera
-FROM python:3.11-slim
+FROM python:3.14-slim
 
 # Evitar que Python genere archivos .pyc y habilitar modo sin buffer para logs
 ENV PYTHONDONTWRITEBYTECODE 1
