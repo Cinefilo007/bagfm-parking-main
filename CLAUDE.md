@@ -73,8 +73,15 @@ modelo — la que se inspeccionó es una sola.
 
 ## Arquitectura del flujo ANPR
 
+En la DS-TCG406-E ese envío **no se llama "HTTP Listening"** —ese nombre es el de las
+cámaras de vigilancia— sino **`Red → Conexión de datos → Socket de escucha ISAPI`**
+(verificado en la cámara `192.168.100.171`). Sus vecinas de pestaña no valen: `Escucha
+SDK` habla el protocolo propietario, `ISUP`/`OTAP` son para plataformas de terceros y
+`FTP` sube fotos sin el dato de la placa. Que la lectura llegue a subirse depende además
+de la pestaña **`Cargar Arm`**.
+
 ```
-Cámara ─(HTTP Listening, multipart XML+JPEG)─> POST /api/v1/anpr/ingesta/{token}
+Cámara ─(Socket escucha ISAPI, multipart XML+JPEG)─> POST /api/v1/anpr/ingesta/{token}
    └─ token identifica la cámara Y su alcabala
       └─ anpr_service: parsea, deduplica, guarda fotos, verifica placa
          └─ WebSocket ──> teléfono del guardia (Puerta) + TV (Monitor)

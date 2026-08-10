@@ -253,10 +253,10 @@ const GuiaConfiguracion = () => {
             <div className="text-xs leading-relaxed text-text-sec">
               <p className="font-bold text-text-main">Antes que nada: compruebe si la cámara hace HTTPS.</p>
               <p className="mt-1">
-                En el formulario de HTTP Listening, mire si el campo de protocolo le deja
-                elegir HTTPS. El servidor responde a HTTP con una redirección a HTTPS, y
-                las cámaras <strong>no siguen redirecciones</strong>: enviarían el evento
-                y se perdería sin más aviso.
+                En el formulario del <strong>Socket de escucha ISAPI</strong>, mire si el campo
+                de protocolo le deja elegir HTTPS. El servidor responde a HTTP con una
+                redirección a HTTPS, y las cámaras <strong>no siguen redirecciones</strong>:
+                enviarían el evento y se perdería sin más aviso.
               </p>
               <p className="mt-1">
                 Si la cámara solo hace HTTP, <strong>no la apunte a internet en texto
@@ -275,46 +275,60 @@ const GuiaConfiguracion = () => {
               encenderla sino <strong>decirle a dónde mandar lo que lee</strong>.
             </p>
             <p className="mt-1">
-              Los nombres de menú de abajo son los del firmware <Ruta>V5.3.2</Ruta>. Si
-              alguno no coincide, busque por lo que hace: lo que se persigue en cada paso
-              está dicho, y eso no cambia entre versiones.
+              Los nombres de menú de abajo están tomados de una cámara real de la base
+              (firmware <Ruta>V5.3.2</Ruta>, IP <Ruta>192.168.100.171</Ruta>). Aquí
+              <strong> no existe “HTTP Listening”</strong>: en esta serie eso se llama
+              <strong> Socket de escucha ISAPI</strong> y vive bajo Conexión de datos.
             </p>
           </div>
 
           <div className="space-y-3">
-            <Paso numero="1" titulo="Red — Configuración → Red → Configuración básica">
+            <Paso numero="1" titulo="Red — Configuración → Red → Parámetros de red → Interfaz de red">
               <p>
-                IP fija, puerta de enlace y <strong>DNS</strong>. El DNS es obligatorio: si
-                pone la IP del servidor en vez del nombre, el certificado no valida y la
-                conexión se cae.
+                Las cámaras vienen con <strong>DHCP marcado</strong>. Conviene quitarlo y
+                fijarles la IP: si el router les cambia la dirección, nadie vuelve a entrar
+                a su web sin salir a buscarlas con el SADP. Al envío no le afecta —la cámara
+                es la que sale— pero a mantenerlas sí.
+              </p>
+              <p>
+                Y ponga el <strong>DNS</strong>. Es obligatorio: el destino se escribe por
+                nombre, no por IP, o el certificado no valida.
               </p>
             </Paso>
 
             <Paso numero="2" titulo="Hora — Configuración → Sistema → Configuración de hora">
               <p>
-                Active <strong>NTP</strong>. Con el reloj desfasado el certificado se ve
-                como “aún no válido” y el envío falla en silencio. Además de ahí sale la
-                hora que se guarda con cada detección.
+                Active <strong>NTP</strong>. No es un paso de adorno: en la cámara que se
+                revisó, el certificado se emitió con fecha de <strong>1970</strong>, señal de
+                que el reloj arrancó a cero y nadie lo sincronizó. Con esa hora, un
+                certificado de internet se ve como “aún no válido” y el envío por HTTPS falla
+                sin decir por qué. Además de ahí sale la hora de cada detección.
               </p>
             </Paso>
 
-            <Paso numero="3" titulo="La lectura — Configuración → Captura / Parámetros de captura">
+            <Paso numero="3" titulo="La lectura — Configuración → Captura → Modo de aplicación">
               <p>
-                En estas cámaras el ANPR no está bajo Evento sino en su propia sección de
-                captura. Puede aparecer como <em>Configuración inteligente</em>.
+                En estas cámaras el ANPR no está bajo Evento: tiene su propia sección.
+                Normalmente ya viene bien de fábrica —conviene mirar, no tocar.
               </p>
               <ul className="ml-4 list-disc space-y-0.5">
-                <li>Región / país de la placa: <strong>Venezuela</strong> — sin esto la lectura empeora mucho</li>
-                <li>Modo de disparo: <strong>por vídeo</strong>, no por bucle inductivo (no hay bucle enterrado)</li>
-                <li>Dibuje el carril y la línea de disparo sobre la imagen</li>
-                <li>Marque los atributos de <strong>tipo y color</strong> de vehículo</li>
+                <li>Modo de trabajo: <strong>Sistema de reconocimiento de matrículas</strong></li>
+                <li>Tipo de disparador: <strong>Detección de vídeo</strong> (no bucle inductivo: no hay bucle enterrado)</li>
+                <li>Tipos de captura: <strong>Prioridad de matrículas</strong></li>
+                <li>Carriles totales: <strong>1</strong>, y dibuje el carril sobre la imagen</li>
               </ul>
             </Paso>
 
-            <Paso numero="4" titulo="El destino — Configuración → Red → Configuración avanzada → HTTP Listening">
+            <Paso numero="4" titulo="El destino — Configuración → Red → Conexión de datos → Socket de escucha ISAPI">
               <p>
-                Aquí van los datos que le entrega esta pantalla al crear la cámara o rotar
-                su token: host, puerto, protocolo y ruta, <strong>en campos separados</strong>.
+                <strong>Esta es la pestaña.</strong> Es el equivalente al “HTTP Listening” de
+                las cámaras de vigilancia: la cámara hace POST del
+                <Ruta>EventNotificationAlert</Ruta> en XML con las fotos adjuntas, que es
+                exactamente lo que este sistema espera.
+              </p>
+              <p>
+                Ahí van los datos que le entrega esta pantalla al crear la cámara o rotar su
+                token: host, puerto, protocolo y ruta, <strong>en campos separados</strong>.
               </p>
               <p>
                 Cada cámara lleva <strong>su propia ruta</strong>, porque el token identifica
@@ -322,29 +336,29 @@ const GuiaConfiguracion = () => {
                 guardia de esa alcabala.
               </p>
               <p>
-                Si el firmware ofrece además una página de <Ruta>Post PRS</Ruta> o
-                “publicar resultados”, <strong>no es esa</strong>: sirve para plataformas de
-                terceros con protocolos propios. Aquí se espera el HTTP Listening de
-                siempre, que manda el <Ruta>EventNotificationAlert</Ruta> en XML con las
-                fotos adjuntas.
+                Las vecinas de esa misma fila <strong>no sirven</strong>:
+                <Ruta>Escucha SDK</Ruta> usa el protocolo propietario de Hikvision,
+                <Ruta>ISUP</Ruta> y <Ruta>OTAP</Ruta> son para plataformas de terceros, y
+                <Ruta>FTP</Ruta> sube fotos sueltas sin el dato de la placa.
               </p>
             </Paso>
 
-            <Paso numero="5" titulo="Vinculación — que la lectura dispare el envío">
+            <Paso numero="5" titulo="Que la lectura dispare el envío — pestaña Cargar Arm">
               <p>
-                En la pestaña de <strong>Vinculación / Linkage</strong> de la captura, marque
-                <strong> “Notificar al centro de vigilancia”</strong> y, si aparece,
-                <strong> “Cargar a HTTP Listening”</strong>. Sin esto la cámara lee la placa
-                y no la manda a ningún sitio: es el olvido más común y desde fuera se ve
-                igual que una cámara apagada.
+                De nada sirve el destino si la cámara no tiene marcado que suba lo que lee.
+                En <strong>Cargar Arm</strong> (carga por armado), compruebe que el envío de
+                los resultados de matrícula esté activado y apuntando al canal ISAPI.
+              </p>
+              <p>
+                Es el olvido más común, y desde fuera se ve igual que una cámara apagada: lee
+                la placa perfectamente y no la manda a ningún sitio.
               </p>
             </Paso>
 
-            <Paso numero="6" titulo="Fotos — parámetros de captura de la misma pantalla">
+            <Paso numero="6" titulo="Fotos — Configuración → Captura → Parámetros de captura">
               <p>
-                Elija <strong>“imagen de escena + imagen de primer plano”</strong> para que
-                lleguen las dos fotos: el recorte de la placa y el vehículo completo. Si el
-                evento supera los 12 MB el servidor lo rechaza, así que no suba la
+                Que lleguen las dos imágenes: el recorte de la placa y la escena completa. Si
+                el evento supera los 12 MB el servidor lo rechaza, así que no suba la
                 resolución más de lo necesario.
               </p>
             </Paso>
@@ -373,7 +387,8 @@ const GuiaConfiguracion = () => {
             <p className="font-bold text-text-main">Si no llega nada</p>
             <ul className="ml-4 mt-1 list-disc space-y-0.5">
               <li>Mire primero el <strong>Diagnóstico</strong>: distingue “no llegó” de “llegó y se descartó”.</li>
-              <li>¿Quedó marcada la vinculación del paso 5?</li>
+              <li>¿Quedó activado el envío en <strong>Cargar Arm</strong> (paso 5)?</li>
+              <li>¿Configuró el <strong>Socket de escucha ISAPI</strong> y no la Escucha SDK?</li>
               <li>¿La cámara está <strong>activa</strong> y con token en esta pantalla?</li>
               <li>¿La ruta lleva el token completo? Un carácter de menos da 404.</li>
               <li>
