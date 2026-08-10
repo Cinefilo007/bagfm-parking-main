@@ -469,22 +469,36 @@ class AnprService:
         placa = normalizar_placa(datos.get("licensePlate") or datos.get("plateNumber"))
         if not placa:
             # Se anota con las etiquetas que sí traía el XML, porque son las que separan
-            # los dos casos que desde fuera parecen el mismo. Si la lista viene llena, la
-            # cámara está enviando bien y lo que falla es el nombre del campo de la placa
-            # —firmware distinto, o subiendo en un formato que no es el de HTTP
-            # Listening—. Si viene vacía, lo que llegó no era XML siquiera.
+            # los casos que desde fuera parecen el mismo. Si la lista viene llena, la
+            # cámara está enviando bien y lo que falla es el nombre del campo de la placa;
+            # si viene vacía, lo que llegó no era XML siquiera.
+            #
+            # Aparte va el evento que NO pretendía ser una lectura. El Socket de escucha
+            # ISAPI tiene un "intervalo entre latidos": con eso activado la cámara postea
+            # cada pocos segundos para avisar de que sigue viva, y también manda por aquí
+            # sus otros eventos armados. Ninguno trae placa, pero llamarlos error de
+            # formato sería mentir — y a razón de un latido cada pocos segundos llenarían
+            # la lista y taparían los fallos de verdad.
+            tipo_evento = datos.get("eventType") or ""
+            es_otro_evento = bool(xml) and tipo_evento.lower() not in ("", "anpr")
+
             anpr_diagnostico.registrar_rechazo(
-                anpr_diagnostico.SIN_PLACA,
+                anpr_diagnostico.OTRO_EVENTO if es_otro_evento else anpr_diagnostico.SIN_PLACA,
                 content_type=content_type,
                 tamano=len(cuerpo),
                 camara_nombre=camara.nombre,
                 detalle=(
+                    f"La cámara alcanza el servidor y mandó un evento de tipo "
+                    f"'{tipo_evento}', que no es una lectura de placa. Si son latidos, "
+                    f"ponga el intervalo en 0: no aportan nada aquí y tapan los fallos "
+                    f"reales."
+                    if es_otro_evento else
                     "Llegó un evento sin placa: se encontró XML pero ninguna etiqueta "
                     "licensePlate ni plateNumber."
                     if xml else
-                    "Llegó un POST que no traía XML. Revise el formato de subida "
-                    "configurado en la cámara: aquí se espera HTTP Listening con "
-                    "notificación XML, no un envío de solo imagen."
+                    "Llegó un POST que no traía XML. Revise el formato de subida en la "
+                    "cámara: aquí se espera el Socket de escucha ISAPI con notificación "
+                    "XML, no un envío de solo imagen."
                 ),
                 cuerpo=cuerpo if not imagenes else (xml or cuerpo),
                 etiquetas=sorted(datos.keys()),

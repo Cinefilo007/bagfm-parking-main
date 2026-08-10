@@ -45,6 +45,10 @@ IP_RECHAZADA = "ip_rechazada"
 CUERPO_ENORME = "cuerpo_enorme"
 SIN_ALCABALA = "sin_alcabala"
 SIN_PLACA = "sin_placa"
+# El evento llegó bien pero no era una lectura: un latido del Socket de escucha ISAPI, o
+# cualquier otro evento armado en la cámara. Se separa de SIN_PLACA porque no es un fallo
+# de configuración sino la prueba de que la cámara alcanza el servidor.
+OTRO_EVENTO = "otro_evento"
 
 # `deque` con `maxlen` descarta el más viejo al llegar al tope, que es exactamente lo que
 # se quiere, y su `append` es atómico: no hace falta un lock alrededor.

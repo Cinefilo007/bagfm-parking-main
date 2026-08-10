@@ -438,6 +438,13 @@ const MOTIVOS = {
     color: 'text-warning',
     que_hacer: 'La cámara alcanza el servidor. Lo que falla es el formato: revise el modo de subida.',
   },
+  otro_evento: {
+    // Buena noticia disfrazada de error: el camino entero funciona. Va en verde para que
+    // no se busque una avería donde no la hay.
+    titulo: 'Llegó un evento que no es una lectura',
+    color: 'text-success',
+    que_hacer: 'La cámara alcanza el servidor y el token es correcto. Si son latidos, ponga el intervalo en 0.',
+  },
 };
 
 /**
