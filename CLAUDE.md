@@ -74,11 +74,39 @@ modelo — la que se inspeccionó es una sola.
 ## Arquitectura del flujo ANPR
 
 En la DS-TCG406-E ese envío **no se llama "HTTP Listening"** —ese nombre es el de las
-cámaras de vigilancia— sino **`Red → Conexión de datos → Socket de escucha ISAPI`**
-(verificado en la cámara `192.168.100.171`). Sus vecinas de pestaña no valen: `Escucha
-SDK` habla el protocolo propietario, `ISUP`/`OTAP` son para plataformas de terceros y
-`FTP` sube fotos sin el dato de la placa. Que la lectura llegue a subirse depende además
-de la pestaña **`Cargar Arm`**.
+cámaras de vigilancia— sino **`Red → Conexión de datos → Socket de escucha ISAPI`**.
+Sus vecinas de pestaña no valen: `Escucha SDK` habla el protocolo propietario,
+`ISUP`/`OTAP` son para plataformas de terceros y `FTP` sube fotos sin el dato de la
+placa. Que la lectura llegue a subirse depende además de la pestaña **`Cargar Arm`**.
+
+**Esto no es teoría: el 11-08-2026 las cámaras quedaron transmitiendo a producción.**
+Los campos de esa pestaña, con los valores que funcionaron:
+
+| Campo | Valor |
+|---|---|
+| `N.º de escucha` | `1` |
+| `Habilitar la escucha ISAPI` | marcado |
+| `Versión` | `HTTPS` — la cámara sí lo soporta, no hace falta túnel para Fase 1 |
+| `ANPR IP/Dominio` | `api.bagfm.app` — por nombre, no por IP, o el certificado no valida |
+| `Puerto ANPR` | `443` — viene de fábrica en `80`, y con HTTPS eso falla siempre |
+| `Host URL` | `/api/v1/anpr/ingesta/<TOKEN>` — el token del panel, uno por cámara |
+| `Intervalo entre latidos` | `0` — ver abajo |
+| `Uploaded Picture Type` | `Todo`, para que lleguen placa y escena |
+| `Modo de autenticación` | `Ninguno`: el secreto va en la ruta, no en una cabecera |
+
+Dos trampas del equipo, ninguna del software:
+
+- **El reloj.** La cámara traía el certificado emitido en **1970**, señal de que nadie
+  sincronizó la hora. Con eso, un certificado de internet se ve como "aún no válido" y el
+  envío por HTTPS falla sin decir por qué. NTP es requisito, no recomendación.
+- **La zona horaria.** La entrada `(GMT-04:30) Caracas` del firmware está anclada al huso
+  que Venezuela abandonó en 2016. Hay que elegir una **GMT-04:00 sin horario de verano** y
+  comprobar la pestaña `DST`. No corrompe los datos —la bitácora usa `timestamp_recibido`,
+  la hora del servidor, y `timestamp_camara` existe justo para contrastar— pero conviene
+  arreglarlo.
+
+Los **latidos** van en 0 a propósito: son POST sin placa, así que el backend los descarta
+igual, y a uno cada pocos segundos llenarían el diagnóstico y taparían los fallos reales.
 
 ```
 Cámara ─(Socket escucha ISAPI, multipart XML+JPEG)─> POST /api/v1/anpr/ingesta/{token}
@@ -259,12 +287,19 @@ medir en el navegador con `mcp__Claude_Browser__` ha sido lo único fiable.
 
 ## Estado y pendientes
 
-**Funcionando:** ingesta ANPR, pantalla de Puerta, monitor de TV con emparejamiento por
-QR, semáforo, modo claro, admin de cámaras y pantallas, saneamiento de duplicados, tour
-guiado, identificación opcional del conductor (cámara con guías dentro del navegador,
-recorte al marco antes de subir), destinos en botonera o en lista con búsqueda a
-elección del guardia, KPI de conductores identificados por turno, par de cámaras
-delantera/trasera con fusión de las dos lecturas.
+**Funcionando:** ingesta ANPR —**con las cámaras reales transmitiendo desde el
+11-08-2026**, no solo con el simulador—, pantalla de Puerta, monitor de TV con
+emparejamiento por QR, semáforo, modo claro, admin de cámaras y pantallas, saneamiento de
+duplicados, tour guiado, identificación opcional del conductor (cámara con guías dentro
+del navegador, recorte al marco antes de subir), destinos en botonera o en lista con
+búsqueda a elección del guardia, KPI de conductores identificados por turno, par de
+cámaras delantera/trasera con fusión de las dos lecturas, diagnóstico de ingesta.
+
+**Lo primero que conviene mirar ahora que hay tráfico real**, porque son cosas que el
+simulador no puede contestar: que un carro genere **una sola** tarjeta y no dos (si salen
+duplicadas, `ANPR_DEDUPE_SEGUNDOS=30` se queda corto para lo que tardan las dos cámaras en
+dispararse), y con qué frecuencia llega el sentido en el carril compartido — de eso
+depende que el pendiente 0.b valga la pena o sobre.
 
 **Pendiente:**
 0. **Meta de identificaciones por guardia**: el KPI ya cuenta; falta que el Comandante
