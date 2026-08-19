@@ -43,12 +43,12 @@ const SEMAFORO_DE = {
 };
 
 const ETIQUETA_COINCIDENCIA = {
-  socio: 'Socio',
+  socio: 'Identificado',
   vehiculo_registrado: 'Registrado',
   pase: 'Pase vigente',
   reingreso: 'Reingreso',
   no_registrado: 'Sin registrar',
-  socio_vencido: 'Socio vencido',
+  socio_vencido: 'Vencido',
   pase_invalido: 'Pase inválido',
 };
 
@@ -333,49 +333,40 @@ const TarjetaCaptura = ({ evento, onAbrir }) => {
       </div>
 
       <div className="p-2">
-        <p className="font-mono text-sm font-black tracking-wider text-text-main">{evento.placa}</p>
-        <p className={cn('text-[9px] font-black uppercase tracking-wider', s.texto)}>
-          {ETIQUETA_COINCIDENCIA[evento.coincidencia] || 'Sin veredicto'}
-        </p>
+        {/* Placa + identidad en la misma línea para no empujar la foto hacia arriba. */}
+        <div className="flex items-baseline justify-between gap-1">
+          <p className="shrink-0 font-mono text-sm font-black tracking-wider text-text-main">{evento.placa}</p>
+          {persona ? (
+            <p className="flex items-center gap-1 truncate text-[10px] text-text-main" title={persona}>
+              {evento.conductor_nombre
+                ? <UserCheck className="h-2.5 w-2.5 shrink-0 text-success" />
+                : <User className="h-2.5 w-2.5 shrink-0 text-text-muted" />}
+              <span className="truncate">{persona}</span>
+            </p>
+          ) : (
+            <span className={cn('shrink-0 text-[9px] font-black uppercase tracking-wider', s.texto)}>
+              {ETIQUETA_COINCIDENCIA[evento.coincidencia] || 'Sin veredicto'}
+            </span>
+          )}
+        </div>
 
-        {/* Quién es. Se prefiere el conductor que el guardia identificó sobre el titular
-            de la placa: son cosas distintas y, cuando existe, el conductor es quien de
-            verdad iba en el carro ese día.
-            Solo se pinta como persona lo que ES una persona. En un vehículo de entidad
-            el titular es la propia organización, y sacarlo aquí además de en su línea
-            repetiría el mismo nombre dos veces con dos iconos distintos. */}
-        {persona && (
-          <p className="mt-1 flex items-center gap-1 truncate text-[10px] text-text-main"
-             title={persona}>
-            {evento.conductor_nombre
-              ? <UserCheck className="h-2.5 w-2.5 shrink-0 text-success" />
-              : <User className="h-2.5 w-2.5 shrink-0 text-text-muted" />}
-            <span className="truncate">{persona}</span>
-          </p>
-        )}
-
-        {/* La entidad va aparte del nombre: saber que el carro es del club de pádel
-            explica su presencia igual que saber de quién es. */}
         {evento.entidad_nombre && (
-          <p className="flex items-center gap-1 truncate text-[9px] text-text-sec"
-             title={evento.entidad_nombre}>
+          <p className="flex items-center gap-1 truncate text-[9px] text-text-sec" title={evento.entidad_nombre}>
             <Building2 className="h-2.5 w-2.5 shrink-0" />
             <span className="truncate">{evento.entidad_nombre}</span>
           </p>
         )}
 
-        <div className="mt-1.5 flex items-center justify-between text-[9px] text-text-muted">
+        <div className="mt-1 flex items-center justify-between text-[9px] text-text-muted">
           <span className="inline-flex items-center gap-1">
             <Clock className="h-2.5 w-2.5" />{soloHora(evento.timestamp_recibido)}
           </span>
           <Sentido direccion={evento.direccion} origen={evento.sentido_origen} />
         </div>
 
-        <p className="mt-1 truncate text-[9px] text-text-muted" title={evento.camara_nombre || ''}>
+        <p className="mt-0.5 truncate text-[9px] text-text-muted" title={evento.camara_nombre || ''}>
           <Camera className="mr-1 inline h-2.5 w-2.5" />
           {evento.camara_rol || 'sin rol'}
-          {/* Que una captura no tenga pareja es el síntoma de que una de las dos cámaras
-              del paso dejó de leer. En una moto es normal: lleva una sola placa. */}
           {!evento.confirmada_por_rol && <span className="ml-1 text-warning">· sin pareja</span>}
         </p>
       </div>
