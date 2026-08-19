@@ -73,9 +73,16 @@ export const anprService = {
     return data;
   },
 
-  async getHistorial({ page = 1, size = 20, placa, estado, puntoAccesoId } = {}) {
+  async getHistorial({
+    page = 1, size = 20, placa, estado, puntoAccesoId, camaraId, sinDuplicados,
+  } = {}) {
     const { data } = await api.get('/anpr/eventos', {
-      params: { page, size, placa, estado, punto_acceso_id: puntoAccesoId },
+      params: {
+        page, size, placa, estado,
+        punto_acceso_id: puntoAccesoId,
+        camara_id: camaraId,
+        sin_duplicados: sinDuplicados,
+      },
     });
     return data;
   },

@@ -38,6 +38,15 @@ class EventoAnprSalida(BaseModel):
     estado: AnprEstado
     acceso_id: Optional[UUID] = None
 
+    # Quién lo capturó, en nombres y no en identificadores. El monitor del Comandante
+    # existe sobre todo para ver si las dos cámaras de un paso rinden igual, y para eso
+    # "Alcabala Principal · trasera" dice algo y un UUID no. Van sueltos y no como una
+    # relación porque el evento guarda la cámara con ON DELETE SET NULL: una cámara
+    # retirada deja sus eventos en pie, y entonces esto queda en nulo sin romper nada.
+    camara_id: Optional[UUID] = None
+    camara_nombre: Optional[str] = None
+    punto_nombre: Optional[str] = None
+
     # URLs de las fotos. No se sirven como estáticos: son enlaces a un endpoint que
     # exige sesión, porque son fotos de civiles.
     foto_placa_url: Optional[str] = None

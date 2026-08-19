@@ -104,10 +104,24 @@ const MapaBaseReal = ({
   );
 
   // Perímetro EXACTO de la Base Aérea (Según captura del Comandante)
+  //
+  // El borde sur se bajó de 10.4750 a 10.4700 por una razón concreta: con la vista
+  // centrada en la pista, la mitad inferior del mapa a zoom 15 llega más al sur que el
+  // borde anterior, y como `maxBoundsViscosity` es 1.0 el mapa se reajustaba solo hacia
+  // el norte y deshacía el centrado. Ampliar el borde no muestra nada de más — es el
+  // límite hasta donde se puede arrastrar, no lo que se dibuja.
   const boundsBase = [
-      [10.4750, -66.8650], // Suroeste (Fin de pista oeste / Colinas)
+      [10.4700, -66.8650], // Suroeste (Fin de pista oeste / Colinas)
       [10.5050, -66.8150]  // Noreste (Fin de pista este / Autopista)
   ];
+
+  // La vista arranca sobre la PISTA, no en el centro geométrico del perímetro.
+  //
+  // Antes esto era [10.490, -66.840], que es exactamente el punto medio de `boundsBase`.
+  // Como el perímetro se extiende bastante más al norte que al sur, ese punto medio caía
+  // muy por encima de la base: el mapa abría enseñando Altamira —que no es de la base y
+  // no le interesa a nadie aquí— y dejaba la pista contra el borde inferior.
+  const CENTRO_PISTA = [10.4833, -66.8433];
 
   const hasCoords = (item) => {
       return item && typeof item.latitud === 'number' && typeof item.longitud === 'number';
@@ -144,8 +158,8 @@ const MapaBaseReal = ({
           `}
         </style>
         <MapContainer 
-            center={[10.490, -66.840]} 
-            zoom={15} 
+            center={CENTRO_PISTA}
+            zoom={15}
             maxZoom={20}
             maxBounds={boundsBase}
             maxBoundsViscosity={1.0}

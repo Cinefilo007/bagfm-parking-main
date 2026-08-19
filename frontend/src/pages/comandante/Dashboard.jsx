@@ -6,7 +6,7 @@ import { Target, CarFront, ShieldAlert, AlertTriangle, ArrowUpRight, Droplet, Fu
 import MapaTactico from '../../components/MapaTactico';
 import EventMonitor from '../../components/dashboard/EventMonitor';
 import FuelMonitor from '../../components/dashboard/FuelMonitor';
-import TrafficChart from '../../components/dashboard/TrafficChart';
+import MonitorCapturasAnpr from '../../components/dashboard/MonitorCapturasAnpr';
 import { mapaService } from '../../services/mapaService';
 import { combustibleService } from '../../services/combustible.service';
 
@@ -151,8 +151,11 @@ export default function DashboardComando() {
              <div className="h-[480px]">
                 <MapaTactico pollingEnabled={false} situacionPreload={situacion} />
              </div>
-             <div className="h-[240px] flex-shrink-0">
-                <TrafficChart />
+             {/* Más alto que la gráfica que había aquí: estas tarjetas llevan la foto
+                 del vehículo y el recorte de la placa, y con 240px la placa quedaba
+                 ilegible, que es justo el dato por el que se mira esta tira. */}
+             <div className="h-[330px] flex-shrink-0">
+                <MonitorCapturasAnpr />
              </div>
           </div>
 

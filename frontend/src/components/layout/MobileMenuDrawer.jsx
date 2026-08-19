@@ -1,9 +1,9 @@
 import React, { useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
-  X, CalendarRange, AlertTriangle, UserCog, Palette, 
+  X, CalendarRange, AlertTriangle, UserCog, Palette,
   ShieldAlert, Bell, Settings, LogOut, ShieldCheck,
-  User, ChevronRight, Flame, Sunrise, Car as CarIcon, Fuel, BedDouble
+  User, ChevronRight, Flame, Sunrise, Car as CarIcon, Fuel, BedDouble, Camera
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/auth.store';
@@ -32,6 +32,11 @@ export const MobileMenuDrawer = ({ isOpen, onClose }) => {
   const extendedNavItems = [];
   if (user?.rol === 'COMANDANTE' || user?.rol === 'ADMIN_BASE') {
     extendedNavItems.push(
+      // Va aquí y no en la barra de abajo porque esos cinco huecos ya están llenos, y
+      // porque a las cámaras se entra a configurarlas o a mirar el diagnóstico, no cada
+      // pocos minutos. Solo COMANDANTE y ADMIN_BASE: la ruta lleva su propia guarda y
+      // un SUPERVISOR que entrara ahí solo se encontraría un 403.
+      { to: '/comando/camaras', label: 'Cámaras ANPR', icon: Camera, color: 'text-sky-400' },
       { to: '/comando/eventos', label: 'Eventos Masivos', icon: CalendarRange, color: 'text-orange-400' },
       { to: '/comando/infracciones', label: 'Infracciones', icon: AlertTriangle, color: 'text-danger' },
       { to: '/comando/personal', label: 'Gestión Personal', icon: UserCog, color: 'text-primary' },

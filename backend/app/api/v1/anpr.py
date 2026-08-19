@@ -448,13 +448,27 @@ async def listar_puntos_acceso(
 # Operación del guardia
 # ──────────────────────────────────────────────────────────────────────────────
 
-def _a_salida(evento: EventoAnpr) -> EventoAnprSalida:
+def _a_salida(
+    evento: EventoAnpr,
+    camara_nombre: Optional[str] = None,
+    punto_nombre: Optional[str] = None,
+) -> EventoAnprSalida:
+    """
+    El evento tal como lo ve el frontend.
+
+    Los nombres llegan por parámetro en vez de leerse de una relación porque quien más
+    los necesita —el monitor de capturas— trae muchos eventos de golpe, y resolverlos uno
+    a uno sería una consulta por fila. Quien no los tenga a mano los omite: son opcionales
+    y las pantallas que no los usan no cambian.
+    """
     salida = EventoAnprSalida.model_validate(evento)
     base = f"{config.backend_url_base}/api/v1/anpr/evento/{evento.id}/foto"
     if evento.foto_placa_path:
         salida.foto_placa_url = f"{base}/placa"
     if evento.foto_escena_path:
         salida.foto_escena_url = f"{base}/escena"
+    salida.camara_nombre = camara_nombre
+    salida.punto_nombre = punto_nombre
     return salida
 
 
@@ -1369,12 +1383,23 @@ async def historial_eventos(
     placa: Optional[str] = None,
     estado: Optional[AnprEstado] = None,
     punto_acceso_id: Optional[UUID] = None,
+    camara_id: Optional[UUID] = None,
+    sin_duplicados: bool = False,
     db: AsyncSession = Depends(obtener_db),
     usuario: Usuario = Depends(require_rol([
         RolTipo.COMANDANTE, RolTipo.ADMIN_BASE, RolTipo.SUPERVISOR,
     ])),
 ):
-    """Histórico de detecciones. Es la materia prima del análisis de patrones."""
+    """
+    Histórico de detecciones. Es la materia prima del análisis de patrones.
+
+    `camara_id` sirve para comparar el rendimiento de las dos cámaras de un mismo paso,
+    que es como se descubre que una de las dos casi no dispara.
+
+    `sin_duplicados` es lo que quiere el monitor de capturas: la segunda lectura de un
+    vehículo no guarda fotos —son del mismo carro de hace segundos— así que en una
+    pantalla hecha de fotos saldría como una tarjeta vacía.
+    """
     page = max(1, page)
     size = min(max(1, size), 100)
 
@@ -1385,21 +1410,30 @@ async def historial_eventos(
         filtros.append(EventoAnpr.estado == estado)
     if punto_acceso_id:
         filtros.append(EventoAnpr.punto_acceso_id == punto_acceso_id)
+    if camara_id:
+        filtros.append(EventoAnpr.camara_id == camara_id)
+    if sin_duplicados:
+        filtros.append(EventoAnpr.estado != AnprEstado.duplicado)
 
     total = (await db.execute(
         select(func.count()).select_from(EventoAnpr).where(*filtros)
     )).scalar_one()
 
-    eventos = (await db.execute(
-        select(EventoAnpr)
+    # Los nombres se traen en la misma consulta. Con LEFT JOIN a propósito: la cámara se
+    # borra con ON DELETE SET NULL, así que un evento de una cámara ya retirada tiene que
+    # seguir apareciendo —es historial— aunque no se le pueda poner nombre.
+    filas = (await db.execute(
+        select(EventoAnpr, CamaraAnpr.nombre, PuntoAcceso.nombre)
+        .outerjoin(CamaraAnpr, CamaraAnpr.id == EventoAnpr.camara_id)
+        .outerjoin(PuntoAcceso, PuntoAcceso.id == EventoAnpr.punto_acceso_id)
         .where(*filtros)
         .order_by(EventoAnpr.timestamp_recibido.desc())
         .offset((page - 1) * size)
         .limit(size)
-    )).scalars().all()
+    )).all()
 
     return PaginatedEventosAnpr(
-        items=[_a_salida(e) for e in eventos],
+        items=[_a_salida(e, cam, punto) for e, cam, punto in filas],
         total=total,
         page=page,
         size=size,
