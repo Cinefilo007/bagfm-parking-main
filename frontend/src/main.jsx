@@ -21,8 +21,15 @@ useAuthStore.getState().checkSession()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <Toaster 
+    <Toaster
       position="top-center"
+      // Por encima de los modales, que van en z-index 9999.
+      //
+      // Con el mismo valor gana el que aparezca después en el DOM, y el Toaster está
+      // declarado antes que el router: el aviso quedaba TAPADO justo cuando más falta
+      // hace —dentro de un formulario, explicando por qué no se puede guardar— y el
+      // usuario solo veía que el botón no hacía nada.
+      containerStyle={{ zIndex: 12000 }}
       toastOptions={{
         duration: 5000,
         style: {

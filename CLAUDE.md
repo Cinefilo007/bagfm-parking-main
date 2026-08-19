@@ -206,6 +206,15 @@ lista blanca) necesita WireGuard en el VPS + un router saliente en cada alcabala
   discrepancia: quien declaró no tener vehículo y aparece con placas a su nombre es justo
   el patrón que el módulo existe para hacer visible. Fundirlas en un solo indicador lo
   perdería.
+- **…pero el alta NO puede guardar un "no tiene" cuando ya consta una placa suya.** Pasó
+  en la primera prueba real: el formulario no traía el vehículo de quien ya estaba
+  registrado, le impedía elegir su propia placa por "ya tiene dueño" —el dueño era él
+  mismo— y al guardar la ficha salía con la placa Y con el reproche de haberla negado.
+  Eso no era la señal buscada, era una contradicción **fabricada por el formulario**. Hoy
+  `crear_integrante` hace `declarado or tiene_placas_reales`, la sugerencia de persona
+  trae sus vehículos y `buscar_vehiculos` recibe el `usuario_id` para marcar `es_suyo`.
+  La señal legítima sigue intacta: quien no tiene placas y declara que no, queda en
+  `false`, y si mañana la cámara le descubre una, la discrepancia salta.
 - **Los dos QR del módulo son PERSISTENTES; consultarlos no los cambia.** Nacieron
   siguiendo el patrón de cámaras y pantallas —el secreto se enseña una vez y solo queda
   el hash— y resultó impracticable: el QR está impreso y pegado en una puerta, así que
@@ -334,6 +343,14 @@ medir en el navegador con `mcp__Claude_Browser__` ha sido lo único fiable.
 - En modo claro, `bg-low` es el fondo de los campos de formulario. Un panel que también
   use `bg-low` deja los campos invisibles: los contenedores de formulario van sobre
   `bg-card`.
+- **El `Toaster` va en `z-index` 12000, por encima de los modales (9999).** Con el mismo
+  valor gana el que esté después en el DOM, y el Toaster se declara antes que el router:
+  el aviso quedaba tapado justo cuando más falta hace —dentro de un formulario,
+  explicando por qué no se puede guardar— y el usuario solo veía que el botón no hacía
+  nada.
+- **El valor crudo de `rol_tipo` no se enseña; se traduce.** `SOCIO` es el vocabulario de
+  cuando el sistema servía solo a los clubes y en un censo militar suena a otra cosa. La
+  columna no se toca —ENUM nativo de Postgres— y la traducción vive en `NOMBRE_DEL_ROL`.
 
 ## Estado y pendientes
 

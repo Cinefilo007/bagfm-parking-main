@@ -9,7 +9,7 @@ abre el QR pegado en la puerta. Va fuera de la dependencia de rol porque quien t
 puerta no tiene cuenta en el sistema, y se autentica con el token de la habitación
 igual que el monitor de garita con el suyo.
 """
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -467,6 +467,7 @@ async def buscar_jefes(
 @router.get("/vehiculos/buscar", response_model=List[VehiculoSugerido])
 async def buscar_vehiculos(
     placa: str = "",
+    usuario_id: Optional[UUID] = None,
     db: AsyncSession = Depends(obtener_db),
     usuario: Usuario = DEPENDENCY_ADMIN,
 ):
@@ -476,8 +477,11 @@ async def buscar_vehiculos(
     Los que ya tienen dueño vienen igualmente, marcados: ocultarlos haría pensar que la
     placa está libre y llevaría a registrarla de nuevo, que es como aparecieron las
     fichas duplicadas que hubo que sanear.
+
+    `usuario_id` es la persona que se está dando de alta, cuando ya existe. Sirve para
+    no tratar su propio vehículo como una placa ajena.
     """
-    return await dormitorio_service.buscar_vehiculos(db, placa)
+    return await dormitorio_service.buscar_vehiculos(db, placa, usuario_id=usuario_id)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

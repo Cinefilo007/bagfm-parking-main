@@ -222,6 +222,12 @@ class PersonaSugerida(BaseModel):
     ya_es_integrante: bool = False
     habitacion_id: Optional[UUID] = None
 
+    # Lo que ya consta a su nombre. El formulario lo usa para no preguntar por algo que
+    # el sistema ya sabe: sin esto, elegir a alguien con placa registrada dejaba la
+    # casilla de vehículo sin marcar y la ficha acababa mostrando la placa junto al
+    # aviso de que la había negado.
+    vehiculos: List[VehiculoResumen] = []
+
 
 class JefeSugerido(BaseModel):
     usuario_id: UUID
@@ -245,6 +251,9 @@ class VehiculoSugerido(BaseModel):
     # Solo se puede vincular un vehículo sin dueño. Los que ya lo tienen se muestran
     # igualmente, para que quede claro por qué esa placa no se puede tomar.
     libre: bool = True
+    # …salvo que el dueño sea la misma persona que se está registrando: entonces no es
+    # una placa ajena, es la suya, y elegirla es lo correcto.
+    es_suyo: bool = False
     dueno: Optional[str] = None
 
 

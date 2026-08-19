@@ -54,6 +54,29 @@ const IconoPersonaHallada = UserCheck;
 
 const POR_PAGINA = 8;
 
+/**
+ * Cómo se nombra cada rol delante de quien administra la base.
+ *
+ * El valor crudo de `rol_tipo` no vale para enseñarlo: "SOCIO" es el vocabulario de
+ * cuando el sistema servía solo a los clubes, y decirle "socio" a un sargento en un
+ * censo militar suena a otra cosa. La columna no se toca —es un ENUM nativo de
+ * Postgres y alterarlo ya costó caro—, se traduce al mostrarla.
+ */
+const NOMBRE_DEL_ROL = {
+  COMANDANTE: 'comandante',
+  ADMIN_BASE: 'administración de la base',
+  SUPERVISOR: 'supervisor de base',
+  ALCABALA: 'guardia de alcabala',
+  ADMIN_ENTIDAD: 'administración de entidad',
+  SUPERVISOR_PARQUEROS: 'supervisor de parqueros',
+  PARQUERO: 'parquero',
+  SOCIO: 'personal registrado',
+  BOMBERO: 'bombero',
+  SUPERVISOR_BOMBEROS: 'supervisor de bomberos',
+};
+
+const nombrarRol = (rol) => NOMBRE_DEL_ROL[rol] || (rol || '').replace(/_/g, ' ').toLowerCase();
+
 const FORM_HABITACION = { numero: '', piso: '', camas: 1, notas: '' };
 const FORM_INTEGRANTE = {
   cedula: '', nombre: '', apellido: '', telefono: '', email: '',
@@ -403,9 +426,19 @@ const DormitorioDetalle = () => {
     setModalIntegrante(habitacion);
   };
 
-  /** Rellena el formulario con lo que ya sabemos de esa persona. */
+  /**
+   * Rellena el formulario con lo que ya sabemos de esa persona.
+   *
+   * Incluido su vehículo: si ya tiene una placa a su nombre, la casilla se marca sola y
+   * la placa viene puesta. Preguntar por algo que el sistema ya sabe era justo lo que
+   * llevaba a guardar "no tiene vehículo" junto a una placa suya.
+   */
   const elegirPersona = (persona) => {
     setPersonaExistente(persona);
+
+    const suyos = persona.vehiculos || [];
+    const primero = suyos[0];
+
     setFormIntegrante((previo) => ({
       ...previo,
       cedula: persona.cedula,
@@ -417,7 +450,18 @@ const DormitorioDetalle = () => {
       unidad: persona.unidad || previo.unidad,
       jefe_nombre: persona.jefe_nombre || previo.jefe_nombre,
       jefe_telefono: persona.jefe_telefono || previo.jefe_telefono,
+      tiene_vehiculo: suyos.length > 0 ? true : previo.tiene_vehiculo,
     }));
+
+    if (primero) {
+      setFormVehiculo({
+        vehiculo_id: primero.id,
+        placa: primero.placa,
+        marca: primero.marca || '',
+        modelo: primero.modelo || '',
+        color: primero.color || '',
+      });
+    }
   };
 
   const guardarIntegrante = async (evento) => {
@@ -859,9 +903,17 @@ const DormitorioDetalle = () => {
               <IconoPersonaHallada size={15} className="text-primary shrink-0 mt-0.5" />
               <p className="text-[10px] text-text-sec leading-relaxed">
                 <strong className="text-text-main">Ya está en el sistema</strong>
-                {personaExistente.rol && ` como ${personaExistente.rol.replace('_', ' ').toLowerCase()}`}.
-                No se creará otra ficha: se completa la suya, y los vehículos que ya tenga a
-                su nombre aparecerán solos.
+                {personaExistente.rol && ` como ${nombrarRol(personaExistente.rol)}`}.
+                No se creará otra ficha: se completa la suya.
+                {personaExistente.vehiculos?.length > 0 && (
+                  <>
+                    {' '}Tiene{' '}
+                    <strong className="text-text-main font-mono">
+                      {personaExistente.vehiculos.map((v) => v.placa).join(', ')}
+                    </strong>
+                    {' '}a su nombre, así que el vehículo ya viene marcado abajo.
+                  </>
+                )}
                 {personaExistente.ya_es_integrante && ' Ojo: ya está alojado en otra habitación, así que esto es un traslado.'}
               </p>
             </div>
@@ -884,7 +936,9 @@ const DormitorioDetalle = () => {
                 valor={formVehiculo.placa}
                 onChange={(v) => setFormVehiculo({ ...FORM_VEHICULO, placa: v.toUpperCase() })}
                 onElegir={(v) => {
-                  if (!v.libre) {
+                  // Solo se rechaza la placa de OTRA persona. La suya propia es
+                  // precisamente la que hay que poder elegir.
+                  if (!v.libre && !v.es_suyo) {
                     toast.error(`${v.placa} ya está a nombre de ${v.dueno}. El cambio de titular se hace desde Parque Automotor.`);
                     return;
                   }
@@ -896,7 +950,7 @@ const DormitorioDetalle = () => {
                     color: v.color || '',
                   });
                 }}
-                buscar={dormitoriosService.buscarVehiculos}
+                buscar={(t) => dormitoriosService.buscarVehiculos(t, personaExistente?.usuario_id)}
                 claveDe={(v) => v.id}
                 placeholder="AB123CD"
                 elegido={Boolean(formVehiculo.vehiculo_id)}
@@ -909,7 +963,9 @@ const DormitorioDetalle = () => {
                         {[v.marca, v.modelo, v.color].filter(Boolean).join(' · ') || 'Sin datos'}
                       </span>
                     </div>
-                    {v.libre ? (
+                    {v.es_suyo ? (
+                      <span className="text-[9px] font-black uppercase tracking-widest text-primary shrink-0">Ya es suyo</span>
+                    ) : v.libre ? (
                       <span className="text-[9px] font-black uppercase tracking-widest text-primary shrink-0">Libre</span>
                     ) : (
                       <span className="text-[9px] font-black uppercase tracking-widest text-warning shrink-0 text-right">

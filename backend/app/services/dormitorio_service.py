@@ -242,8 +242,25 @@ class DormitorioService:
         perfil.unidad = datos.unidad
         perfil.jefe_nombre = datos.jefe_nombre
         perfil.jefe_telefono = datos.jefe_telefono
-        perfil.tiene_vehiculo = datos.tiene_vehiculo
         perfil.activo = True
+
+        # La declaración solo puede ser "no tiene vehículo" si de verdad no consta
+        # ninguno a su nombre.
+        #
+        # `tiene_vehiculo` está para hacer visible una discrepancia REAL: alguien que
+        # niega tener vehículo y sin embargo aparece con placas. Guardar un "no" cuando
+        # el propio sistema ya tiene la placa registrada no descubre nada — fabrica la
+        # contradicción, y la pantalla acaba enseñando la placa junto al reproche de
+        # haberla negado. La discrepancia tiene que venir de los datos, no de este
+        # formulario.
+        res_veh_suyos = await db.execute(
+            select(func.count(Vehiculo.id)).where(
+                Vehiculo.socio_id == usuario.id,
+                Vehiculo.activo == True,  # noqa: E712
+            )
+        )
+        tiene_placas_reales = (res_veh_suyos.scalar() or 0) > 0
+        perfil.tiene_vehiculo = datos.tiene_vehiculo or tiene_placas_reales
 
         if datos.habitacion_id:
             habitacion = await self.obtener_habitacion(db, datos.habitacion_id)
@@ -540,9 +557,24 @@ class DormitorioService:
         )
         perfiles = {p.usuario_id: p for p in res_perfiles.scalars().all()}
 
+        # Los vehículos que ya constan a su nombre viajan con la sugerencia. Sin esto,
+        # elegir a alguien que ya tiene placa registrada dejaba el formulario diciendo
+        # que no tiene vehículo, y al guardar la ficha salía con la placa Y con el aviso
+        # de que lo había negado — una contradicción fabricada por el propio formulario.
+        res_veh = await db.execute(
+            select(Vehiculo).where(
+                Vehiculo.socio_id.in_(ids),
+                Vehiculo.activo == True,  # noqa: E712
+            )
+        )
+        vehiculos_por_persona: dict = {}
+        for v in res_veh.scalars().all():
+            vehiculos_por_persona.setdefault(v.socio_id, []).append(v)
+
         salida = []
         for p in personas:
             perfil = perfiles.get(p.id)
+            sus_vehiculos = vehiculos_por_persona.get(p.id, [])
             salida.append({
                 "usuario_id": p.id,
                 "cedula": p.cedula,
@@ -559,6 +591,18 @@ class DormitorioService:
                 # Si ya duerme en otra habitación, el alta sería un traslado.
                 "ya_es_integrante": perfil is not None and perfil.activo,
                 "habitacion_id": perfil.habitacion_id if perfil else None,
+                # Lo que ya tiene a su nombre, para que el formulario no le pregunte
+                # por algo que el sistema ya sabe.
+                "vehiculos": [
+                    {
+                        "id": v.id,
+                        "placa": v.placa,
+                        "marca": v.marca,
+                        "modelo": v.modelo,
+                        "color": v.color,
+                    }
+                    for v in sus_vehiculos
+                ],
             })
         return salida
 
@@ -608,13 +652,20 @@ class DormitorioService:
             for p in personas
         ]
 
-    async def buscar_vehiculos(self, db: AsyncSession, placa: str) -> List[dict]:
+    async def buscar_vehiculos(
+        self, db: AsyncSession, placa: str, usuario_id: Optional[UUID] = None
+    ) -> List[dict]:
         """
         Vehículos cuya placa se parece a lo tecleado, con su dueño si lo tienen.
 
         Devuelve también los que YA tienen dueño, marcados como no asignables. Ocultarlos
         haría creer que la placa está libre y llevaría a registrarla otra vez, que es
         exactamente cómo aparecieron las fichas duplicadas que hubo que sanear.
+
+        `usuario_id` distingue el caso que importa: un vehículo que ya está a nombre de
+        LA MISMA persona que se está registrando no es una placa ajena, es la suya, y
+        tiene que poder elegirla. Sin esta distinción el sistema le impedía declarar su
+        propio vehículo y después le reprochaba no haberlo declarado.
         """
         placa = normalizar_placa(placa or "")
         if len(placa) < 2:
@@ -635,6 +686,7 @@ class DormitorioService:
 
         salida = []
         for v in res.scalars().all():
+            es_suyo = usuario_id is not None and v.socio_id == usuario_id
             salida.append({
                 "id": v.id,
                 "placa": v.placa,
@@ -642,7 +694,10 @@ class DormitorioService:
                 "modelo": v.modelo,
                 "color": v.color,
                 "libre": v.socio_id is None,
-                "dueno": v.socio.nombre_completo if v.socio else None,
+                "es_suyo": es_suyo,
+                # El nombre del dueño solo interesa cuando es OTRA persona: es lo que
+                # explica por qué esa placa no se puede tomar desde aquí.
+                "dueno": v.socio.nombre_completo if (v.socio and not es_suyo) else None,
             })
         return salida
 

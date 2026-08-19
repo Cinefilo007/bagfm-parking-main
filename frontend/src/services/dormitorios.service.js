@@ -122,8 +122,12 @@ export const dormitoriosService = {
     return res.data;
   },
 
-  buscarVehiculos: async (placa) => {
-    const res = await api.get('/dormitorios/vehiculos/buscar', { params: { placa } });
+  // `usuarioId` es la persona que se está dando de alta, cuando ya existe: sirve para
+  // que su propio vehículo no salga marcado como placa ajena.
+  buscarVehiculos: async (placa, usuarioId = null) => {
+    const res = await api.get('/dormitorios/vehiculos/buscar', {
+      params: usuarioId ? { placa, usuario_id: usuarioId } : { placa },
+    });
     return res.data;
   },
 
