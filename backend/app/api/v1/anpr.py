@@ -11,7 +11,7 @@ Dos públicos muy distintos comparten este router:
 """
 import ipaddress
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from typing import Dict, List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -55,7 +55,7 @@ from app.schemas.anpr import (
 from app.services.acceso_service import acceso_service
 from app.services import anpr_diagnostico
 from app.services.anpr_service import anpr_service
-from app.services.placa_lookup import normalizar_placa, verificar_placa
+from app.services.placa_lookup import normalizar_placa, titulares_por_placa, verificar_placa
 from app.services.storage_local import leer_imagen
 
 router = APIRouter()
@@ -452,6 +452,8 @@ def _a_salida(
     evento: EventoAnpr,
     camara_nombre: Optional[str] = None,
     punto_nombre: Optional[str] = None,
+    titular: Optional[Dict[str, Optional[str]]] = None,
+    conductor_nombre: Optional[str] = None,
 ) -> EventoAnprSalida:
     """
     El evento tal como lo ve el frontend.
@@ -469,6 +471,11 @@ def _a_salida(
         salida.foto_escena_url = f"{base}/escena"
     salida.camara_nombre = camara_nombre
     salida.punto_nombre = punto_nombre
+    if titular:
+        salida.titular_nombre = titular.get("nombre")
+        salida.titular_tipo = titular.get("tipo")
+        salida.entidad_nombre = titular.get("entidad")
+    salida.conductor_nombre = conductor_nombre
     return salida
 
 
@@ -1432,8 +1439,32 @@ async def historial_eventos(
         .limit(size)
     )).all()
 
+    eventos = [e for e, _, _ in filas]
+
+    # Los titulares se resuelven en bloque para toda la página. Llamar a verificar_placa
+    # por fila costaría varias consultas por detección; esto son dos para la lista entera.
+    titulares = await titulares_por_placa(db, [e.placa for e in eventos])
+
+    # Y los conductores que el guardia llegó a identificar, en una sola consulta más.
+    ids_conductor = {e.conductor_usuario_id for e in eventos if e.conductor_usuario_id}
+    conductores: dict = {}
+    if ids_conductor:
+        conductores = {
+            u.id: u.nombre_completo
+            for u in (await db.execute(
+                select(Usuario).where(Usuario.id.in_(ids_conductor))
+            )).scalars().all()
+        }
+
     return PaginatedEventosAnpr(
-        items=[_a_salida(e, cam, punto) for e, cam, punto in filas],
+        items=[
+            _a_salida(
+                e, cam, punto,
+                titular=titulares.get(normalizar_placa(e.placa)),
+                conductor_nombre=conductores.get(e.conductor_usuario_id),
+            )
+            for e, cam, punto in filas
+        ],
         total=total,
         page=page,
         size=size,

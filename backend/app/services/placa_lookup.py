@@ -13,7 +13,7 @@ usara sin duplicarla, y unas reglas de membresía duplicadas se desincronizan si
 nadie lo note hasta que un socio vigente aparece rechazado en una pantalla y aceptado
 en otra.
 """
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterable, Optional
 from uuid import UUID
 from datetime import datetime, timezone
 
@@ -383,3 +383,96 @@ async def verificar_placa(
         "mensaje": f"❌ {placa} NO REGISTRADO. Pedir Pase QR.",
         "alerta": "error",
     }
+
+
+async def titulares_por_placa(
+    db: AsyncSession, placas: Iterable[str]
+) -> Dict[str, Dict[str, Optional[str]]]:
+    """
+    A nombre de quién está cada placa, resuelto para muchas a la vez.
+
+    Vive aquí y no en el endpoint que la usa porque quién es el dueño de una placa es
+    justo lo que este módulo define. `verificar_placa` contesta esa pregunta entre otras
+    muchas, pero cuesta varias consultas por placa: una lista de detecciones la llamaría
+    una vez por fila. Esto responde solo a la parte de titularidad, y en dos consultas
+    para toda la lista.
+
+    Se resuelve al consultar y no se guarda en el evento a propósito, igual que hace
+    `/anpr/pendientes`: dar de alta a alguien tiene que arreglar también las detecciones
+    que ya pasaron, no solo las siguientes.
+
+    Devuelve `{placa: {"nombre": ..., "tipo": "socio" | "entidad", "entidad": ...}}`.
+
+    El `tipo` importa y no es adorno: en un socio el nombre es el de una PERSONA, y en
+    una entidad el de una organización —el parque interno de la base cuelga de ahí—.
+    Pintar el nombre de una entidad como si fuera el conductor sería inventarse un dato.
+
+    `entidad` va SIEMPRE que el vehículo cuelgue de una, incluso cuando además tiene
+    socio. Son dos datos distintos y los dos hacen falta: saber que un carro es del club
+    de pádel explica su presencia igual que saber de quién es, y quedarse solo con el
+    socio perdía a qué organización responde.
+    """
+    normalizadas = {normalizar_placa(p) for p in placas if p}
+    if not normalizadas:
+        return {}
+
+    # Igual que en `verificar_placa`: primero la comparación exacta, que usa el índice, y
+    # solo se paga la normalizada para las que no aparecieron. Las placas con guion que
+    # la migración no pudo tocar —las que colisionaban— caen en esa segunda pasada.
+    encontrados: Dict[str, Vehiculo] = {}
+    filas = (await db.execute(
+        select(Vehiculo).where(Vehiculo.placa.in_(normalizadas), Vehiculo.activo == True)
+    )).scalars().all()
+    for v in filas:
+        encontrados[normalizar_placa(v.placa)] = v
+
+    faltan = normalizadas - set(encontrados)
+    if faltan:
+        filas = (await db.execute(
+            select(Vehiculo).where(
+                _placa_sin_separadores(Vehiculo.placa).in_(faltan),
+                Vehiculo.activo == True,
+            )
+        )).scalars().all()
+        for v in filas:
+            encontrados.setdefault(normalizar_placa(v.placa), v)
+
+    ids_socio = {v.socio_id for v in encontrados.values() if v.socio_id}
+    # Todas las entidades, también las de vehículos que ya tienen socio: son dos datos
+    # distintos y la pantalla enseña los dos.
+    ids_entidad = {v.entidad_id for v in encontrados.values() if v.entidad_id}
+
+    socios: Dict[Any, Usuario] = {}
+    if ids_socio:
+        socios = {u.id: u for u in (await db.execute(
+            select(Usuario).where(Usuario.id.in_(ids_socio), Usuario.activo == True)
+        )).scalars().all()}
+
+    entidades: Dict[Any, EntidadCivil] = {}
+    if ids_entidad:
+        entidades = {e.id: e for e in (await db.execute(
+            select(EntidadCivil).where(EntidadCivil.id.in_(ids_entidad))
+        )).scalars().all()}
+
+    salida: Dict[str, Dict[str, Optional[str]]] = {}
+    for placa, v in encontrados.items():
+        socio = socios.get(v.socio_id) if v.socio_id else None
+        entidad = entidades.get(v.entidad_id) if v.entidad_id else None
+        nombre_entidad = entidad.nombre if entidad else None
+
+        # Como titular manda el socio: si la placa tiene persona a su nombre, esa es la
+        # respuesta. La entidad viaja aparte, no en su lugar.
+        if socio:
+            salida[placa] = {
+                "nombre": socio.nombre_completo,
+                "tipo": "socio",
+                "entidad": nombre_entidad,
+            }
+        elif entidad:
+            salida[placa] = {
+                "nombre": nombre_entidad,
+                "tipo": "entidad",
+                "entidad": nombre_entidad,
+            }
+
+    return salida

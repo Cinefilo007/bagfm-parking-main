@@ -47,6 +47,24 @@ class EventoAnprSalida(BaseModel):
     camara_nombre: Optional[str] = None
     punto_nombre: Optional[str] = None
 
+    # A nombre de quién está la placa, resuelto al consultar y no guardado en el evento:
+    # dar de alta a alguien tiene que arreglar también lo que ya pasó.
+    #
+    # `titular_tipo` distingue `socio` de `entidad` y no es un detalle: en el primero el
+    # nombre es el de una PERSONA y en el segundo el de una organización —el parque
+    # interno de la base cuelga de ahí—. Sin esa marca, la pantalla acabaría rotulando
+    # una entidad como si fuera el conductor.
+    titular_nombre: Optional[str] = None
+    titular_tipo: Optional[str] = None
+    # A qué organización responde el vehículo. Viaja aparte del titular porque un carro
+    # puede tener las dos cosas —un socio del club de pádel con su club detrás— y saber
+    # de qué entidad es explica su presencia tanto como saber de quién es.
+    entidad_nombre: Optional[str] = None
+
+    # Quién iba al volante, cuando el guardia llegó a identificarlo. Es otra cosa que el
+    # titular: el dueño de la placa no tiene por qué ser quien la conduce ese día.
+    conductor_nombre: Optional[str] = None
+
     # URLs de las fotos. No se sirven como estáticos: son enlaces a un endpoint que
     # exige sesión, porque son fotos de civiles.
     foto_placa_url: Optional[str] = None

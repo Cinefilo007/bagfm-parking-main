@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ScanLine, RefreshCw, Loader2, X, Camera, Clock, ArrowRight, ArrowLeft,
-  HelpCircle, ImageOff,
+  HelpCircle, ImageOff, User, UserCheck, Building2,
 } from 'lucide-react';
 
 import { anprService } from '../../services/anpr.service';
@@ -66,6 +66,23 @@ const semaforoDe = (coincidencia) => SEMAFOROS[SEMAFORO_DE[coincidencia] || 'ama
  * corrección siguen así en la base, y sin este respaldo se verían para siempre con la
  * foto del vehículo encogida en la esquina y un "sin foto" en el centro.
  */
+/**
+ * El nombre de la PERSONA de una captura, si la hay.
+ *
+ * Manda el conductor que identificó el guardia sobre el titular de la placa: son cosas
+ * distintas y, cuando consta, el conductor es quien de verdad iba en el carro ese día.
+ *
+ * Devuelve nulo cuando el titular es una entidad, aunque haya nombre. En ese caso el
+ * nombre es el de una organización y ya se muestra en su propia línea: repetirlo aquí lo
+ * pintaría además con icono de persona, dando a entender que alguien se llama "Club de
+ * Pádel La Carlota".
+ */
+const personaDe = (evento) => {
+  if (evento.conductor_nombre) return evento.conductor_nombre;
+  if (evento.titular_tipo === 'socio') return evento.titular_nombre;
+  return null;
+};
+
 const repartirFotos = (evento) => {
   if (evento.foto_escena_url) {
     return { principal: 'escena', miniatura: evento.foto_placa_url ? 'placa' : null };
@@ -214,6 +231,28 @@ const ModalCaptura = ({ evento, onCerrar }) => {
             </div>
           )}
 
+          {/* Quién va en el carro, aparte de la rejilla de datos técnicos: cuando se
+              abre una captura es lo primero que se busca. */}
+          {(evento.conductor_nombre || evento.titular_nombre || evento.entidad_nombre) && (
+            <div className="mt-4 grid gap-3 rounded-xl bg-bg-low p-3 sm:grid-cols-3">
+              {/* Solo cuando el titular es una persona. Si es una entidad, su nombre ya
+                  sale en "Entidad" y ponerlo dos veces no añade nada. */}
+              {evento.titular_tipo === 'socio' && (
+                <Dato etiqueta="Titular de la placa" valor={evento.titular_nombre} resalte />
+              )}
+              {evento.entidad_nombre && (
+                <Dato etiqueta="Entidad" valor={evento.entidad_nombre} resalte />
+              )}
+              {/* Solo aparece si el guardia llegó a identificarlo. Que falte no es un
+                  fallo: identificar al conductor es opcional y no se le pide en salidas. */}
+              <Dato
+                etiqueta="Conductor identificado"
+                valor={evento.conductor_nombre || 'No se identificó'}
+                resalte={!!evento.conductor_nombre}
+              />
+            </div>
+          )}
+
           <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:grid-cols-4">
             <Dato etiqueta="Hora de captura" valor={fechaCompleta(evento.timestamp_recibido)} resalte />
             <Dato etiqueta="Alcabala" valor={evento.punto_nombre} />
@@ -253,6 +292,7 @@ const ModalCaptura = ({ evento, onCerrar }) => {
 const TarjetaCaptura = ({ evento, onAbrir }) => {
   const s = semaforoDe(evento.coincidencia);
   const { principal, miniatura } = repartirFotos(evento);
+  const persona = personaDe(evento);
 
   return (
     <button
@@ -297,6 +337,32 @@ const TarjetaCaptura = ({ evento, onAbrir }) => {
         <p className={cn('text-[9px] font-black uppercase tracking-wider', s.texto)}>
           {ETIQUETA_COINCIDENCIA[evento.coincidencia] || 'Sin veredicto'}
         </p>
+
+        {/* Quién es. Se prefiere el conductor que el guardia identificó sobre el titular
+            de la placa: son cosas distintas y, cuando existe, el conductor es quien de
+            verdad iba en el carro ese día.
+            Solo se pinta como persona lo que ES una persona. En un vehículo de entidad
+            el titular es la propia organización, y sacarlo aquí además de en su línea
+            repetiría el mismo nombre dos veces con dos iconos distintos. */}
+        {persona && (
+          <p className="mt-1 flex items-center gap-1 truncate text-[10px] text-text-main"
+             title={persona}>
+            {evento.conductor_nombre
+              ? <UserCheck className="h-2.5 w-2.5 shrink-0 text-success" />
+              : <User className="h-2.5 w-2.5 shrink-0 text-text-muted" />}
+            <span className="truncate">{persona}</span>
+          </p>
+        )}
+
+        {/* La entidad va aparte del nombre: saber que el carro es del club de pádel
+            explica su presencia igual que saber de quién es. */}
+        {evento.entidad_nombre && (
+          <p className="flex items-center gap-1 truncate text-[9px] text-text-sec"
+             title={evento.entidad_nombre}>
+            <Building2 className="h-2.5 w-2.5 shrink-0" />
+            <span className="truncate">{evento.entidad_nombre}</span>
+          </p>
+        )}
 
         <div className="mt-1.5 flex items-center justify-between text-[9px] text-text-muted">
           <span className="inline-flex items-center gap-1">
