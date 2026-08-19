@@ -42,3 +42,7 @@ from app.models.tanque_combustible import TanqueCombustible
 from app.models.lectura_tanque import LecturaTanque
 from app.models.solicitud_combustible import SolicitudCombustible
 from app.models.abastecimiento import Abastecimiento
+
+# Módulo Dormitorios — alojamiento del personal y censo militar
+from app.models.dormitorio import Dormitorio, Habitacion
+from app.models.perfil_militar import PerfilMilitar

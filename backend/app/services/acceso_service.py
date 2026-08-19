@@ -13,6 +13,7 @@ from app.models.vehiculo import Vehiculo
 from app.models.membresia import Membresia
 from app.models.infraccion import Infraccion
 from app.models.codigo_qr import CodigoQR
+from app.models.perfil_militar import PerfilMilitar
 from app.models.entidad_civil import EntidadCivil
 from app.models.vehiculo_pase import VehiculoPase
 from app.models.alcabala_evento import LotePaseMasivo
@@ -276,6 +277,53 @@ class AccesoService:
                     puesto_nombre=p_nombre,
                     tipo_acceso=qr_db.tipo_acceso
                 )
+
+            # 5.b Personal militar alojado en la base (módulo Dormitorios)
+            #
+            # Va ANTES del camino de socio permanente y no después, porque ese camino
+            # corta con "Socio sin registro de membresía vigente" y un militar que
+            # duerme en la base nunca va a tener una: no es socio de ningún club. Sin
+            # esta rama, el carnet peatonal quedaría emitido pero nunca validaría.
+            if socio:
+                res_perfil = await db.execute(
+                    select(PerfilMilitar)
+                    .options(selectinload(PerfilMilitar.habitacion))
+                    .where(PerfilMilitar.usuario_id == socio.id, PerfilMilitar.activo == True)
+                )
+                perfil_mil = res_perfil.scalars().first()
+
+                if perfil_mil:
+                    habitacion = perfil_mil.habitacion
+                    dormitorio = habitacion.dormitorio if habitacion else None
+
+                    # Aunque el carnet es para quien NO tiene vehículo, se buscan igual:
+                    # si declaró no tener y aparece con placas, el guardia lo ve en el acto.
+                    res_veh_mil = await db.execute(
+                        select(Vehiculo).where(Vehiculo.socio_id == socio.id, Vehiculo.activo == True)
+                    )
+                    vehiculos_mil = res_veh_mil.scalars().all()
+
+                    return ResultadoValidacion(
+                        permitido=True,
+                        mensaje=f"PERSONAL ALOJADO — {perfil_mil.grado or 'SIN GRADO'}",
+                        tipo_alerta="success",
+                        socio=socio,
+                        vehiculo=vehiculos_mil[0] if vehiculos_mil else None,
+                        vehiculos=vehiculos_mil,
+                        qr_id=qr_db.id,
+                        usuario_id=socio.id,
+                        vehiculo_id=vehiculos_mil[0].id if vehiculos_mil else None,
+                        requiere_datos_manuales=False,
+                        es_personal_alojado=True,
+                        info_militar={
+                            "grado": perfil_mil.grado,
+                            "unidad": perfil_mil.unidad,
+                            "dormitorio": dormitorio.nombre if dormitorio else None,
+                            "habitacion": habitacion.numero if habitacion else None,
+                            "jefe_nombre": perfil_mil.jefe_nombre,
+                            "jefe_telefono": perfil_mil.jefe_telefono,
+                        },
+                    )
 
             # 6. Validación Estándar para Socios Permanentes
             if not socio:

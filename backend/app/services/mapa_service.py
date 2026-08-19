@@ -9,12 +9,13 @@ from sqlalchemy import func, select, Date, cast
 from app.models.entidad_civil import EntidadCivil
 from app.models.alcabala_evento import PuntoAcceso
 from app.models.zona_estacionamiento import ZonaEstacionamiento
+from app.models.dormitorio import Dormitorio
 from app.models.acceso import Acceso
 from app.models.infraccion import Infraccion
 from app.models.enums import InfraccionEstado, RolTipo
 from app.models.usuario import Usuario
 
-async def get_situacion_actual(db: AsyncSession):
+async def get_situacion_actual(db: AsyncSession, usuario_actual=None):
     hoy = date.today()
     
     # 1. Entidades Civiles + Ocupación Dinámica (Aproximada por accesos hoy)
@@ -132,6 +133,35 @@ async def get_situacion_actual(db: AsyncSession):
             "config_ia": z.config_ia,
             "grilla_tactica": z.grilla_tactica
         })
+
+    # 3.b Dormitorios — dónde duerme el personal
+    #
+    # Van al mapa por el mismo motivo que las alcabalas: saber dónde está la gente es la
+    # mitad del sistema. El pin lleva a la ficha del dormitorio de un toque.
+    #
+    # Pero SOLO para el mando administrativo, y esto no es una precaución de más: este
+    # mismo mapa lo pinta también el panel del administrador de una entidad civil (el
+    # club de pádel, la pizzería). Sin el filtro, ese administrador vería en qué edificio
+    # duerme el personal militar y cuántos hay dentro, cuando ni siquiera puede abrir el
+    # módulo. Lo mismo con el parquero.
+    dormitorios_data = []
+    rol_actual = getattr(usuario_actual, "rol", None)
+
+    if rol_actual in (RolTipo.COMANDANTE, RolTipo.ADMIN_BASE):
+        query_dorms = select(Dormitorio).filter(Dormitorio.activo == True)
+        result_dorms = await db.execute(query_dorms)
+
+        for d in result_dorms.scalars().all():
+            dormitorios_data.append({
+                "id": str(d.id),
+                "nombre": d.nombre,
+                "codigo": d.codigo,
+                "latitud": float(d.latitud) if d.latitud is not None else None,
+                "longitud": float(d.longitud) if d.longitud is not None else None,
+                "habitaciones": d.total_habitaciones,
+                "camas_totales": d.camas_totales,
+                "ocupacion": d.ocupacion,
+            })
 
     # 4. Eventos Recientes (Monitor en tiempo real)
     # Combinar los últimos 15 accesos con info vehicular
@@ -264,6 +294,7 @@ async def get_situacion_actual(db: AsyncSession):
         "entidades": entidades_data,
         "alcabalas": alcabalas_data,
         "zonas_estacionamiento": zonas_data,
+        "dormitorios": dormitorios_data,
         "vehiculos_dentro": vehiculos_dentro,
         "total_accesos_hoy": total_entradas,
         "alertas_activas": alertas_activas,
@@ -324,7 +355,7 @@ async def get_trafico_historico(db: AsyncSession, weeks_ago: int = 0):
 
 async def actualizar_georreferencia(
     db: AsyncSession, 
-    tipo: Literal['entidad', 'alcabala', 'zona'], 
+    tipo: Literal['entidad', 'alcabala', 'zona', 'dormitorio'], 
     res_id: str, 
     lat: float, 
     lng: float
@@ -336,6 +367,8 @@ async def actualizar_georreferencia(
         obj = await db.get(PuntoAcceso, res_id)
     elif tipo == 'zona':
         obj = await db.get(ZonaEstacionamiento, res_id)
+    elif tipo == 'dormitorio':
+        obj = await db.get(Dormitorio, res_id)
     else:
         return False
     

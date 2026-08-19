@@ -106,6 +106,12 @@ class ResultadoValidacion(BaseModel):
     alerta_capacidad_critica: bool = False
     info_capacidad_zona: Optional[dict] = None # {zona_id, cupo_total, ocupacion_actual, critico}
 
+    # Personal militar alojado en la base (módulo Dormitorios). Va aparte de `socio`
+    # porque no es socio de ningún club: no tiene membresía que comprobar y lo que el
+    # guardia necesita ver es otra cosa — grado, unidad y dónde duerme.
+    es_personal_alojado: bool = False
+    info_militar: Optional[dict] = None # {grado, unidad, dormitorio, habitacion, jefe_nombre, jefe_telefono}
+
 
 class EventoTactico(BaseModel):
     id: UUID

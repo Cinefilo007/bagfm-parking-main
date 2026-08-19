@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, Polyline, Polygon, Circle } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Shield, Building, SquareParking, Crosshair, Target, Edit3, AlertTriangle } from 'lucide-react';
+import { Shield, Building, SquareParking, Crosshair, Target, Edit3, AlertTriangle, BedDouble } from 'lucide-react';
 import { renderToString } from 'react-dom/server';
 import { useThemeStore } from '../store/theme.store';
 
@@ -91,7 +91,8 @@ const MapaBaseReal = ({
   onMapClick = null, 
   selectedForMove = null, 
   isFullscreen = false,
-  hideSituacion = false
+  hideSituacion = false,
+  onVerDormitorio = null
 }) => {
   const { isDarkMode } = useThemeStore();
   const [mapType, setMapType] = React.useState('satellite'); 
@@ -221,6 +222,41 @@ const MapaBaseReal = ({
                                <span className="text-text-sec font-bold uppercase">Uso:</span>
                                <span className="text-primary font-black text-[11px]">{entidad.ocupacion_actual || 0} / {entidad.capacidad_total || 0}</span>
                             </div>
+                        </div>
+                    </Popup>
+                  </Marker>
+                ))}
+
+                {/* DORMITORIOS - Dónde duerme el personal */}
+                {!hideSituacion && situacion.dormitorios?.filter(hasCoords).map(dormitorio => (
+                  <Marker
+                    key={`dormitorio-${dormitorio.id}`}
+                    position={[dormitorio.latitud, dormitorio.longitud]}
+                    icon={createTacticalPin(
+                      '#38BDF8',
+                      dormitorio.nombre,
+                      selectedForMove?.id === dormitorio.id && selectedForMove?.tipo === 'dormitorio',
+                      isDarkMode,
+                      BedDouble
+                    )}
+                    eventHandlers={{ click: () => !assignmentMode && onSelectEntity(dormitorio) }}
+                  >
+                    <Popup className="tactical-popup">
+                        <div className="p-1 min-w-[150px]">
+                            <div className="text-[9px] font-black uppercase tracking-widest text-sky-400 mb-0.5">Alojamiento</div>
+                            <div className="text-[11px] font-display font-black uppercase text-text-main mb-2 tracking-tight">{dormitorio.nombre}</div>
+                            <div className="flex justify-between items-center text-[9px] font-mono border-t border-bg-high/20 pt-2 mb-2">
+                               <span className="text-text-sec uppercase font-bold">Camas:</span>
+                               <span className="text-primary font-black text-[11px]">{dormitorio.ocupacion || 0} / {dormitorio.camas_totales || 0}</span>
+                            </div>
+                            {onVerDormitorio && (
+                               <button
+                                 onClick={(e) => { e.stopPropagation(); onVerDormitorio(dormitorio.id); }}
+                                 className="w-full py-1.5 bg-sky-400 text-black text-[9px] font-black uppercase rounded shadow-lg hover:scale-[1.02] transition-all"
+                               >
+                                 VER HABITACIONES
+                               </button>
+                            )}
                         </div>
                     </Popup>
                   </Marker>

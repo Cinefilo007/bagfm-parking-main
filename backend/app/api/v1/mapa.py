@@ -17,7 +17,7 @@ from app.models.usuario import Usuario
 router = APIRouter()
 
 class GeorreferenciaRequest(BaseModel):
-    tipo: Literal['entidad', 'alcabala', 'zona']
+    tipo: Literal['entidad', 'alcabala', 'zona', 'dormitorio']
     id: str
     lat: float
     lng: float
@@ -28,7 +28,7 @@ async def get_situacion(
     usuario_actual = Depends(obtener_usuario_actual)
 ):
     """Retorna la situación táctica consolidada de la Base."""
-    return await mapa_service.get_situacion_actual(db)
+    return await mapa_service.get_situacion_actual(db, usuario_actual)
 
 @router.get("/trafico")
 async def get_trafico(

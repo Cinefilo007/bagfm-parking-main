@@ -128,6 +128,7 @@ lista blanca) necesita WireGuard en el VPS + un router saliente en cada alcabala
 | `api/v1/anpr.py` | Ingesta sin sesión + operación del guardia + admin de cámaras y pantallas + emparejamiento. |
 | `api/v1/vehiculos.py` | Saneamiento de fichas duplicadas (`/duplicados`, `/fusionar-en/`). |
 | `services/ia_service.py` | Lectura de documentos con Gemini (cédula, circulación, odómetro, surtidor). Llama al SDK **en un hilo aparte** y reintenta con espera creciente. |
+| `services/dormitorio_service.py` | Censo de alojamiento. Su regla central: un integrante **no es una tabla nueva de personas**, se busca por cédula en `usuarios` y se completa. |
 
 ### Decisiones que conviene no revertir sin leer el porqué
 
@@ -194,6 +195,28 @@ lista blanca) necesita WireGuard en el VPS + un router saliente en cada alcabala
   al frontend en `error` (`cuota`, `servicio`, `clave`, `lectura`) para que la pantalla
   pueda decir la verdad en vez de "no se pudo leer".
 
+- **Un integrante de dormitorio es una fila de `usuarios`, no una tabla nueva de personas.**
+  El alta busca por cédula: si ya está (socio de un club, guardia, quien sea) se le añade
+  el `PerfilMilitar` y se conserva su rol; si no, se crea con `RolTipo.SOCIO`. Ese es el
+  motivo de existir del módulo — registrar a alguien porque duerme en la base lo ata solo
+  a los vehículos que ya tenía a su nombre. Se descartó un rol `MILITAR` nuevo porque
+  `rol_tipo` es ENUM nativo de Postgres y un `ALTER TYPE` ya costó caro (`fix_enum.py`).
+- **`perfiles_militares.tiene_vehiculo` es lo que la persona DECLARA, no la verdad.** La
+  verdad está en `vehiculos.socio_id`. La ficha devuelve las dos y la pantalla canta la
+  discrepancia: quien declaró no tener vehículo y aparece con placas a su nombre es justo
+  el patrón que el módulo existe para hacer visible. Fundirlas en un solo indicador lo
+  perdería.
+- **El QR de la puerta usa token hasheado (SHA-256); el carnet peatonal, JWT en
+  `codigos_qr`.** No es incoherencia: el de la puerta identifica a un SITIO y tiene que
+  poder cortarse en la petición siguiente cuando alguien fotografía el pasillo, así que
+  sigue el patrón de cámaras y pantallas. El peatonal identifica a una PERSONA, se
+  reimprime cuando hace falta y entra por el escáner de siempre, así que sigue el de los
+  pases.
+- **`validar_qr` comprueba el perfil militar ANTES del camino de socio permanente.** Ese
+  camino corta con "Socio sin registro de membresía vigente" y un militar alojado nunca va
+  a tener membresía: no es socio de ningún club. Puesta después, la rama sería inalcanzable
+  y el carnet quedaría emitido pero sin validar nunca.
+
 ## Roles y pantallas
 
 | Rol | Pantalla | Ruta |
@@ -205,6 +228,8 @@ lista blanca) necesita WireGuard en el VPS + un router saliente en cada alcabala
 | — | **Monitor del TV** (kiosco, sin sesión) | `/monitor` |
 | COMANDANTE | Cámaras ANPR y pantallas | `/comando/camaras` |
 | COMANDANTE | Duplicados de vehículos | Parque Automotor → Duplicados |
+| COMANDANTE | **Dormitorios** | `/comando/dormitorios` · `/comando/dormitorios/:id` |
+| — | **Ficha de habitación** (QR de la puerta, sin sesión) | `/habitacion/:token` |
 
 El **monitor** se autentica con token de pantalla (no caduca, revocable al instante) y se
 empareja escaneando un QR con el teléfono del guardia, estilo Netflix (RFC 8628).
@@ -293,7 +318,9 @@ emparejamiento por QR, semáforo, modo claro, admin de cámaras y pantallas, san
 duplicados, tour guiado, identificación opcional del conductor (cámara con guías dentro
 del navegador, recorte al marco antes de subir), destinos en botonera o en lista con
 búsqueda a elección del guardia, KPI de conductores identificados por turno, par de
-cámaras delantera/trasera con fusión de las dos lecturas, diagnóstico de ingesta.
+cámaras delantera/trasera con fusión de las dos lecturas, diagnóstico de ingesta, módulo
+Dormitorios (censo de alojamiento, QR de puerta con ficha pública, carnet peatonal y pin
+en el mapa táctico).
 
 **Lo primero que conviene mirar ahora que hay tráfico real**, porque son cosas que el
 simulador no puede contestar: que un carro genere **una sola** tarjeta y no dos (si salen
@@ -320,3 +347,6 @@ depende que el pendiente 0.b valga la pena o sobre.
 4. Terminar la unificación de las tres tablas de vehículos.
 5. Limpiar los artefactos de Railway.
 6. **Fase 3**: restringir accesos de verdad, solo cuando haya meses de datos.
+7. **Dormitorios, siguiente paso**: que el alta de integrante ofrezca registrarle el
+   vehículo en el acto en vez de esperar a que la cámara lo descubra, y que el Comandante
+   vea la lista de residentes cuya declaración de vehículo no cuadra con `vehiculos`.

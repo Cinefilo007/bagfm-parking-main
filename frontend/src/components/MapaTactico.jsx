@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
     Target, MapPin, X, Check, Search, Filter, Maximize2, Minimize2, 
-    Shield, Users, Car as CarIcon, Scissors, Square, Activity, MousePointer2, Sparkles, Layers, Loader2
+    Shield, Users, Car as CarIcon, Scissors, Square, Activity, MousePointer2, Sparkles, Layers, Loader2,
+    BedDouble
 } from 'lucide-react';
 import { mapaService } from '../services/mapaService';
 import MapaBaseReal from './MapaBaseReal';
@@ -28,6 +30,7 @@ const MapaTactico = ({
     accessPoints = [],
     accessPointMode = null
 }) => {
+    const navigate = useNavigate();
     const [situacion, setSituacion] = useState(situacionPreload);
     const [loading, setLoading] = useState(!situacionPreload);
     const [selected, setSelected] = useState(null);
@@ -150,6 +153,7 @@ const MapaTactico = ({
                     selectedForMove={selectedEntityToMove}
                     isFullscreen={false}
                     hideSituacion={drawingMode}
+                    onVerDormitorio={(id) => navigate(`/comando/dormitorios/${id}`)}
                 />
 
                 {/* Botón flotante para Alternar Polígonos (Capas) */}
@@ -214,7 +218,8 @@ const MapaTactico = ({
                          {[
                             ...(situacion?.entidades || []).map(e => ({...e, tipo_label: 'Entidad Alojada', tipo: 'entidad', color: 'text-purple-400', icon: <Users size={16}/>})),
                             ...(situacion?.alcabalas || []).map(a => ({...a, tipo_label: 'Punto de Control', tipo: 'alcabala', color: 'text-primary', icon: <Shield size={16}/>})),
-                            ...(situacion?.zonas_estacionamiento || []).map(z => ({...z, tipo_label: 'Zona de Parqueo', tipo: 'zona', color: 'text-warning', icon: <Car size={16}/>}))
+                            ...(situacion?.zonas_estacionamiento || []).map(z => ({...z, tipo_label: 'Zona de Parqueo', tipo: 'zona', color: 'text-warning', icon: <CarIcon size={16}/>})),
+                            ...(situacion?.dormitorios || []).map(d => ({...d, tipo_label: 'Alojamiento', tipo: 'dormitorio', color: 'text-sky-400', icon: <BedDouble size={16}/>}))
                          ].map(item => (
                             <button 
                                key={`${item.tipo}-${item.id}`}

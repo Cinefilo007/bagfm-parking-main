@@ -18,6 +18,9 @@ import MonitorAlcabala from '../pages/alcabala/Monitor';
 import ConfirmarPantalla from '../pages/alcabala/ConfirmarPantalla';
 import Alcabalas from '../pages/comandante/Alcabalas';
 import CamarasAnpr from '../pages/comandante/CamarasAnpr';
+import Dormitorios from '../pages/comandante/Dormitorios';
+import DormitorioDetalle from '../pages/comandante/DormitorioDetalle';
+import HabitacionPublica from '../pages/HabitacionPublica';
 import EventosMando from '../pages/comandante/EventosMando';
 import PasesMasivosEntidad from '../pages/entidad/PasesMasivos';
 import EditorCarnets from '../pages/entidad/EditorCarnets';
@@ -85,6 +88,14 @@ export const router = createBrowserRouter([
     path: '/monitor',
     element: <MonitorAlcabala />,
   },
+  // ====== FICHA DE HABITACIÓN (QR DE LA PUERTA) ======
+  // Fuera de RutaProtegida y sin MainLayout por el mismo motivo que el monitor: quien
+  // escanea el QR de una puerta no tiene sesión, y dentro de la rama protegida
+  // acabaría en el login. El token de la URL es toda la credencial que hay.
+  {
+    path: '/habitacion/:token',
+    element: <HabitacionPublica />,
+  },
   {
     path: '/',
     element: <RutaProtegida />,
@@ -118,6 +129,17 @@ export const router = createBrowserRouter([
                 path: 'camaras',
                 element: <RutaProtegida rolesPermitidos={['COMANDANTE', 'ADMIN_BASE']} />,
                 children: [{ path: '', element: <CamarasAnpr /> }]
+              },
+              // Misma guarda propia que las cámaras: el bloque /comando también deja
+              // entrar a SUPERVISOR, y los endpoints de dormitorios solo aceptan
+              // COMANDANTE y ADMIN_BASE — aquí solo se encontraría con 403.
+              {
+                path: 'dormitorios',
+                element: <RutaProtegida rolesPermitidos={['COMANDANTE', 'ADMIN_BASE']} />,
+                children: [
+                  { path: '', element: <Dormitorios /> },
+                  { path: ':id', element: <DormitorioDetalle /> }
+                ]
               }
             ],
           },

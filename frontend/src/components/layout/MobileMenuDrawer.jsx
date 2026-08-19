@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { 
   X, CalendarRange, AlertTriangle, UserCog, Palette, 
   ShieldAlert, Bell, Settings, LogOut, ShieldCheck,
-  User, ChevronRight, Flame, Sunrise, Car as CarIcon, Fuel
+  User, ChevronRight, Flame, Sunrise, Car as CarIcon, Fuel, BedDouble
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/auth.store';
@@ -36,6 +36,7 @@ export const MobileMenuDrawer = ({ isOpen, onClose }) => {
       { to: '/comando/infracciones', label: 'Infracciones', icon: AlertTriangle, color: 'text-danger' },
       { to: '/comando/personal', label: 'Gestión Personal', icon: UserCog, color: 'text-primary' },
       { to: '/comando/carnets', label: 'Editor de Carnets', icon: Palette, color: 'text-indigo-400' },
+      { to: '/comando/dormitorios', label: 'Dormitorios', icon: BedDouble, color: 'text-sky-400' },
       { to: '/parque-automotor', label: 'Parque Automotor', icon: CarIcon, color: 'text-emerald-400' },
       { to: '/combustible/tanques', label: 'Tanques Combustible', icon: Flame, color: 'text-amber-400' },
     );
