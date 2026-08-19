@@ -22,6 +22,7 @@ from app.core.database import obtener_db
 from app.core.dependencias import require_rol
 from app.core.excepciones import CapacidadExcedida, EntidadDuplicada, EntidadNoEncontrada
 from app.models.dormitorio import Dormitorio, Habitacion
+from app.models.entidad_civil import EntidadCivil
 from app.models.enums import RolTipo
 from app.models.perfil_militar import PerfilMilitar
 from app.models.usuario import Usuario
@@ -38,7 +39,12 @@ from app.schemas.dormitorio import (
     IntegranteCrear,
     IntegranteEditar,
     IntegranteSalida,
+    JefeSugerido,
+    PersonaSugerida,
     QrPeatonalSalida,
+    UnidadSugerida,
+    VehiculoSugerido,
+    VehiculoVincular,
 )
 from app.services.dormitorio_service import dormitorio_service
 
@@ -122,6 +128,29 @@ async def ficha_publica_habitacion(token: str, db: AsyncSession = Depends(obtene
         raise HTTPException(status_code=404, detail="Habitación no encontrada")
 
 
+@router.get("/unidades", response_model=List[UnidadSugerida])
+async def listar_unidades(
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = DEPENDENCY_ADMIN,
+):
+    """
+    Entidades registradas, para ofrecerlas como unidad en el alta de integrante.
+
+    La lista sugiere; no obliga. `perfiles_militares.unidad` sigue siendo texto libre
+    porque la unidad de un militar no tiene por qué estar dada de alta como entidad.
+
+    Va aquí arriba y no junto a las demás búsquedas por un motivo de enrutado: es la
+    única de un solo segmento, así que declarada después de `/{dormitorio_id}` acabaría
+    capturada por esa ruta e intentando leer "unidades" como UUID.
+    """
+    res = await db.execute(
+        select(EntidadCivil)
+        .where(EntidadCivil.activo == True)  # noqa: E712
+        .order_by(EntidadCivil.nombre)
+    )
+    return [UnidadSugerida(id=e.id, nombre=e.nombre) for e in res.scalars().all()]
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Dormitorios
 # ──────────────────────────────────────────────────────────────────────────────
@@ -163,23 +192,38 @@ async def crear_dormitorio(
 @router.get("/{dormitorio_id}", response_model=DormitorioDetalle)
 async def detalle_dormitorio(
     dormitorio_id: UUID,
+    pagina: int = 1,
+    por_pagina: int = 10,
+    buscar: str = "",
     db: AsyncSession = Depends(obtener_db),
     usuario: Usuario = DEPENDENCY_ADMIN,
 ):
+    """
+    Habitaciones del dormitorio, paginadas y filtrables por persona.
+
+    `buscar` filtra por la GENTE (nombre, apellido, cédula o grado), no por el número
+    de habitación: lo que se quiere saber es en cuál duerme alguien.
+    """
     try:
         dormitorio = await dormitorio_service.obtener_dormitorio(db, dormitorio_id)
     except EntidadNoEncontrada as e:
         raise HTTPException(status_code=404, detail=str(e))
 
-    res = await db.execute(
-        select(Habitacion)
-        .where(Habitacion.dormitorio_id == dormitorio_id, Habitacion.activo == True)  # noqa: E712
-        .order_by(Habitacion.piso, Habitacion.numero)
+    habitaciones_db, total = await dormitorio_service.habitaciones_paginadas(
+        db, dormitorio_id, pagina=pagina, por_pagina=por_pagina, buscar=buscar
     )
-    habitaciones = [await _salida_habitacion(db, h) for h in res.scalars().all()]
+    habitaciones = [await _salida_habitacion(db, h) for h in habitaciones_db]
 
+    por_pagina_efectivo = max(1, min(por_pagina, 100))
     base = await _salida_dormitorio(dormitorio)
-    return DormitorioDetalle(**base.model_dump(), habitaciones=habitaciones)
+    return DormitorioDetalle(
+        **base.model_dump(),
+        habitaciones=habitaciones,
+        pagina=max(1, pagina),
+        por_pagina=por_pagina_efectivo,
+        total_habitaciones_filtradas=total,
+        total_paginas=max(1, -(-total // por_pagina_efectivo)),
+    )
 
 
 @router.patch("/{dormitorio_id}", response_model=DormitorioSalida)
@@ -306,24 +350,55 @@ async def desactivar_habitacion(
     habitacion.activo = False
     # El QR de una habitación dada de baja deja de servir en el acto: el adhesivo sigue
     # pegado en la puerta y no hay nada que impida escanearlo.
+    habitacion.token = None
     habitacion.token_hash = None
     habitacion.token_pista = None
     habitacion.token_generado_at = None
     await db.commit()
 
 
-@router.post("/habitaciones/{habitacion_id}/qr", response_model=HabitacionConToken)
-async def generar_qr_habitacion(
+@router.get("/habitaciones/{habitacion_id}/qr", response_model=HabitacionConToken)
+async def consultar_qr_habitacion(
     habitacion_id: UUID,
     db: AsyncSession = Depends(obtener_db),
     usuario: Usuario = DEPENDENCY_ADMIN,
 ):
     """
-    Genera o rota el QR de la puerta. Única vez que el token viaja en claro: en la base
-    solo queda su hash, así que hay que imprimirlo ahora.
+    Devuelve el QR de la puerta, creándolo si es la primera vez.
+
+    Consultarlo NO lo cambia: el adhesivo que ya está pegado sigue valiendo. Antes sí
+    lo cambiaba, y eso convertía cada visita al panel en una invalidación silenciosa
+    del impreso.
     """
     try:
-        habitacion, token = await dormitorio_service.generar_token_habitacion(db, habitacion_id)
+        habitacion, token = await dormitorio_service.obtener_token_habitacion(db, habitacion_id)
+    except EntidadNoEncontrada as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    return HabitacionConToken(
+        habitacion=await _salida_habitacion(db, habitacion),
+        token=token,
+        url_publica=_url_publica(token),
+    )
+
+
+@router.post("/habitaciones/{habitacion_id}/qr/regenerar", response_model=HabitacionConToken)
+async def regenerar_qr_habitacion(
+    habitacion_id: UUID,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = DEPENDENCY_ADMIN,
+):
+    """
+    Emite un QR nuevo para la puerta y deja el anterior sin valor.
+
+    Acción deliberada, no un efecto secundario de mirar: obliga a imprimir el nuevo y
+    a cambiar el adhesivo. Es lo que hay que hacer cuando se sabe que alguien fotografió
+    la puerta.
+    """
+    try:
+        habitacion, token = await dormitorio_service.obtener_token_habitacion(
+            db, habitacion_id, regenerar=True
+        )
     except EntidadNoEncontrada as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -354,6 +429,55 @@ async def listar_integrantes(
     usuario: Usuario = DEPENDENCY_ADMIN,
 ):
     return await dormitorio_service.listar_integrantes_habitacion(db, habitacion_id)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Búsquedas que alimentan el formulario de alta
+#
+# Todas son de solo lectura y devuelven pocas filas: el formulario las llama a cada
+# pulsación de tecla, así que van con LIMIT y con un mínimo de caracteres antes de
+# tocar la base.
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.get("/personas/buscar", response_model=List[PersonaSugerida])
+async def buscar_personas(
+    q: str = "",
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = DEPENDENCY_ADMIN,
+):
+    """
+    Personas ya registradas que encajan con la cédula o el nombre tecleados.
+
+    Compara la cédula sin la letra ni los separadores: "12345678", "V12345678" y
+    "V-12.345.678" son la misma persona, y sin esto el alta creaba una segunda ficha.
+    """
+    return await dormitorio_service.buscar_personas(db, q)
+
+
+@router.get("/jefes/buscar", response_model=List[JefeSugerido])
+async def buscar_jefes(
+    q: str = "",
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = DEPENDENCY_ADMIN,
+):
+    """Candidatos a jefe directo entre las personas registradas, según se escribe."""
+    return await dormitorio_service.buscar_jefes(db, q)
+
+
+@router.get("/vehiculos/buscar", response_model=List[VehiculoSugerido])
+async def buscar_vehiculos(
+    placa: str = "",
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = DEPENDENCY_ADMIN,
+):
+    """
+    Vehículos cuya placa se parece a lo tecleado, indicando cuáles están libres.
+
+    Los que ya tienen dueño vienen igualmente, marcados: ocultarlos haría pensar que la
+    placa está libre y llevaría a registrarla de nuevo, que es como aparecieron las
+    fichas duplicadas que hubo que sanear.
+    """
+    return await dormitorio_service.buscar_vehiculos(db, placa)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -466,20 +590,23 @@ async def desasignar_de_habitacion(
     return await dormitorio_service.construir_integrante(db, perfil)
 
 
-@router.post("/integrantes/{usuario_id}/qr-peatonal", response_model=QrPeatonalSalida)
-async def generar_qr_peatonal(
+@router.get("/integrantes/{usuario_id}/qr-peatonal", response_model=QrPeatonalSalida)
+async def consultar_qr_peatonal(
     usuario_id: UUID,
     db: AsyncSession = Depends(obtener_db),
     usuario: Usuario = DEPENDENCY_ADMIN,
 ):
     """
-    Carnet QR para el personal sin vehículo.
+    Carnet QR para el personal que entra a pie. Se emite una vez y se conserva.
 
     Sin él, quien entra a pie no deja rastro: la cámara solo ve placas. El guardia lo
     escanea con el lector de siempre y el acceso queda en la bitácora con nombre.
+
+    Consultarlo devuelve el mismo carnet, así que reimprimirlo por deterioro no deja
+    fuera al que la persona lleva encima.
     """
     try:
-        persona, perfil, token = await dormitorio_service.generar_qr_peatonal(
+        persona, perfil, token = await dormitorio_service.obtener_qr_peatonal(
             db, usuario_id, creador_id=usuario.id
         )
     except EntidadNoEncontrada as e:
@@ -492,3 +619,59 @@ async def generar_qr_peatonal(
         grado=perfil.grado,
         token=token,
     )
+
+
+@router.post("/integrantes/{usuario_id}/qr-peatonal/regenerar", response_model=QrPeatonalSalida)
+async def regenerar_qr_peatonal(
+    usuario_id: UUID,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = DEPENDENCY_ADMIN,
+):
+    """
+    Emite un carnet nuevo y anula el anterior. Es lo que hace falta cuando alguien
+    pierde la credencial: si el viejo siguiera valiendo, quien lo encontrase entraría.
+    """
+    try:
+        persona, perfil, token = await dormitorio_service.obtener_qr_peatonal(
+            db, usuario_id, creador_id=usuario.id, regenerar=True
+        )
+    except EntidadNoEncontrada as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    return QrPeatonalSalida(
+        usuario_id=persona.id,
+        nombre_completo=persona.nombre_completo,
+        cedula=persona.cedula,
+        grado=perfil.grado,
+        token=token,
+    )
+
+
+@router.post("/integrantes/{usuario_id}/vehiculo", response_model=IntegranteSalida)
+async def vincular_vehiculo(
+    usuario_id: UUID,
+    datos: VehiculoVincular,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = DEPENDENCY_ADMIN,
+):
+    """
+    Ata una placa al integrante, en la tabla madre `vehiculos`.
+
+    O se elige un vehículo existente **sin dueño**, o se registra uno nuevo. Va a
+    `vehiculos` y no a una tabla propia del módulo para que la cámara de la alcabala lo
+    reconozca desde la siguiente lectura, sin que nadie tenga que darlo de alta aparte.
+    """
+    try:
+        await dormitorio_service.vincular_vehiculo(
+            db,
+            usuario_id,
+            vehiculo_id=datos.vehiculo_id,
+            datos_nuevos=datos.model_dump(exclude={"vehiculo_id"}, exclude_none=True),
+        )
+        perfil = await dormitorio_service.obtener_perfil(db, usuario_id)
+    except EntidadDuplicada as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except EntidadNoEncontrada as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    return await dormitorio_service.construir_integrante(db, perfil)

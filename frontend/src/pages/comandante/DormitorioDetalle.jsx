@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  DoorClosed, Plus, Loader2, ArrowLeft, QrCode, Users,
+  DoorClosed, Plus, Loader2, ArrowLeft, QrCode, Users, Search,
   UserPlus, Trash2, Download, X, Car, ShieldAlert, Phone, Pencil,
+  ChevronDown, ChevronLeft, ChevronRight, RefreshCw, UserCheck,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 // Import con nombre y no por defecto: `react-qr-code` es CommonJS y su export por
@@ -14,20 +15,29 @@ import { Card } from '../../components/ui/Card';
 import { Boton } from '../../components/ui/Boton';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
+import { ModalConfirmacion } from '../../components/ui/ModalConfirmacion';
 import { Header } from '../../components/layout/Header';
+import CampoConSugerencias from '../../components/comando/CampoConSugerencias';
 import { dormitoriosService } from '../../services/dormitorios.service';
 import { cn } from '../../lib/utils';
 
 /**
  * Detalle de un dormitorio: sus habitaciones y quién ocupa cada cama.
  *
- * Dos QR distintos conviven en esta pantalla y conviene no confundirlos:
+ * Las habitaciones van plegadas y paginadas. Un dormitorio de tres plantas no cabe en
+ * una pantalla, y desplegarlas todas obligaba a hacer scroll hasta la 40 para ver quién
+ * duerme ahí. El buscador filtra por PERSONA y abre sola la habitación donde está: la
+ * pregunta real es "¿dónde duerme Rojas?", no "¿existe la 104?".
+ *
+ * Dos QR distintos conviven aquí y conviene no confundirlos:
  *
  *   - El de la PUERTA identifica a la habitación. Se imprime, se pega y abre la ficha
- *     pública de sus ocupantes. Su token solo se ve al generarlo.
+ *     pública de sus ocupantes.
  *   - El PEATONAL identifica a una persona en la alcabala. Es para quien no tiene
- *     vehículo, porque la cámara solo sabe leer placas y quien entra a pie no deja
- *     rastro de otra forma.
+ *     vehículo, porque la cámara solo sabe leer placas.
+ *
+ * Los dos son PERSISTENTES: abrirlos devuelve el mismo código, porque están impresos y
+ * pegados o en un bolsillo. Regenerarlos es un botón aparte que anula el anterior.
  */
 
 const IconoPuerta = DoorClosed;
@@ -35,12 +45,21 @@ const IconoGente = Users;
 const IconoCarro = Car;
 const IconoTelefono = Phone;
 const IconoAlerta = ShieldAlert;
+const IconoLupa = Search;
+const IconoFlechaAbajo = ChevronDown;
+const IconoAnterior = ChevronLeft;
+const IconoSiguiente = ChevronRight;
+const IconoRegenerar = RefreshCw;
+const IconoPersonaHallada = UserCheck;
+
+const POR_PAGINA = 8;
 
 const FORM_HABITACION = { numero: '', piso: '', camas: 1, notas: '' };
 const FORM_INTEGRANTE = {
   cedula: '', nombre: '', apellido: '', telefono: '', email: '',
   grado: '', unidad: '', jefe_nombre: '', jefe_telefono: '', tiene_vehiculo: false,
 };
+const FORM_VEHICULO = { vehiculo_id: null, placa: '', marca: '', modelo: '', color: '' };
 
 /**
  * Ficha de un ocupante.
@@ -78,7 +97,7 @@ const FichaIntegrante = ({ integrante, onQrPeatonal, onDesasignar }) => {
           <button
             onClick={() => onQrPeatonal(integrante)}
             className="p-2 rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 transition-all"
-            title="Generar carnet QR peatonal"
+            title="Ver carnet QR peatonal"
           >
             <QrCode size={15} />
           </button>
@@ -148,30 +167,77 @@ const DormitorioDetalle = () => {
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
 
+  // Paginación y filtro de habitaciones.
+  const [pagina, setPagina] = useState(1);
+  const [busqueda, setBusqueda] = useState('');
+  const [busquedaAplicada, setBusquedaAplicada] = useState('');
+  const [desplegadas, setDesplegadas] = useState(() => new Set());
+
   const [modalHabitacion, setModalHabitacion] = useState(false);
   const [habitacionEditando, setHabitacionEditando] = useState(null);
   const [formHabitacion, setFormHabitacion] = useState(FORM_HABITACION);
 
   const [modalIntegrante, setModalIntegrante] = useState(null); // habitación destino
   const [formIntegrante, setFormIntegrante] = useState(FORM_INTEGRANTE);
+  const [personaExistente, setPersonaExistente] = useState(null);
+  const [formVehiculo, setFormVehiculo] = useState(FORM_VEHICULO);
+  const [unidades, setUnidades] = useState([]);
 
-  // { titulo, subtitulo, valor, archivo } — sirve para los dos tipos de QR.
+  // { titulo, subtitulo, valor, archivo, nota, onRegenerar } — vale para los dos QR.
   const [qrMostrado, setQrMostrado] = useState(null);
+  const [regenerando, setRegenerando] = useState(false);
   const refQr = useRef(null);
+
+  // { mensaje, titulo, accion } — sustituye a los confirm del navegador.
+  const [confirmacion, setConfirmacion] = useState(null);
 
   const cargar = useCallback(async () => {
     setCargando(true);
     try {
-      setDormitorio(await dormitoriosService.detalle(id));
+      const datos = await dormitoriosService.detalle(id, {
+        pagina,
+        porPagina: POR_PAGINA,
+        buscar: busquedaAplicada,
+      });
+      setDormitorio(datos);
+
+      // Buscando una persona, no tiene sentido dejar las habitaciones plegadas: lo que
+      // se quiere ver es precisamente quién está dentro.
+      if (busquedaAplicada) {
+        setDesplegadas(new Set(datos.habitaciones.map((h) => h.id)));
+      }
     } catch {
       toast.error('No se pudo cargar el dormitorio');
       navigate('/comando/dormitorios');
     } finally {
       setCargando(false);
     }
-  }, [id, navigate]);
+  }, [id, navigate, pagina, busquedaAplicada]);
 
   useEffect(() => { cargar(); }, [cargar]);
+
+  // Las unidades se piden una vez: es una lista corta y estable.
+  useEffect(() => {
+    dormitoriosService.listarUnidades().then(setUnidades).catch(() => setUnidades([]));
+  }, []);
+
+  // El buscador espera a que se deje de teclear antes de ir al servidor.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setBusquedaAplicada(busqueda.trim());
+      setPagina(1);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [busqueda]);
+
+  const alternarDespliegue = (habitacionId) => {
+    setDesplegadas((previas) => {
+      const copia = new Set(previas);
+      if (copia.has(habitacionId)) copia.delete(habitacionId);
+      else copia.add(habitacionId);
+      return copia;
+    });
+  };
 
   // ─── Habitaciones ──────────────────────────────────────────────────────────
 
@@ -231,73 +297,83 @@ const DormitorioDetalle = () => {
     }
   };
 
-  const desactivarHabitacion = async (habitacion) => {
-    if (!window.confirm(`¿Dar de baja la habitación ${habitacion.numero}? Su QR de puerta dejará de funcionar.`)) return;
-
-    try {
-      await dormitoriosService.desactivarHabitacion(habitacion.id);
-      toast.success('Habitación dada de baja');
-      await cargar();
-    } catch {
-      toast.error('No se pudo dar de baja');
-    }
+  const pedirBajaHabitacion = (habitacion) => {
+    setConfirmacion({
+      titulo: 'Dar de baja la habitación',
+      mensaje: `Se dará de baja la habitación ${habitacion.numero} y su QR de puerta dejará de funcionar. El adhesivo seguirá pegado, pero no abrirá nada.`,
+      textoConfirmar: 'Dar de baja',
+      accion: async () => {
+        await dormitoriosService.desactivarHabitacion(habitacion.id);
+        toast.success('Habitación dada de baja');
+      },
+    });
   };
 
-  // ─── QR de la puerta ───────────────────────────────────────────────────────
+  // ─── QR (persistentes) ─────────────────────────────────────────────────────
 
-  const generarQrPuerta = async (habitacion) => {
-    const yaTenia = habitacion.tiene_token;
-    if (yaTenia && !window.confirm(
-      `La habitación ${habitacion.numero} ya tiene un QR pegado. Generar otro invalida el impreso ` +
-      `en el acto: habrá que imprimir el nuevo y cambiarlo físicamente. ¿Continuar?`
-    )) return;
-
+  const verQrPuerta = async (habitacion) => {
     try {
-      const res = await dormitoriosService.generarQrHabitacion(habitacion.id);
+      const res = await dormitoriosService.qrHabitacion(habitacion.id);
       setQrMostrado({
         titulo: `Habitación ${habitacion.numero}`,
         subtitulo: 'Pegar en la puerta',
         valor: res.url_publica,
         archivo: `PUERTA_${dormitorio.nombre}_${habitacion.numero}`.replace(/\s+/g, '_'),
-        nota: 'Este token no se puede volver a consultar: en la base solo queda su hash. Descárgalo ahora.',
+        nota: 'Este QR es el mismo cada vez que lo abras: el adhesivo pegado en la puerta sigue valiendo. Regenerarlo lo anula y obliga a imprimir y cambiar el impreso.',
+        onRegenerar: async () => {
+          const nuevo = await dormitoriosService.regenerarQrHabitacion(habitacion.id);
+          return nuevo.url_publica;
+        },
       });
-      await cargar();
+      if (!habitacion.tiene_token) await cargar();
     } catch {
-      toast.error('No se pudo generar el QR de la puerta');
+      toast.error('No se pudo obtener el QR de la puerta');
     }
   };
 
-  const revocarQrPuerta = async (habitacion) => {
-    if (!window.confirm(`¿Revocar el QR de la habitación ${habitacion.numero}? El adhesivo pegado dejará de servir.`)) return;
-
-    try {
-      await dormitoriosService.revocarQrHabitacion(habitacion.id);
-      toast.success('QR revocado');
-      await cargar();
-    } catch {
-      toast.error('No se pudo revocar');
-    }
+  const pedirRevocarQrPuerta = (habitacion) => {
+    setConfirmacion({
+      titulo: 'Revocar el QR de la puerta',
+      mensaje: `El adhesivo pegado en la habitación ${habitacion.numero} dejará de abrir la ficha y no se sustituye por otro. Para volver a tener uno habrá que generarlo e imprimirlo de nuevo.`,
+      textoConfirmar: 'Revocar',
+      accion: async () => {
+        await dormitoriosService.revocarQrHabitacion(habitacion.id);
+        toast.success('QR revocado');
+      },
+    });
   };
 
-  // ─── QR peatonal ───────────────────────────────────────────────────────────
-
-  const generarQrPeatonal = async (integrante) => {
-    if (integrante.tiene_qr_peatonal && !window.confirm(
-      `${integrante.nombre} ${integrante.apellido} ya tiene carnet. Emitir otro anula el anterior. ¿Continuar?`
-    )) return;
-
+  const verQrPeatonal = async (integrante) => {
     try {
-      const res = await dormitoriosService.generarQrPeatonal(integrante.usuario_id);
+      const res = await dormitoriosService.qrPeatonal(integrante.usuario_id);
       setQrMostrado({
         titulo: res.nombre_completo,
         subtitulo: `${res.grado || 'Personal alojado'} · ${res.cedula}`,
         valor: res.token,
         archivo: `CARNET_${res.cedula}`,
-        nota: 'El guardia lo escanea con el lector de siempre. Se puede reimprimir cuando haga falta.',
+        nota: 'El guardia lo escanea con el lector de siempre. Es siempre el mismo carnet, así que se puede reimprimir sin invalidar el que la persona lleva encima. Regenerarlo solo hace falta si lo perdió.',
+        onRegenerar: async () => {
+          const nuevo = await dormitoriosService.regenerarQrPeatonal(integrante.usuario_id);
+          return nuevo.token;
+        },
       });
+      if (!integrante.tiene_qr_peatonal) await cargar();
+    } catch {
+      toast.error('No se pudo obtener el carnet');
+    }
+  };
+
+  const regenerarQr = async () => {
+    setRegenerando(true);
+    try {
+      const nuevoValor = await qrMostrado.onRegenerar();
+      setQrMostrado({ ...qrMostrado, valor: nuevoValor });
+      toast.success('QR regenerado. El anterior ya no sirve.');
       await cargar();
     } catch {
-      toast.error('No se pudo emitir el carnet');
+      toast.error('No se pudo regenerar');
+    } finally {
+      setRegenerando(false);
     }
   };
 
@@ -322,7 +398,26 @@ const DormitorioDetalle = () => {
 
   const abrirNuevoIntegrante = (habitacion) => {
     setFormIntegrante(FORM_INTEGRANTE);
+    setFormVehiculo(FORM_VEHICULO);
+    setPersonaExistente(null);
     setModalIntegrante(habitacion);
+  };
+
+  /** Rellena el formulario con lo que ya sabemos de esa persona. */
+  const elegirPersona = (persona) => {
+    setPersonaExistente(persona);
+    setFormIntegrante((previo) => ({
+      ...previo,
+      cedula: persona.cedula,
+      nombre: persona.nombre || '',
+      apellido: persona.apellido || '',
+      telefono: persona.telefono || '',
+      email: persona.email || '',
+      grado: persona.grado || previo.grado,
+      unidad: persona.unidad || previo.unidad,
+      jefe_nombre: persona.jefe_nombre || previo.jefe_nombre,
+      jefe_telefono: persona.jefe_telefono || previo.jefe_telefono,
+    }));
   };
 
   const guardarIntegrante = async (evento) => {
@@ -331,10 +426,14 @@ const DormitorioDetalle = () => {
       toast.error('Cédula, nombre y apellido son obligatorios');
       return;
     }
+    if (formIntegrante.tiene_vehiculo && !formVehiculo.vehiculo_id && !formVehiculo.placa.trim()) {
+      toast.error('Declaraste que tiene vehículo: indica la placa o desmarca la casilla');
+      return;
+    }
 
     setGuardando(true);
     try {
-      await dormitoriosService.crearIntegrante({
+      const creado = await dormitoriosService.crearIntegrante({
         ...formIntegrante,
         cedula: formIntegrante.cedula.trim(),
         nombre: formIntegrante.nombre.trim(),
@@ -347,6 +446,27 @@ const DormitorioDetalle = () => {
         jefe_telefono: formIntegrante.jefe_telefono.trim() || null,
         habitacion_id: modalIntegrante.id,
       });
+
+      // El vehículo va en una segunda llamada a propósito: si falla (placa ya con
+      // dueño), el integrante ya quedó registrado y solo hay que reintentar la placa.
+      if (formIntegrante.tiene_vehiculo) {
+        try {
+          await dormitoriosService.vincularVehiculo(creado.usuario_id, {
+            vehiculo_id: formVehiculo.vehiculo_id,
+            placa: formVehiculo.vehiculo_id ? null : formVehiculo.placa.trim().toUpperCase(),
+            marca: formVehiculo.marca.trim() || null,
+            modelo: formVehiculo.modelo.trim() || null,
+            color: formVehiculo.color.trim() || null,
+          });
+        } catch (error) {
+          toast.error(
+            error?.response?.data?.detail
+            || 'El integrante quedó registrado, pero no se pudo vincular el vehículo.',
+            { duration: 6000 },
+          );
+        }
+      }
+
       toast.success('Integrante registrado');
       setModalIntegrante(null);
       await cargar();
@@ -357,21 +477,37 @@ const DormitorioDetalle = () => {
     }
   };
 
-  const desasignarIntegrante = async (integrante) => {
-    if (!window.confirm(`¿Liberar la cama de ${integrante.nombre} ${integrante.apellido}? Seguirá registrado en el sistema.`)) return;
+  const pedirDesasignar = (integrante) => {
+    setConfirmacion({
+      titulo: 'Liberar la cama',
+      // Sin concordancia de género: la frase nombra a una persona concreta y "Sigue
+      // registrado" chirría cuando esa persona es una mujer.
+      mensaje: `${integrante.nombre} ${integrante.apellido} dejará de ocupar esta habitación. La ficha, con sus datos y sus vehículos, permanece en el sistema: solo se libera la plaza.`,
+      textoConfirmar: 'Liberar la cama',
+      tipo: 'warning',
+      accion: async () => {
+        await dormitoriosService.desasignarHabitacion(integrante.usuario_id);
+        toast.success('Cama liberada');
+      },
+    });
+  };
 
+  const ejecutarConfirmacion = async () => {
+    setGuardando(true);
     try {
-      await dormitoriosService.desasignarHabitacion(integrante.usuario_id);
-      toast.success('Cama liberada');
+      await confirmacion.accion();
+      setConfirmacion(null);
       await cargar();
-    } catch {
-      toast.error('No se pudo liberar la cama');
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || 'No se pudo completar la acción');
+    } finally {
+      setGuardando(false);
     }
   };
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
-  if (cargando) {
+  if (cargando && !dormitorio) {
     return (
       <div className="min-h-screen bg-bg-app flex items-center justify-center gap-3 text-text-muted">
         <Loader2 className="animate-spin" size={20} />
@@ -381,6 +517,8 @@ const DormitorioDetalle = () => {
   }
 
   if (!dormitorio) return null;
+
+  const sinResultados = dormitorio.habitaciones.length === 0;
 
   return (
     <div className="min-h-screen bg-bg-app pb-24">
@@ -395,101 +533,172 @@ const DormitorioDetalle = () => {
       />
 
       <div className="container mx-auto px-4 md:px-8 flex flex-col gap-4">
-        <button
-          onClick={() => navigate('/comando/dormitorios')}
-          className="self-start flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-text-muted hover:text-primary transition-colors"
-        >
-          <ArrowLeft size={14} /> Todos los dormitorios
-        </button>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+          <button
+            onClick={() => navigate('/comando/dormitorios')}
+            className="self-start flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-text-muted hover:text-primary transition-colors"
+          >
+            <ArrowLeft size={14} /> Todos los dormitorios
+          </button>
 
-        {dormitorio.habitaciones.length === 0 ? (
+          <div className="relative w-full sm:w-80">
+            <IconoLupa size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+            <input
+              type="text"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar persona por nombre, cédula o grado"
+              className="input-field pl-10"
+            />
+          </div>
+        </div>
+
+        {busquedaAplicada && (
+          <p className="text-[10px] font-black uppercase tracking-widest text-text-muted">
+            {dormitorio.total_habitaciones_filtradas} habitación(es) con alguien que coincide con “{busquedaAplicada}”
+          </p>
+        )}
+
+        {sinResultados ? (
           <Card className="py-16 flex flex-col items-center gap-4 text-center">
             <IconoPuerta size={40} className="text-text-muted opacity-40" />
-            <p className="text-sm font-black uppercase tracking-widest text-text-main">Sin habitaciones</p>
-            <Boton onClick={abrirNuevaHabitacion}><Plus size={16} /> Registrar la primera</Boton>
+            <p className="text-sm font-black uppercase tracking-widest text-text-main">
+              {busquedaAplicada ? 'Nadie coincide en este dormitorio' : 'Sin habitaciones'}
+            </p>
+            {busquedaAplicada ? (
+              <Boton variant="ghost" onClick={() => setBusqueda('')}>Limpiar búsqueda</Boton>
+            ) : (
+              <Boton onClick={abrirNuevaHabitacion}><Plus size={16} /> Registrar la primera</Boton>
+            )}
           </Card>
         ) : (
-          dormitorio.habitaciones.map((h) => (
-            <Card key={h.id} className="flex flex-col gap-4">
-              <div className="flex items-start justify-between gap-3 flex-wrap">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 rounded-2xl bg-primary/10 text-primary">
-                    <IconoPuerta size={20} />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-black uppercase tracking-tight text-text-main">
-                      Habitación {h.numero}
-                      {h.piso && <span className="text-text-muted font-bold text-xs ml-2">Piso {h.piso}</span>}
-                    </h3>
-                    <div className="flex items-center gap-3 mt-0.5 text-[10px] font-black uppercase tracking-widest">
-                      <span className={cn(h.camas_libres === 0 ? 'text-warning' : 'text-primary')}>
-                        {h.ocupacion} / {h.camas} camas
-                      </span>
-                      {h.camas_libres > 0 && (
-                        <span className="text-text-muted">{h.camas_libres} libre(s)</span>
-                      )}
+          dormitorio.habitaciones.map((h) => {
+            const abierta = desplegadas.has(h.id);
+
+            return (
+              <Card key={h.id} className="flex flex-col gap-0 p-0 overflow-hidden">
+                {/* Cabecera: siempre visible, es lo que se recorre de un vistazo */}
+                <div className="flex items-center justify-between gap-3 flex-wrap p-4">
+                  <button
+                    onClick={() => alternarDespliegue(h.id)}
+                    className="flex items-center gap-3 min-w-0 flex-1 text-left group"
+                  >
+                    <div className="p-3 rounded-2xl bg-primary/10 text-primary shrink-0">
+                      <IconoPuerta size={20} />
                     </div>
+                    <div className="min-w-0">
+                      <h3 className="text-base font-black uppercase tracking-tight text-text-main group-hover:text-primary transition-colors">
+                        Habitación {h.numero}
+                        {h.piso && <span className="text-text-muted font-bold text-xs ml-2">Piso {h.piso}</span>}
+                      </h3>
+                      <div className="flex items-center gap-3 mt-0.5 text-[10px] font-black uppercase tracking-widest">
+                        <span className={cn(h.camas_libres === 0 ? 'text-warning' : 'text-primary')}>
+                          {h.ocupacion} / {h.camas} camas
+                        </span>
+                        {h.camas_libres > 0 && (
+                          <span className="text-text-muted">{h.camas_libres} libre(s)</span>
+                        )}
+                        {h.tiene_token && (
+                          <span className="text-primary/60">QR activo</span>
+                        )}
+                      </div>
+                    </div>
+                    <IconoFlechaAbajo
+                      size={18}
+                      className={cn(
+                        'text-text-muted shrink-0 transition-transform duration-200',
+                        abierta && 'rotate-180',
+                      )}
+                    />
+                  </button>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Boton size="sm" variant="secundario" onClick={() => abrirNuevoIntegrante(h)}>
+                      <UserPlus size={13} /> Integrante
+                    </Boton>
+                    <Boton size="sm" variant="outline" onClick={() => verQrPuerta(h)}>
+                      <QrCode size={13} /> QR puerta
+                    </Boton>
+                    {h.tiene_token && (
+                      <button
+                        onClick={() => pedirRevocarQrPuerta(h)}
+                        className="p-2 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-all"
+                        title="Revocar el QR de la puerta"
+                      >
+                        <X size={15} />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => abrirEdicionHabitacion(h)}
+                      className="p-2 rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 transition-all"
+                      title="Editar habitación"
+                    >
+                      <Pencil size={15} />
+                    </button>
+                    <button
+                      onClick={() => pedirBajaHabitacion(h)}
+                      className="p-2 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-all"
+                      title="Dar de baja"
+                    >
+                      <Trash2 size={15} />
+                    </button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Boton size="sm" variant="secundario" onClick={() => abrirNuevoIntegrante(h)}>
-                    <UserPlus size={13} /> Integrante
-                  </Boton>
-                  <Boton size="sm" variant="outline" onClick={() => generarQrPuerta(h)}>
-                    <QrCode size={13} /> {h.tiene_token ? 'Rotar QR' : 'QR puerta'}
-                  </Boton>
-                  {h.tiene_token && (
-                    <button
-                      onClick={() => revocarQrPuerta(h)}
-                      className="p-2 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-all"
-                      title="Revocar el QR de la puerta"
-                    >
-                      <X size={15} />
-                    </button>
-                  )}
-                  <button
-                    onClick={() => abrirEdicionHabitacion(h)}
-                    className="p-2 rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 transition-all"
-                    title="Editar habitación"
-                  >
-                    <Pencil size={15} />
-                  </button>
-                  <button
-                    onClick={() => desactivarHabitacion(h)}
-                    className="p-2 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-all"
-                    title="Dar de baja"
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              </div>
+                {abierta && (
+                  <div className="px-4 pb-4 flex flex-col gap-3 border-t border-text-main/5 pt-4">
+                    {h.notas && (
+                      <p className="text-[11px] text-text-muted italic">{h.notas}</p>
+                    )}
 
-              {h.notas && (
-                <p className="text-[11px] text-text-muted italic">{h.notas}</p>
-              )}
+                    {h.integrantes.length === 0 ? (
+                      <div className="py-6 flex flex-col items-center gap-2 text-text-muted">
+                        <IconoGente size={22} className="opacity-30" />
+                        <span className="text-[10px] font-black uppercase tracking-widest opacity-60">
+                          Habitación vacía
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        {h.integrantes.map((integrante) => (
+                          <FichaIntegrante
+                            key={integrante.usuario_id}
+                            integrante={integrante}
+                            onQrPeatonal={verQrPeatonal}
+                            onDesasignar={pedirDesasignar}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Card>
+            );
+          })
+        )}
 
-              {h.integrantes.length === 0 ? (
-                <div className="py-6 flex flex-col items-center gap-2 text-text-muted">
-                  <IconoGente size={22} className="opacity-30" />
-                  <span className="text-[10px] font-black uppercase tracking-widest opacity-60">
-                    Habitación vacía
-                  </span>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                  {h.integrantes.map((integrante) => (
-                    <FichaIntegrante
-                      key={integrante.usuario_id}
-                      integrante={integrante}
-                      onQrPeatonal={generarQrPeatonal}
-                      onDesasignar={desasignarIntegrante}
-                    />
-                  ))}
-                </div>
-              )}
-            </Card>
-          ))
+        {dormitorio.total_paginas > 1 && (
+          <div className="flex items-center justify-center gap-3 pt-2">
+            <Boton
+              size="sm"
+              variant="outline"
+              disabled={pagina <= 1}
+              onClick={() => setPagina((p) => Math.max(1, p - 1))}
+            >
+              <IconoAnterior size={14} /> Anterior
+            </Boton>
+            <span className="text-[10px] font-black uppercase tracking-widest text-text-muted">
+              Página {dormitorio.pagina} de {dormitorio.total_paginas}
+            </span>
+            <Boton
+              size="sm"
+              variant="outline"
+              disabled={pagina >= dormitorio.total_paginas}
+              onClick={() => setPagina((p) => Math.min(dormitorio.total_paginas, p + 1))}
+            >
+              Siguiente <IconoSiguiente size={14} />
+            </Boton>
+          </div>
         )}
       </div>
 
@@ -503,14 +712,14 @@ const DormitorioDetalle = () => {
           <Input
             label="Número"
             value={formHabitacion.numero}
-            onChange={(e) => setFormHabitacion({ ...formHabitacion, numero: e.target.value })}
+            onChange={(e) => setFormHabitacion((h) => ({ ...h, numero: e.target.value }))}
             placeholder="104"
             autoFocus
           />
           <Input
             label="Piso (opcional)"
             value={formHabitacion.piso}
-            onChange={(e) => setFormHabitacion({ ...formHabitacion, piso: e.target.value })}
+            onChange={(e) => setFormHabitacion((h) => ({ ...h, piso: e.target.value }))}
             placeholder="1"
           />
           <Input
@@ -518,12 +727,12 @@ const DormitorioDetalle = () => {
             type="number"
             min="1"
             value={formHabitacion.camas}
-            onChange={(e) => setFormHabitacion({ ...formHabitacion, camas: e.target.value })}
+            onChange={(e) => setFormHabitacion((h) => ({ ...h, camas: e.target.value }))}
           />
           <Input
             label="Notas (opcional)"
             value={formHabitacion.notas}
-            onChange={(e) => setFormHabitacion({ ...formHabitacion, notas: e.target.value })}
+            onChange={(e) => setFormHabitacion((h) => ({ ...h, notas: e.target.value }))}
             placeholder="Baño compartido con la 105"
           />
 
@@ -542,74 +751,200 @@ const DormitorioDetalle = () => {
         className="max-w-xl"
       >
         <form onSubmit={guardarIntegrante}>
-          <p className="text-[10px] text-text-muted leading-relaxed mb-4">
-            Si la cédula ya existe en el sistema, no se crea una segunda ficha: se completa
-            la que hay, y los vehículos que esa persona ya tenga a su nombre aparecerán solos.
-          </p>
-
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
-            <Input
-              label="Cédula"
-              value={formIntegrante.cedula}
-              onChange={(e) => setFormIntegrante({ ...formIntegrante, cedula: e.target.value })}
-              placeholder="V12345678"
+            <CampoConSugerencias
+              etiqueta="Cédula"
+              valor={formIntegrante.cedula}
+              onChange={(v) => { setFormIntegrante((f) => ({ ...f, cedula: v })); setPersonaExistente(null); }}
+              onElegir={elegirPersona}
+              buscar={dormitoriosService.buscarPersonas}
+              claveDe={(p) => p.usuario_id}
+              placeholder="V12345678 o 12345678"
               autoFocus
+              elegido={Boolean(personaExistente)}
+              ayuda="Busca sin importar la V ni los puntos. Si ya está, se completa su ficha en vez de duplicarla."
+              render={(p) => (
+                <div className="flex flex-col">
+                  <span className="text-xs font-black uppercase text-text-main">
+                    {p.nombre} {p.apellido}
+                  </span>
+                  <span className="text-[10px] font-mono text-text-muted">
+                    {p.cedula}
+                    {p.grado && ` · ${p.grado}`}
+                    {p.ya_es_integrante && ' · YA ALOJADO'}
+                  </span>
+                </div>
+              )}
             />
+
             <Input
               label="Grado"
               value={formIntegrante.grado}
-              onChange={(e) => setFormIntegrante({ ...formIntegrante, grado: e.target.value })}
+              onChange={(e) => setFormIntegrante((f) => ({ ...f, grado: e.target.value }))}
               placeholder="Sargento Primero"
             />
             <Input
               label="Nombre"
               value={formIntegrante.nombre}
-              onChange={(e) => setFormIntegrante({ ...formIntegrante, nombre: e.target.value })}
+              onChange={(e) => setFormIntegrante((f) => ({ ...f, nombre: e.target.value }))}
             />
             <Input
               label="Apellido"
               value={formIntegrante.apellido}
-              onChange={(e) => setFormIntegrante({ ...formIntegrante, apellido: e.target.value })}
+              onChange={(e) => setFormIntegrante((f) => ({ ...f, apellido: e.target.value }))}
             />
             <Input
               label="Teléfono"
               value={formIntegrante.telefono}
-              onChange={(e) => setFormIntegrante({ ...formIntegrante, telefono: e.target.value })}
+              onChange={(e) => setFormIntegrante((f) => ({ ...f, telefono: e.target.value }))}
               placeholder="04141234567"
             />
-            <Input
-              label="Unidad"
-              value={formIntegrante.unidad}
-              onChange={(e) => setFormIntegrante({ ...formIntegrante, unidad: e.target.value })}
+
+            <CampoConSugerencias
+              etiqueta="Unidad"
+              valor={formIntegrante.unidad}
+              onChange={(v) => setFormIntegrante((f) => ({ ...f, unidad: v }))}
+              onElegir={(u) => setFormIntegrante((f) => ({ ...f, unidad: u.nombre }))}
+              buscar={async (t) => unidades.filter((u) => u.nombre.toLowerCase().includes(t.toLowerCase()))}
+              claveDe={(u) => u.id}
               placeholder="Grupo Aéreo N.º 4"
+              minimoCaracteres={0}
+              sugerenciasIniciales={unidades}
+              ayuda="Elige una entidad registrada o escribe la unidad si no está."
+              render={(u) => (
+                <span className="text-xs font-bold uppercase text-text-main">{u.nombre}</span>
+              )}
             />
-            <Input
-              label="Jefe directo"
-              value={formIntegrante.jefe_nombre}
-              onChange={(e) => setFormIntegrante({ ...formIntegrante, jefe_nombre: e.target.value })}
+
+            <CampoConSugerencias
+              etiqueta="Jefe directo"
+              valor={formIntegrante.jefe_nombre}
+              onChange={(v) => setFormIntegrante((f) => ({ ...f, jefe_nombre: v }))}
+              onElegir={(j) => setFormIntegrante({
+                ...formIntegrante,
+                jefe_nombre: j.grado ? `${j.grado} ${j.nombre_completo}` : j.nombre_completo,
+                jefe_telefono: j.telefono || formIntegrante.jefe_telefono,
+              })}
+              buscar={dormitoriosService.buscarJefes}
+              claveDe={(j) => j.usuario_id}
+              placeholder="Escribe para buscar"
+              ayuda="Si está registrado, elegirlo trae su teléfono."
+              render={(j) => (
+                <div className="flex flex-col">
+                  <span className="text-xs font-black uppercase text-text-main">
+                    {j.grado ? `${j.grado} ` : ''}{j.nombre_completo}
+                  </span>
+                  {j.telefono && (
+                    <span className="text-[10px] font-mono text-text-muted">{j.telefono}</span>
+                  )}
+                </div>
+              )}
             />
+
             <Input
               label="Teléfono del jefe"
               value={formIntegrante.jefe_telefono}
-              onChange={(e) => setFormIntegrante({ ...formIntegrante, jefe_telefono: e.target.value })}
+              onChange={(e) => setFormIntegrante((f) => ({ ...f, jefe_telefono: e.target.value }))}
             />
             <Input
               label="Correo (opcional)"
               type="email"
               value={formIntegrante.email}
-              onChange={(e) => setFormIntegrante({ ...formIntegrante, email: e.target.value })}
+              onChange={(e) => setFormIntegrante((f) => ({ ...f, email: e.target.value }))}
             />
           </div>
 
-          <label className="flex items-center gap-3 mb-5 cursor-pointer">
+          {personaExistente && (
+            <div className="flex items-start gap-2.5 mb-4 p-3 rounded-xl bg-primary/5 border border-primary/20">
+              <IconoPersonaHallada size={15} className="text-primary shrink-0 mt-0.5" />
+              <p className="text-[10px] text-text-sec leading-relaxed">
+                <strong className="text-text-main">Ya está en el sistema</strong>
+                {personaExistente.rol && ` como ${personaExistente.rol.replace('_', ' ').toLowerCase()}`}.
+                No se creará otra ficha: se completa la suya, y los vehículos que ya tenga a
+                su nombre aparecerán solos.
+                {personaExistente.ya_es_integrante && ' Ojo: ya está alojado en otra habitación, así que esto es un traslado.'}
+              </p>
+            </div>
+          )}
+
+          <label className="flex items-center gap-3 mb-4 cursor-pointer">
             <input
               type="checkbox"
               checked={formIntegrante.tiene_vehiculo}
-              onChange={(e) => setFormIntegrante({ ...formIntegrante, tiene_vehiculo: e.target.checked })}
+              onChange={(e) => setFormIntegrante((f) => ({ ...f, tiene_vehiculo: e.target.checked }))}
               className="w-4 h-4 accent-primary"
             />
             <span className="text-xs font-bold text-text-sec">Declara tener vehículo</span>
           </label>
+
+          {formIntegrante.tiene_vehiculo && (
+            <div className="mb-5 p-4 rounded-xl bg-bg-high/20 border border-text-main/5">
+              <CampoConSugerencias
+                etiqueta="Placa"
+                valor={formVehiculo.placa}
+                onChange={(v) => setFormVehiculo({ ...FORM_VEHICULO, placa: v.toUpperCase() })}
+                onElegir={(v) => {
+                  if (!v.libre) {
+                    toast.error(`${v.placa} ya está a nombre de ${v.dueno}. El cambio de titular se hace desde Parque Automotor.`);
+                    return;
+                  }
+                  setFormVehiculo({
+                    vehiculo_id: v.id,
+                    placa: v.placa,
+                    marca: v.marca || '',
+                    modelo: v.modelo || '',
+                    color: v.color || '',
+                  });
+                }}
+                buscar={dormitoriosService.buscarVehiculos}
+                claveDe={(v) => v.id}
+                placeholder="AB123CD"
+                elegido={Boolean(formVehiculo.vehiculo_id)}
+                ayuda="Si la placa ya existe y no tiene dueño, se le asigna. Si no existe, se registra en el parque automotor y la cámara de la alcabala la reconocerá desde la siguiente lectura."
+                render={(v) => (
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-mono font-black uppercase text-text-main">{v.placa}</span>
+                      <span className="text-[10px] text-text-muted">
+                        {[v.marca, v.modelo, v.color].filter(Boolean).join(' · ') || 'Sin datos'}
+                      </span>
+                    </div>
+                    {v.libre ? (
+                      <span className="text-[9px] font-black uppercase tracking-widest text-primary shrink-0">Libre</span>
+                    ) : (
+                      <span className="text-[9px] font-black uppercase tracking-widest text-warning shrink-0 text-right">
+                        De {v.dueno}
+                      </span>
+                    )}
+                  </div>
+                )}
+              />
+
+              {/* Solo para una placa nueva: la que se elige de la lista ya tiene ficha */}
+              {!formVehiculo.vehiculo_id && formVehiculo.placa.trim() && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-3">
+                  <Input
+                    label="Marca"
+                    value={formVehiculo.marca}
+                    onChange={(e) => setFormVehiculo((v) => ({ ...v, marca: e.target.value }))}
+                    placeholder="Toyota"
+                  />
+                  <Input
+                    label="Modelo"
+                    value={formVehiculo.modelo}
+                    onChange={(e) => setFormVehiculo((v) => ({ ...v, modelo: e.target.value }))}
+                    placeholder="Corolla"
+                  />
+                  <Input
+                    label="Color"
+                    value={formVehiculo.color}
+                    onChange={(e) => setFormVehiculo((v) => ({ ...v, color: e.target.value }))}
+                    placeholder="Gris"
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="flex gap-3 justify-end">
             <Boton type="button" variant="ghost" onClick={() => setModalIntegrante(null)}>Cancelar</Boton>
@@ -618,7 +953,7 @@ const DormitorioDetalle = () => {
         </form>
       </Modal>
 
-      {/* ─── Modal: QR generado ────────────────────────────────────────────── */}
+      {/* ─── Modal: QR ─────────────────────────────────────────────────────── */}
       <Modal
         isOpen={Boolean(qrMostrado)}
         onClose={() => setQrMostrado(null)}
@@ -642,13 +977,27 @@ const DormitorioDetalle = () => {
               {qrMostrado.nota}
             </p>
 
-            <div className="flex gap-3">
+            <div className="flex gap-3 flex-wrap justify-center">
               <Boton variant="ghost" onClick={() => setQrMostrado(null)}>Cerrar</Boton>
+              <Boton variant="outline" onClick={regenerarQr} isLoading={regenerando}>
+                <IconoRegenerar size={15} /> Regenerar
+              </Boton>
               <Boton onClick={descargarQr}><Download size={15} /> Descargar</Boton>
             </div>
           </div>
         )}
       </Modal>
+
+      <ModalConfirmacion
+        isOpen={Boolean(confirmacion)}
+        onClose={() => setConfirmacion(null)}
+        onConfirm={ejecutarConfirmacion}
+        loading={guardando}
+        title={confirmacion?.titulo || ''}
+        message={confirmacion?.mensaje || ''}
+        confirmText={confirmacion?.textoConfirmar || 'Confirmar'}
+        type={confirmacion?.tipo || 'danger'}
+      />
     </div>
   );
 };

@@ -10,6 +10,7 @@ import { Card } from '../../components/ui/Card';
 import { Boton } from '../../components/ui/Boton';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
+import { ModalConfirmacion } from '../../components/ui/ModalConfirmacion';
 import { Header } from '../../components/layout/Header';
 import { dormitoriosService } from '../../services/dormitorios.service';
 import { cn } from '../../lib/utils';
@@ -65,6 +66,7 @@ const Dormitorios = () => {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [editando, setEditando] = useState(null);
   const [form, setForm] = useState(FORM_VACIO);
+  const [bajaPendiente, setBajaPendiente] = useState(null);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -128,16 +130,22 @@ const Dormitorios = () => {
     }
   };
 
-  const desactivar = async (dormitorio, evento) => {
+  const pedirBaja = (dormitorio, evento) => {
     evento.stopPropagation();
-    if (!window.confirm(`¿Dar de baja el dormitorio ${dormitorio.nombre}? Sus habitaciones dejarán de estar disponibles.`)) return;
+    setBajaPendiente(dormitorio);
+  };
 
+  const confirmarBaja = async () => {
+    setGuardando(true);
     try {
-      await dormitoriosService.desactivar(dormitorio.id);
+      await dormitoriosService.desactivar(bajaPendiente.id);
       toast.success('Dormitorio dado de baja');
+      setBajaPendiente(null);
       await cargar();
     } catch {
       toast.error('No se pudo dar de baja');
+    } finally {
+      setGuardando(false);
     }
   };
 
@@ -172,45 +180,42 @@ const Dormitorios = () => {
             <Boton onClick={abrirNuevo}><Plus size={16} /> Nuevo dormitorio</Boton>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          // Una fila por dormitorio y no una rejilla: son pocos, se comparan entre sí
+          // (cuál está lleno, cuál sigue sin ubicar) y en una pantalla ancha la rejilla
+          // dejaba dos tercios en blanco. En móvil la fila se apila sola.
+          <div className="flex flex-col gap-3">
             {dormitorios.map((d) => (
               <Card
                 key={d.id}
                 hoverable
                 onClick={() => navigate(`/comando/dormitorios/${d.id}`)}
-                className="flex flex-col gap-4 group"
+                className="group flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-6"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="p-3 rounded-2xl bg-primary/10 text-primary shrink-0">
-                      <IconoCama size={20} />
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="text-sm font-black uppercase tracking-tight text-text-main truncate group-hover:text-primary transition-colors">
-                        {d.nombre}
-                      </h3>
-                      {d.codigo && (
-                        <span className="text-[9px] font-mono font-black uppercase tracking-widest text-text-muted">
-                          {d.codigo}
-                        </span>
-                      )}
+                <div className="flex items-center gap-4 min-w-0 lg:flex-1">
+                  <div className="p-3 rounded-2xl bg-primary/10 text-primary shrink-0">
+                    <IconoCama size={20} />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-black uppercase tracking-tight text-text-main truncate group-hover:text-primary transition-colors">
+                      {d.nombre}
+                    </h3>
+                    <div className="flex items-center gap-3 mt-0.5 text-[9px] font-black uppercase tracking-widest text-text-muted">
+                      {d.codigo && <span className="font-mono">{d.codigo}</span>}
+                      <span className="flex items-center gap-1.5">
+                        <IconoPuerta size={12} /> {d.total_habitaciones} hab.
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <IconoGente size={12} /> {d.camas_totales} camas
+                      </span>
                     </div>
                   </div>
-                  <ChevronRight size={18} className="text-text-muted opacity-40 group-hover:opacity-100 group-hover:text-primary transition-all shrink-0" />
                 </div>
 
-                <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-text-muted">
-                  <span className="flex items-center gap-1.5">
-                    <IconoPuerta size={13} /> {d.total_habitaciones} hab.
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <IconoGente size={13} /> {d.camas_totales} camas
-                  </span>
+                <div className="lg:w-64 shrink-0">
+                  <BarraOcupacion ocupacion={d.ocupacion} total={d.camas_totales} />
                 </div>
 
-                <BarraOcupacion ocupacion={d.ocupacion} total={d.camas_totales} />
-
-                <div className="flex items-center justify-between pt-3 border-t border-text-main/5">
+                <div className="flex items-center justify-between lg:justify-end gap-3 lg:w-56 shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-text-main/5">
                   {d.latitud && d.longitud ? (
                     <span className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-primary/70">
                       <IconoMapa size={12} /> En el mapa
@@ -232,12 +237,13 @@ const Dormitorios = () => {
                       <Pencil size={14} />
                     </button>
                     <button
-                      onClick={(e) => desactivar(d, e)}
+                      onClick={(e) => pedirBaja(d, e)}
                       className="p-2 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-all"
                       title="Dar de baja"
                     >
                       <Trash2 size={14} />
                     </button>
+                    <ChevronRight size={18} className="text-text-muted opacity-40 group-hover:opacity-100 group-hover:text-primary transition-all" />
                   </div>
                 </div>
               </Card>
@@ -287,6 +293,20 @@ const Dormitorios = () => {
           </div>
         </form>
       </Modal>
+
+      <ModalConfirmacion
+        isOpen={Boolean(bajaPendiente)}
+        onClose={() => setBajaPendiente(null)}
+        onConfirm={confirmarBaja}
+        loading={guardando}
+        title="Dar de baja el dormitorio"
+        message={
+          bajaPendiente
+            ? `Se dará de baja "${bajaPendiente.nombre}" y sus ${bajaPendiente.total_habitaciones} habitación(es) dejarán de estar disponibles. Los accesos ya registrados de sus residentes se conservan.`
+            : ''
+        }
+        confirmText="Dar de baja"
+      />
     </div>
   );
 };

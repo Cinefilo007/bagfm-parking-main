@@ -11,8 +11,10 @@ export const dormitoriosService = {
     return res.data;
   },
 
-  detalle: async (id) => {
-    const res = await api.get(`/dormitorios/${id}`);
+  detalle: async (id, { pagina = 1, porPagina = 10, buscar = '' } = {}) => {
+    const res = await api.get(`/dormitorios/${id}`, {
+      params: { pagina, por_pagina: porPagina, buscar },
+    });
     return res.data;
   },
 
@@ -46,9 +48,15 @@ export const dormitoriosService = {
     await api.delete(`/dormitorios/habitaciones/${habitacionId}`);
   },
 
-  // Devuelve el token en claro una sola vez: si se pierde, hay que rotarlo.
-  generarQrHabitacion: async (habitacionId) => {
-    const res = await api.post(`/dormitorios/habitaciones/${habitacionId}/qr`);
+  // Consultar NO cambia el QR: el adhesivo pegado en la puerta sigue valiendo. Solo
+  // `regenerarQrHabitacion` emite uno nuevo y anula el impreso.
+  qrHabitacion: async (habitacionId) => {
+    const res = await api.get(`/dormitorios/habitaciones/${habitacionId}/qr`);
+    return res.data;
+  },
+
+  regenerarQrHabitacion: async (habitacionId) => {
+    const res = await api.post(`/dormitorios/habitaciones/${habitacionId}/qr/regenerar`);
     return res.data;
   },
 
@@ -86,8 +94,41 @@ export const dormitoriosService = {
     return res.data;
   },
 
-  generarQrPeatonal: async (usuarioId) => {
-    const res = await api.post(`/dormitorios/integrantes/${usuarioId}/qr-peatonal`);
+  // Igual que el de la puerta: consultarlo devuelve el carnet que ya tiene la persona.
+  qrPeatonal: async (usuarioId) => {
+    const res = await api.get(`/dormitorios/integrantes/${usuarioId}/qr-peatonal`);
+    return res.data;
+  },
+
+  regenerarQrPeatonal: async (usuarioId) => {
+    const res = await api.post(`/dormitorios/integrantes/${usuarioId}/qr-peatonal/regenerar`);
+    return res.data;
+  },
+
+  // ─── Búsquedas del formulario de alta ──────────────────────────────────────
+
+  buscarPersonas: async (q) => {
+    const res = await api.get('/dormitorios/personas/buscar', { params: { q } });
+    return res.data;
+  },
+
+  buscarJefes: async (q) => {
+    const res = await api.get('/dormitorios/jefes/buscar', { params: { q } });
+    return res.data;
+  },
+
+  listarUnidades: async () => {
+    const res = await api.get('/dormitorios/unidades');
+    return res.data;
+  },
+
+  buscarVehiculos: async (placa) => {
+    const res = await api.get('/dormitorios/vehiculos/buscar', { params: { placa } });
+    return res.data;
+  },
+
+  vincularVehiculo: async (usuarioId, datos) => {
+    const res = await api.post(`/dormitorios/integrantes/${usuarioId}/vehiculo`, datos);
     return res.data;
   },
 

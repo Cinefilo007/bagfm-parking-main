@@ -85,8 +85,17 @@ class Habitacion(Base):
     camas = Column(Integer, nullable=False, default=1)
     notas = Column(Text, nullable=True)
 
-    # QR de la puerta. Mismo esquema que `pantallas_monitor`: solo el hash vive en la
-    # base, el token en claro se enseña una vez al generarlo.
+    # QR de la puerta.
+    #
+    # A diferencia de las cámaras y las pantallas, aquí el token SÍ se guarda en claro
+    # además de su hash. El motivo es práctico: el QR está impreso y pegado en una
+    # puerta, y con el esquema de "se enseña una vez" bastaba con que alguien abriera
+    # el panel a mirarlo para invalidar el adhesivo sin enterarse. Ahora se reimprime
+    # el mismo tantas veces como haga falta y regenerarlo es un acto deliberado.
+    #
+    # El hash se conserva porque la vista pública busca por él y porque es lo que
+    # sostiene el índice único.
+    token = Column(String(64), nullable=True)
     token_hash = Column(String(64), nullable=True, unique=True, index=True)
     token_pista = Column(String(8), nullable=True)
     token_generado_at = Column(DateTime(timezone=True), nullable=True)

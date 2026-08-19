@@ -1,4 +1,4 @@
-# BAGFM — Control de acceso Base Aérea La Carlota
+﻿# BAGFM — Control de acceso Base Aérea La Carlota
 
 ## Qué es esto
 
@@ -206,12 +206,37 @@ lista blanca) necesita WireGuard en el VPS + un router saliente en cada alcabala
   discrepancia: quien declaró no tener vehículo y aparece con placas a su nombre es justo
   el patrón que el módulo existe para hacer visible. Fundirlas en un solo indicador lo
   perdería.
-- **El QR de la puerta usa token hasheado (SHA-256); el carnet peatonal, JWT en
-  `codigos_qr`.** No es incoherencia: el de la puerta identifica a un SITIO y tiene que
-  poder cortarse en la petición siguiente cuando alguien fotografía el pasillo, así que
-  sigue el patrón de cámaras y pantallas. El peatonal identifica a una PERSONA, se
-  reimprime cuando hace falta y entra por el escáner de siempre, así que sigue el de los
-  pases.
+- **Los dos QR del módulo son PERSISTENTES; consultarlos no los cambia.** Nacieron
+  siguiendo el patrón de cámaras y pantallas —el secreto se enseña una vez y solo queda
+  el hash— y resultó impracticable: el QR está impreso y pegado en una puerta, así que
+  bastaba con abrir el panel a mirarlo para dejar muerto el adhesivo sin que nadie se
+  enterase hasta que alguien lo escaneara. Ahora `habitaciones.token` guarda también el
+  valor en claro (migración `b2c3dor4e5f6`) y regenerar es un botón aparte. El coste
+  aceptado: quien lea la base puede abrir cualquier ficha de habitación — que ya es
+  pública por diseño, la abre cualquiera que pase por el pasillo.
+- **El de la puerta conserva el hash además del claro; el peatonal es un JWT en
+  `codigos_qr`.** El hash sigue ahí porque la vista pública busca por él y es lo que
+  sostiene el índice único. El peatonal identifica a una PERSONA y entra por el escáner
+  de siempre, así que sigue el patrón de los pases; regenerarlo anula el anterior, que es
+  lo que hace falta cuando alguien pierde la credencial.
+- **`crear_token_qr` acepta `unico=True` porque el `iat` solo tiene resolución de
+  segundo.** Emitir un carnet y regenerarlo acto seguido producía el MISMO JWT y
+  reventaba contra el índice único de `codigos_qr.token`. El parámetro añade un `jti`
+  aleatorio y va como opción, no por defecto, para no cambiar los tokens que emiten los
+  demás flujos.
+- **El alta de integrante sugiere en vez de imponer.** Cédula, unidad, jefe directo y
+  placa buscan contra la base mientras se escribe, pero ninguno es una lista cerrada: si
+  fueran campos libres se duplicarían los datos, y si fueran listas cerradas no se podría
+  dar de alta a quien todavía no está. La cédula compara **sin la letra ni los
+  separadores** —"12345678", "V12345678" y "V-12.345.678" son la misma persona—, que es
+  lo que evita una segunda ficha en el módulo que existe para unificarlas.
+- **Solo se puede vincular un vehículo SIN dueño.** Reasignar una placa con titular desde
+  aquí sería quitársela a alguien sin dejar rastro; ese cambio pertenece a Parque
+  Automotor. Las placas ocupadas se muestran igualmente, marcadas y con el nombre del
+  dueño: ocultarlas haría creer que están libres y llevaría a registrarlas otra vez, que
+  es como aparecieron las fichas duplicadas que hubo que sanear. La placa nueva se crea
+  en `vehiculos`, la tabla madre, para que la cámara la reconozca desde la lectura
+  siguiente.
 - **`validar_qr` comprueba el perfil militar ANTES del camino de socio permanente.** Ese
   camino corta con "Socio sin registro de membresía vigente" y un militar alojado nunca va
   a tener membresía: no es socio de ningún club. Puesta después, la rama sería inalcanzable
@@ -347,6 +372,7 @@ depende que el pendiente 0.b valga la pena o sobre.
 4. Terminar la unificación de las tres tablas de vehículos.
 5. Limpiar los artefactos de Railway.
 6. **Fase 3**: restringir accesos de verdad, solo cuando haya meses de datos.
-7. **Dormitorios, siguiente paso**: que el alta de integrante ofrezca registrarle el
-   vehículo en el acto en vez de esperar a que la cámara lo descubra, y que el Comandante
-   vea la lista de residentes cuya declaración de vehículo no cuadra con `vehiculos`.
+7. ~~**Dormitorios: registrar el vehículo en el alta**~~ — **resuelto**: el formulario
+   busca la placa mientras se escribe y la crea en `vehiculos` si no existe. Queda que el
+   Comandante vea de un tirón la lista de residentes cuya declaración de vehículo no
+   cuadra con `vehiculos`; hoy la discrepancia se ve en la ficha de cada uno.

@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import UUID
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -25,6 +25,7 @@ from app.models.enums import QRTipo, RolTipo
 from app.models.perfil_militar import PerfilMilitar
 from app.models.usuario import Usuario
 from app.models.vehiculo import Vehiculo
+from app.services.placa_lookup import _placa_sin_separadores, normalizar_placa
 from app.schemas.dormitorio import (
     HabitacionPublica,
     IntegranteCrear,
@@ -122,6 +123,60 @@ class DormitorioService:
             .where(PerfilMilitar.habitacion_id == habitacion_id, PerfilMilitar.activo == True)  # noqa: E712
         )
         return [await self.construir_integrante(db, p) for p in res.scalars().all()]
+
+    async def habitaciones_paginadas(
+        self,
+        db: AsyncSession,
+        dormitorio_id: UUID,
+        pagina: int = 1,
+        por_pagina: int = 10,
+        buscar: str = "",
+    ) -> tuple[List[Habitacion], int]:
+        """
+        Habitaciones del dormitorio, por páginas y con filtro por persona.
+
+        El filtro busca en la GENTE, no en el número de habitación: la pregunta real
+        del Comandante es "¿dónde duerme Rojas?", no "¿existe la 104?". Devuelve las
+        habitaciones que alojan a alguien que coincide por nombre, apellido, cédula o
+        grado, y la paginación se aplica después del filtro para que el número de
+        páginas se corresponda con lo que se está viendo.
+        """
+        base = select(Habitacion).where(
+            Habitacion.dormitorio_id == dormitorio_id,
+            Habitacion.activo == True,  # noqa: E712
+        )
+
+        termino = (buscar or "").strip()
+        if termino:
+            patron = f"%{termino.lower()}%"
+            coincidentes = (
+                select(PerfilMilitar.habitacion_id)
+                .join(Usuario, PerfilMilitar.usuario_id == Usuario.id)
+                .where(
+                    PerfilMilitar.activo == True,  # noqa: E712
+                    or_(
+                        func.lower(Usuario.nombre).like(patron),
+                        func.lower(Usuario.apellido).like(patron),
+                        func.lower(Usuario.cedula).like(patron),
+                        func.lower(PerfilMilitar.grado).like(patron),
+                    ),
+                )
+            )
+            base = base.where(Habitacion.id.in_(coincidentes))
+
+        total = (await db.execute(
+            select(func.count()).select_from(base.subquery())
+        )).scalar() or 0
+
+        pagina = max(1, pagina)
+        por_pagina = max(1, min(por_pagina, 100))
+
+        res = await db.execute(
+            base.order_by(Habitacion.piso, Habitacion.numero)
+            .offset((pagina - 1) * por_pagina)
+            .limit(por_pagina)
+        )
+        return list(res.scalars().all()), total
 
     # ─── Alta y edición de integrantes ─────────────────────────────────────────
 
@@ -277,18 +332,28 @@ class DormitorioService:
 
     # ─── QR de la puerta ───────────────────────────────────────────────────────
 
-    async def generar_token_habitacion(
-        self, db: AsyncSession, habitacion_id: UUID
+    async def obtener_token_habitacion(
+        self, db: AsyncSession, habitacion_id: UUID, regenerar: bool = False
     ) -> tuple[Habitacion, str]:
         """
-        Genera (o rota) el token del QR pegado en la puerta.
+        Devuelve el QR de la puerta. Lo crea la primera vez y lo conserva después.
 
-        Rotar invalida el QR impreso anterior en el acto: hay que imprimir el nuevo y
-        cambiarlo físicamente. Es el precio de poder cortar el acceso a la ficha en el
-        momento en que se sepa que alguien fotografió la puerta.
+        Consultarlo NO lo cambia. Eso es deliberado y corrige el comportamiento
+        anterior: el QR está impreso y pegado en una puerta, así que bastaba con
+        abrir el panel a mirarlo para dejar el adhesivo muerto sin que nadie se
+        enterase hasta que alguien lo escaneara.
+
+        `regenerar=True` sí emite uno nuevo, y ahí sí hay que imprimirlo y cambiarlo
+        físicamente: el anterior deja de servir en la petición siguiente. Es la vía
+        para cortar el acceso cuando se sabe que alguien fotografió la puerta.
         """
         habitacion = await self.obtener_habitacion(db, habitacion_id)
+
+        if habitacion.token and not regenerar:
+            return habitacion, habitacion.token
+
         token = generar_token()
+        habitacion.token = token
         habitacion.token_hash = hashear_token(token)
         habitacion.token_pista = token[:6]
         habitacion.token_generado_at = datetime.now(timezone.utc)
@@ -298,6 +363,7 @@ class DormitorioService:
 
     async def revocar_token_habitacion(self, db: AsyncSession, habitacion_id: UUID) -> Habitacion:
         habitacion = await self.obtener_habitacion(db, habitacion_id)
+        habitacion.token = None
         habitacion.token_hash = None
         habitacion.token_pista = None
         habitacion.token_generado_at = None
@@ -360,20 +426,43 @@ class DormitorioService:
 
     # ─── QR peatonal ───────────────────────────────────────────────────────────
 
-    async def generar_qr_peatonal(
-        self, db: AsyncSession, usuario_id: UUID, creador_id: Optional[UUID] = None
+    async def obtener_qr_peatonal(
+        self,
+        db: AsyncSession,
+        usuario_id: UUID,
+        creador_id: Optional[UUID] = None,
+        regenerar: bool = False,
     ) -> tuple[Usuario, PerfilMilitar, str]:
         """
-        Carnet QR para quien entra a pie.
+        Carnet QR para quien entra a pie. Se emite una vez y se conserva.
 
         Va en `codigos_qr` como cualquier otro pase —mismo escáner, misma bitácora— con
         `vehiculo_id` en nulo porque no hay vehículo que registrar, y sin membresía: lo
         que lo valida es la rama de perfil militar de `acceso_service.validar_qr`.
+
+        Consultarlo devuelve el mismo carnet que ya tiene la persona, de modo que
+        reimprimirlo por deterioro no deja fuera al que lleva en el bolsillo. Solo
+        `regenerar=True` emite uno nuevo, y entonces sí anula el anterior — que es lo
+        que hace falta cuando alguien pierde la credencial.
         """
         perfil = await self.obtener_perfil(db, usuario_id)
         usuario = await db.get(Usuario, usuario_id)
         if not usuario:
             raise EntidadNoEncontrada("Usuario no encontrado")
+
+        if not regenerar:
+            res = await db.execute(
+                select(CodigoQR)
+                .where(
+                    CodigoQR.usuario_id == usuario_id,
+                    CodigoQR.tipo == QRTipo.permanente,
+                    CodigoQR.activo == True,  # noqa: E712
+                )
+                .order_by(CodigoQR.created_at.desc())
+            )
+            vigente = res.scalars().first()
+            if vigente:
+                return usuario, perfil, vigente.token
 
         # Un carnet nuevo deja sin valor al anterior: si no, quien perdió la credencial
         # sigue teniendo una válida circulando por ahí.
@@ -383,7 +472,10 @@ class DormitorioService:
             .values(activo=False)
         )
 
-        token = crear_token_qr(str(usuario_id))
+        # `unico=True` porque aquí sí se dan las dos emisiones seguidas: emitir el
+        # carnet y regenerarlo acto seguido cae en el mismo segundo, y sin esto el JWT
+        # sería idéntico y chocaría contra el índice único de `codigos_qr.token`.
+        token = crear_token_qr(str(usuario_id), unico=True)
         qr = CodigoQR(
             usuario_id=usuario_id,
             tipo=QRTipo.permanente,
@@ -397,6 +489,229 @@ class DormitorioService:
         db.add(qr)
         await db.commit()
         return usuario, perfil, token
+
+    # ─── Búsquedas que alimentan el formulario de alta ─────────────────────────
+
+    async def buscar_personas(self, db: AsyncSession, termino: str) -> List[dict]:
+        """
+        Personas de `usuarios` que encajan con lo tecleado, para autorrellenar el alta.
+
+        Compara la cédula **sin la letra ni los separadores**: en la base conviven
+        "V12345678", "12345678" y "V-12.345.678" para la misma persona, y si el
+        formulario solo casara la cadena exacta se crearían fichas duplicadas justo en
+        el módulo que existe para unificarlas.
+        """
+        termino = (termino or "").strip()
+        if len(termino) < 2:
+            return []
+
+        patron = f"%{termino.lower()}%"
+        solo_digitos = "".join(c for c in termino if c.isdigit())
+
+        condiciones = [
+            func.lower(Usuario.nombre).like(patron),
+            func.lower(Usuario.apellido).like(patron),
+            func.lower(Usuario.cedula).like(patron),
+        ]
+        if solo_digitos:
+            # Quita letra, guiones y puntos de la columna antes de comparar.
+            cedula_normalizada = func.replace(
+                func.replace(
+                    func.replace(func.lower(Usuario.cedula), "v", ""), "-", ""
+                ),
+                ".",
+                "",
+            )
+            condiciones.append(cedula_normalizada.like(f"%{solo_digitos}%"))
+
+        res = await db.execute(
+            select(Usuario)
+            .where(Usuario.is_deleted == False, or_(*condiciones))  # noqa: E712
+            .order_by(Usuario.apellido, Usuario.nombre)
+            .limit(15)
+        )
+        personas = res.scalars().all()
+        if not personas:
+            return []
+
+        ids = [p.id for p in personas]
+        res_perfiles = await db.execute(
+            select(PerfilMilitar).where(PerfilMilitar.usuario_id.in_(ids))
+        )
+        perfiles = {p.usuario_id: p for p in res_perfiles.scalars().all()}
+
+        salida = []
+        for p in personas:
+            perfil = perfiles.get(p.id)
+            salida.append({
+                "usuario_id": p.id,
+                "cedula": p.cedula,
+                "nombre": p.nombre,
+                "apellido": p.apellido,
+                "telefono": p.telefono,
+                "email": p.email,
+                "rol": p.rol.value if p.rol else None,
+                # Lo que ya sabemos de ella, para no obligar a reescribirlo.
+                "grado": perfil.grado if perfil else None,
+                "unidad": perfil.unidad if perfil else None,
+                "jefe_nombre": perfil.jefe_nombre if perfil else None,
+                "jefe_telefono": perfil.jefe_telefono if perfil else None,
+                # Si ya duerme en otra habitación, el alta sería un traslado.
+                "ya_es_integrante": perfil is not None and perfil.activo,
+                "habitacion_id": perfil.habitacion_id if perfil else None,
+            })
+        return salida
+
+    async def buscar_jefes(self, db: AsyncSession, termino: str) -> List[dict]:
+        """
+        Candidatos a jefe directo entre las personas ya registradas.
+
+        El jefe se guarda como texto y no como clave ajena —muchas veces no está en el
+        sistema y exigirlo convertiría un alta en un alta en cadena—, pero cuando sí
+        está, elegirlo de la lista trae su teléfono y evita tres grafías del mismo
+        apellido.
+        """
+        termino = (termino or "").strip()
+        if len(termino) < 2:
+            return []
+
+        patron = f"%{termino.lower()}%"
+        res = await db.execute(
+            select(Usuario)
+            .where(
+                Usuario.is_deleted == False,  # noqa: E712
+                or_(
+                    func.lower(Usuario.nombre).like(patron),
+                    func.lower(Usuario.apellido).like(patron),
+                ),
+            )
+            .order_by(Usuario.apellido, Usuario.nombre)
+            .limit(15)
+        )
+        personas = res.scalars().all()
+
+        ids = [p.id for p in personas]
+        grados = {}
+        if ids:
+            res_perfiles = await db.execute(
+                select(PerfilMilitar).where(PerfilMilitar.usuario_id.in_(ids))
+            )
+            grados = {p.usuario_id: p.grado for p in res_perfiles.scalars().all()}
+
+        return [
+            {
+                "usuario_id": p.id,
+                "nombre_completo": p.nombre_completo,
+                "telefono": p.telefono,
+                "grado": grados.get(p.id),
+            }
+            for p in personas
+        ]
+
+    async def buscar_vehiculos(self, db: AsyncSession, placa: str) -> List[dict]:
+        """
+        Vehículos cuya placa se parece a lo tecleado, con su dueño si lo tienen.
+
+        Devuelve también los que YA tienen dueño, marcados como no asignables. Ocultarlos
+        haría creer que la placa está libre y llevaría a registrarla otra vez, que es
+        exactamente cómo aparecieron las fichas duplicadas que hubo que sanear.
+        """
+        placa = normalizar_placa(placa or "")
+        if len(placa) < 2:
+            return []
+
+        # Se compara sobre la columna ya normalizada, no sobre el texto crudo: hay
+        # placas cargadas por Excel como "AV-645" que nunca casarían con "AV645".
+        res = await db.execute(
+            select(Vehiculo)
+            .options(selectinload(Vehiculo.socio))
+            .where(
+                _placa_sin_separadores(Vehiculo.placa).like(f"%{placa}%"),
+                Vehiculo.activo == True,  # noqa: E712
+            )
+            .order_by(Vehiculo.placa)
+            .limit(15)
+        )
+
+        salida = []
+        for v in res.scalars().all():
+            salida.append({
+                "id": v.id,
+                "placa": v.placa,
+                "marca": v.marca,
+                "modelo": v.modelo,
+                "color": v.color,
+                "libre": v.socio_id is None,
+                "dueno": v.socio.nombre_completo if v.socio else None,
+            })
+        return salida
+
+    async def vincular_vehiculo(
+        self,
+        db: AsyncSession,
+        usuario_id: UUID,
+        vehiculo_id: Optional[UUID] = None,
+        datos_nuevos: Optional[dict] = None,
+    ) -> Vehiculo:
+        """
+        Ata una placa a un integrante, en la tabla madre `vehiculos`.
+
+        Solo acepta un vehículo **sin dueño**. Reasignar uno que ya tiene titular desde
+        aquí sería quitárselo a alguien sin dejar rastro, y ese cambio pertenece al
+        módulo de Parque Automotor, que es donde se ve el historial completo.
+
+        Si la placa no existe se crea la fila aquí mismo, no en una tabla aparte: así la
+        cámara de la alcabala la reconoce desde la siguiente lectura sin que nadie tenga
+        que darla de alta dos veces.
+        """
+        perfil = await self.obtener_perfil(db, usuario_id)
+
+        if vehiculo_id:
+            vehiculo = await db.get(Vehiculo, vehiculo_id)
+            if not vehiculo:
+                raise EntidadNoEncontrada("Vehículo no encontrado")
+            if vehiculo.socio_id and vehiculo.socio_id != usuario_id:
+                dueno = await db.get(Usuario, vehiculo.socio_id)
+                raise EntidadDuplicada(
+                    f"La placa {vehiculo.placa} ya está a nombre de "
+                    f"{dueno.nombre_completo if dueno else 'otra persona'}. "
+                    f"El cambio de titular se hace desde Parque Automotor."
+                )
+            vehiculo.socio_id = usuario_id
+        else:
+            datos_nuevos = datos_nuevos or {}
+            placa = normalizar_placa(datos_nuevos.get("placa", ""))
+            if not placa:
+                raise EntidadNoEncontrada("Hace falta la placa")
+
+            res = await db.execute(select(Vehiculo).where(Vehiculo.placa == placa))
+            existente = res.scalars().first()
+            if existente:
+                if existente.socio_id and existente.socio_id != usuario_id:
+                    dueno = await db.get(Usuario, existente.socio_id)
+                    raise EntidadDuplicada(
+                        f"La placa {placa} ya está a nombre de "
+                        f"{dueno.nombre_completo if dueno else 'otra persona'}."
+                    )
+                existente.socio_id = usuario_id
+                vehiculo = existente
+            else:
+                vehiculo = Vehiculo(
+                    placa=placa,
+                    marca=(datos_nuevos.get("marca") or "SIN ESPECIFICAR").upper(),
+                    modelo=(datos_nuevos.get("modelo") or "SIN ESPECIFICAR").upper(),
+                    color=(datos_nuevos.get("color") or "SIN ESPECIFICAR").upper(),
+                    tipo=datos_nuevos.get("tipo"),
+                    socio_id=usuario_id,
+                )
+                db.add(vehiculo)
+
+        # Tener una placa a su nombre convierte la declaración en un hecho.
+        perfil.tiene_vehiculo = True
+
+        await db.commit()
+        await db.refresh(vehiculo)
+        return vehiculo
 
 
 dormitorio_service = DormitorioService()

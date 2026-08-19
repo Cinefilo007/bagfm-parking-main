@@ -4,6 +4,7 @@ Manejo de contraseñas (bcrypt) y tokens JWT.
 """
 from datetime import datetime, timedelta, timezone
 from typing import Any
+import secrets
 from jose import JWTError, jwt
 import bcrypt
 from app.core.config import obtener_config
@@ -45,10 +46,18 @@ def decodificar_token(token: str) -> dict[str, Any]:
     )
 
 
-def crear_token_qr(usuario_id: str, vehiculo_id: str | None = None) -> str:
+def crear_token_qr(usuario_id: str, vehiculo_id: str | None = None, unico: bool = False) -> str:
     """
     Crea un JWT especial para códigos QR de acceso.
-    Incluye iat para asegurar unicidad en la base de datos.
+
+    El `iat` da unicidad, pero solo con resolución de SEGUNDO: dos llamadas para la
+    misma persona dentro del mismo segundo devuelven exactamente el mismo token y la
+    segunda choca contra el índice único de `codigos_qr.token`. Pasa de verdad al
+    reemitir un carnet justo después de emitirlo (o con un doble clic).
+
+    `unico=True` añade un identificador aleatorio para que eso no ocurra. Va como
+    opción y no por defecto para no cambiar los tokens que ya emiten los otros flujos;
+    nada valida este campo, así que el QR se lee igual.
     """
     payload = {
         "sub": usuario_id,
@@ -57,6 +66,8 @@ def crear_token_qr(usuario_id: str, vehiculo_id: str | None = None) -> str:
     }
     if vehiculo_id:
         payload["vehiculo_id"] = vehiculo_id
+    if unico:
+        payload["jti"] = secrets.token_urlsafe(8)
     return jwt.encode(payload, config.jwt_secret, algorithm=config.jwt_algoritmo)
 
 

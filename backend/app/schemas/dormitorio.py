@@ -186,6 +186,83 @@ class HabitacionConToken(BaseModel):
 class DormitorioDetalle(DormitorioSalida):
     habitaciones: List[HabitacionSalida] = []
 
+    # Paginación de habitaciones: un dormitorio de tres plantas no cabe en una pantalla
+    # y hacer scroll hasta la 40 para ver quién duerme ahí no es una forma de trabajar.
+    pagina: int = 1
+    por_pagina: int = 10
+    total_habitaciones_filtradas: int = 0
+    total_paginas: int = 1
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Búsquedas que alimentan el formulario de alta
+# ──────────────────────────────────────────────────────────────────────────────
+
+class PersonaSugerida(BaseModel):
+    """
+    Una persona que ya está en `usuarios` y encaja con lo tecleado en el alta.
+
+    Existe para que la cédula no sea un campo libre: escribir "12345678" cuando la
+    persona está guardada como "V12345678" creaba una segunda ficha en el módulo cuyo
+    propósito es justamente unificarlas.
+    """
+    usuario_id: UUID
+    cedula: str
+    nombre: str
+    apellido: str
+    telefono: Optional[str] = None
+    email: Optional[str] = None
+    rol: Optional[str] = None
+
+    grado: Optional[str] = None
+    unidad: Optional[str] = None
+    jefe_nombre: Optional[str] = None
+    jefe_telefono: Optional[str] = None
+
+    ya_es_integrante: bool = False
+    habitacion_id: Optional[UUID] = None
+
+
+class JefeSugerido(BaseModel):
+    usuario_id: UUID
+    nombre_completo: str
+    telefono: Optional[str] = None
+    grado: Optional[str] = None
+
+
+class UnidadSugerida(BaseModel):
+    """Una entidad registrada, para ofrecerla como unidad sin obligar a elegirla."""
+    id: UUID
+    nombre: str
+
+
+class VehiculoSugerido(BaseModel):
+    id: UUID
+    placa: str
+    marca: Optional[str] = None
+    modelo: Optional[str] = None
+    color: Optional[str] = None
+    # Solo se puede vincular un vehículo sin dueño. Los que ya lo tienen se muestran
+    # igualmente, para que quede claro por qué esa placa no se puede tomar.
+    libre: bool = True
+    dueno: Optional[str] = None
+
+
+class VehiculoVincular(BaseModel):
+    """
+    O se elige un vehículo existente por `vehiculo_id`, o se describe uno nuevo.
+
+    Los datos del vehículo nuevo van sueltos y no en un objeto aparte porque el
+    formulario de la puerta captura lo mínimo: la placa es lo único imprescindible, el
+    resto se completa después desde Parque Automotor.
+    """
+    vehiculo_id: Optional[UUID] = None
+    placa: Optional[str] = Field(default=None, max_length=20)
+    marca: Optional[str] = Field(default=None, max_length=100)
+    modelo: Optional[str] = Field(default=None, max_length=100)
+    color: Optional[str] = Field(default=None, max_length=50)
+    tipo: Optional[str] = Field(default=None, max_length=50)
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Vista pública de la puerta (sin sesión)
