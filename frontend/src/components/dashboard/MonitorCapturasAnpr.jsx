@@ -54,6 +54,27 @@ const ETIQUETA_COINCIDENCIA = {
 
 const semaforoDe = (coincidencia) => SEMAFOROS[SEMAFORO_DE[coincidencia] || 'amarillo'];
 
+/**
+ * Qué foto va en grande y cuál en la miniatura.
+ *
+ * En el hueco principal va SIEMPRE la panorámica del vehículo, nunca un recorte: es la
+ * única que identifica el carro, y en 28 píxeles de miniatura no sirve de nada.
+ *
+ * El respaldo a la foto de placa no es teórico. Cuando la cámara no consigue leer la
+ * matrícula no manda recorte, solo la panorámica, y el backend la guardaba en el hueco
+ * del recorte (ya corregido en `_clasificar_fotos`). Las capturas grabadas antes de esa
+ * corrección siguen así en la base, y sin este respaldo se verían para siempre con la
+ * foto del vehículo encogida en la esquina y un "sin foto" en el centro.
+ */
+const repartirFotos = (evento) => {
+  if (evento.foto_escena_url) {
+    return { principal: 'escena', miniatura: evento.foto_placa_url ? 'placa' : null };
+  }
+  // Sin escena: lo que haya se muestra en grande, y la miniatura sobra porque sería
+  // exactamente la misma imagen repetida.
+  return { principal: evento.foto_placa_url ? 'placa' : null, miniatura: null };
+};
+
 const soloHora = (valor) =>
   valor ? new Date(valor).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }) : '—';
 
@@ -127,6 +148,7 @@ const Dato = ({ etiqueta, valor, resalte }) => (
 /** Detalle de una captura, con la escena en grande. */
 const ModalCaptura = ({ evento, onCerrar }) => {
   const s = semaforoDe(evento.coincidencia);
+  const { principal, miniatura } = repartirFotos(evento);
 
   // Escape para cerrar: el ratón tiene que viajar hasta la X, y esto se mira de pie.
   useEffect(() => {
@@ -165,27 +187,27 @@ const ModalCaptura = ({ evento, onCerrar }) => {
         </div>
 
         <div className="p-4">
-          {evento.foto_escena_url ? (
+          {principal ? (
             <FotoEvento
               eventoId={evento.id}
-              cual="escena"
+              cual={principal}
               alt={`Vehículo ${evento.placa}`}
               className="max-h-[55vh] w-full rounded-xl bg-bg-low object-contain"
             />
           ) : (
             <div className="flex h-48 items-center justify-center rounded-xl bg-bg-low text-xs text-text-muted">
-              Esta captura no guardó foto de escena
+              Esta captura no guardó ninguna foto
             </div>
           )}
 
-          {evento.foto_placa_url && (
+          {miniatura && (
             <div className="mt-3">
               <p className="mb-1 text-[9px] font-black uppercase tracking-widest text-text-muted">
                 Recorte de la placa
               </p>
               <FotoEvento
                 eventoId={evento.id}
-                cual="placa"
+                cual={miniatura}
                 alt={`Placa ${evento.placa}`}
                 className="h-16 rounded-lg bg-bg-low object-contain"
               />
@@ -230,6 +252,7 @@ const ModalCaptura = ({ evento, onCerrar }) => {
 /** Una captura en la tira. */
 const TarjetaCaptura = ({ evento, onAbrir }) => {
   const s = semaforoDe(evento.coincidencia);
+  const { principal, miniatura } = repartirFotos(evento);
 
   return (
     <button
@@ -245,10 +268,10 @@ const TarjetaCaptura = ({ evento, onAbrir }) => {
       )}
     >
       <div className="relative min-h-[6rem] w-full flex-1 overflow-hidden bg-black/40">
-        {evento.foto_escena_url ? (
+        {principal ? (
           <FotoEvento
             eventoId={evento.id}
-            cual="escena"
+            cual={principal}
             alt={`Vehículo ${evento.placa}`}
             className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
@@ -257,11 +280,12 @@ const TarjetaCaptura = ({ evento, onAbrir }) => {
         )}
 
         {/* El recorte de la placa encima de la escena: es lo que confirma de un vistazo
-            que la lectura corresponde al vehículo de la foto y no a otro. */}
-        {evento.foto_placa_url && (
+            que la lectura corresponde al vehículo de la foto y no a otro. Se omite
+            cuando la principal ya ES esa misma foto, para no repetirla en miniatura. */}
+        {miniatura && (
           <FotoEvento
             eventoId={evento.id}
-            cual="placa"
+            cual={miniatura}
             alt={`Placa ${evento.placa}`}
             className="absolute bottom-1 right-1 h-7 rounded border border-white/20 bg-black/60 object-contain shadow-lg"
           />

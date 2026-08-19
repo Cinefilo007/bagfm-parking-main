@@ -258,6 +258,17 @@ def _clasificar_fotos(imagenes: List[Tuple[str, bytes]]) -> Tuple[Optional[bytes
     Si la cámara nombra las partes, se respeta el nombre. Si no —que es lo habitual—
     se usa el tamaño: el recorte de la matrícula siempre pesa bastante menos que la
     foto completa del vehículo.
+
+    **Una sola imagen sin nombre es la escena, nunca el recorte.** Antes se asignaba al
+    recorte por ser la más pequeña de la lista, y con una lista de uno eso significaba
+    siempre. El caso se da justo cuando la cámara no consigue leer la placa: entonces no
+    hay recorte que mandar y sube solo la panorámica. El resultado era una tarjeta con la
+    foto del vehículo metida en la miniatura de la placa y el hueco principal vacío,
+    diciendo "sin foto" cuando la foto había llegado perfectamente.
+
+    La regla vale también al revés: si de verdad solo llegara el recorte, mostrarlo en
+    grande es peor que aceptable —se ve la placa—, mientras que perder la panorámica en
+    una miniatura de 28px deja al Comandante sin lo único que identifica al vehículo.
     """
     if not imagenes:
         return None, None
@@ -275,10 +286,11 @@ def _clasificar_fotos(imagenes: List[Tuple[str, bytes]]) -> Tuple[Optional[bytes
 
     if sin_nombre:
         sin_nombre.sort(key=len)
-        if foto_placa is None:
-            foto_placa = sin_nombre.pop(0)
-        if foto_escena is None and sin_nombre:
-            foto_escena = sin_nombre[-1]
+        # La más grande es la escena; solo lo que sobra por debajo puede ser el recorte.
+        if foto_escena is None:
+            foto_escena = sin_nombre.pop()
+        if foto_placa is None and sin_nombre:
+            foto_placa = sin_nombre[0]
 
     return foto_placa, foto_escena
 
