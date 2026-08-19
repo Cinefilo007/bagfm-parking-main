@@ -9,6 +9,22 @@ import FuelMonitor from '../../components/dashboard/FuelMonitor';
 import MonitorCapturasAnpr from '../../components/dashboard/MonitorCapturasAnpr';
 import { mapaService } from '../../services/mapaService';
 import { combustibleService } from '../../services/combustible.service';
+import { cn } from '../../lib/utils';
+
+/**
+ * Alturas de las dos filas de abajo, compartidas por las DOS columnas.
+ *
+ * Van en constantes y no escritas en cada hueco porque su único cometido es que las
+ * cuatro tarjetas cuadren entre sí: el mapa con el monitor táctico, y la tira de
+ * capturas con el de combustible. Repetir el número cuatro veces es pedir que alguien
+ * ajuste uno, no los otros, y rompa la simetría sin enterarse.
+ *
+ * La fila de abajo mide 330 y no menos porque las tarjetas de captura llevan la foto del
+ * vehículo con el recorte de la placa encima, y por debajo de eso la placa —que es el
+ * dato por el que se mira esa tira— deja de leerse.
+ */
+const ALTO_FILA_SUPERIOR = 'h-[480px]';
+const ALTO_FILA_INFERIOR = 'h-[330px]';
 
 export default function DashboardComando() {
   const [situacion, setSituacion] = useState(null);
@@ -145,26 +161,23 @@ export default function DashboardComando() {
 
         {/* BOTTOM SECTION: Map + Chart and Events + Fuel Monitor */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          
-          {/* Columna Izquierda: Mapa Táctico + Gráfico (Ocupa 8/12 = 66%) */}
+
+          {/* Columna Izquierda: Mapa Táctico + Capturas ANPR (Ocupa 8/12 = 66%) */}
           <div className="flex flex-col lg:col-span-8 gap-6">
-             <div className="h-[480px]">
+             <div className={ALTO_FILA_SUPERIOR}>
                 <MapaTactico pollingEnabled={false} situacionPreload={situacion} />
              </div>
-             {/* Más alto que la gráfica que había aquí: estas tarjetas llevan la foto
-                 del vehículo y el recorte de la placa, y con 240px la placa quedaba
-                 ilegible, que es justo el dato por el que se mira esta tira. */}
-             <div className="h-[330px] flex-shrink-0">
+             <div className={cn(ALTO_FILA_INFERIOR, 'flex-shrink-0')}>
                 <MonitorCapturasAnpr />
              </div>
           </div>
 
           {/* Columna Derecha: Monitor de Eventos + Fuel Monitor (Ocupa 4/12 = 33%) */}
           <div className="lg:col-span-4 flex flex-col gap-6">
-             <div className="h-[400px]">
+             <div className={ALTO_FILA_SUPERIOR}>
                 <EventMonitor situacion={situacion} />
              </div>
-             <div className="h-[320px]">
+             <div className={ALTO_FILA_INFERIOR}>
                 <FuelMonitor />
              </div>
           </div>
