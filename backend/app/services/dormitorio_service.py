@@ -7,6 +7,7 @@ la persona ya está, le cuelga el perfil militar en vez de duplicarla. Ese es el
 de existir del módulo: que registrar a alguien porque duerme en la base lo ate al
 vehículo que ya tenía a su nombre, sin que nadie cruce nada a mano.
 """
+import io
 import logging
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -172,7 +173,12 @@ class DormitorioService:
         por_pagina = max(1, min(por_pagina, 100))
 
         res = await db.execute(
-            base.order_by(Habitacion.piso, Habitacion.numero)
+            base.order_by(
+                func.coalesce(func.length(Habitacion.piso), 0),
+                Habitacion.piso.asc().nulls_first(),
+                func.length(Habitacion.numero),
+                Habitacion.numero,
+            )
             .offset((pagina - 1) * por_pagina)
             .limit(por_pagina)
         )
@@ -767,6 +773,191 @@ class DormitorioService:
         await db.commit()
         await db.refresh(vehiculo)
         return vehiculo
+
+    # ─── Exportaciones ────────────────────────────────────────────────────────
+
+    async def exportar_excel(
+        self, db: AsyncSession, dormitorio_id: UUID
+    ) -> tuple[io.BytesIO, str]:
+        from openpyxl import Workbook
+        from openpyxl.styles import Alignment, Font, PatternFill
+
+        dormitorio = await self.obtener_dormitorio(db, dormitorio_id)
+
+        res = await db.execute(
+            select(Habitacion)
+            .where(
+                Habitacion.dormitorio_id == dormitorio_id,
+                Habitacion.activo == True,  # noqa: E712
+            )
+            .order_by(
+                func.coalesce(func.length(Habitacion.piso), 0),
+                Habitacion.piso.asc().nulls_first(),
+                func.length(Habitacion.numero),
+                Habitacion.numero,
+            )
+        )
+        habitaciones = res.scalars().all()
+
+        wb = Workbook()
+
+        cabecera_font = Font(bold=True, color="FFFFFF", size=11)
+        cabecera_fill = PatternFill(start_color="2E4057", end_color="2E4057", fill_type="solid")
+        centrado = Alignment(horizontal="center", vertical="center")
+
+        # ── Hoja 1: Habitaciones ──
+        ws = wb.active
+        ws.title = "Habitaciones"
+
+        columnas_hab = ["Habitación", "Piso", "Camas", "Ocupadas", "Libres", "QR activo", "Notas"]
+        for col, titulo in enumerate(columnas_hab, 1):
+            celda = ws.cell(row=1, column=col, value=titulo)
+            celda.font = cabecera_font
+            celda.fill = cabecera_fill
+            celda.alignment = centrado
+
+        for fila, h in enumerate(habitaciones, 2):
+            integrantes = await self.listar_integrantes_habitacion(db, h.id)
+            ocupacion = len(integrantes)
+            ws.cell(row=fila, column=1, value=h.numero).alignment = centrado
+            ws.cell(row=fila, column=2, value=h.piso or "—").alignment = centrado
+            ws.cell(row=fila, column=3, value=h.camas).alignment = centrado
+            ws.cell(row=fila, column=4, value=ocupacion).alignment = centrado
+            ws.cell(row=fila, column=5, value=max(0, h.camas - ocupacion)).alignment = centrado
+            ws.cell(row=fila, column=6, value="Sí" if h.tiene_token else "No").alignment = centrado
+            ws.cell(row=fila, column=7, value=h.notas or "")
+
+        for col in range(1, len(columnas_hab) + 1):
+            ws.column_dimensions[ws.cell(row=1, column=col).column_letter].width = 15
+        ws.column_dimensions["G"].width = 35
+
+        # ── Hoja 2: Personal ──
+        ws2 = wb.create_sheet("Personal")
+        columnas_per = [
+            "Habitación", "Piso", "Grado", "Nombre", "Apellido", "Cédula",
+            "Teléfono", "Unidad", "Jefe directo", "Tel. jefe", "Vehículos",
+            "Declaró vehículo", "Carnet peatonal",
+        ]
+        for col, titulo in enumerate(columnas_per, 1):
+            celda = ws2.cell(row=1, column=col, value=titulo)
+            celda.font = cabecera_font
+            celda.fill = cabecera_fill
+            celda.alignment = centrado
+
+        fila_per = 2
+        for h in habitaciones:
+            integrantes = await self.listar_integrantes_habitacion(db, h.id)
+            for inte in integrantes:
+                placas = ", ".join(v.placa for v in inte.vehiculos) if inte.vehiculos else "—"
+                ws2.cell(row=fila_per, column=1, value=h.numero).alignment = centrado
+                ws2.cell(row=fila_per, column=2, value=h.piso or "—").alignment = centrado
+                ws2.cell(row=fila_per, column=3, value=inte.grado or "—")
+                ws2.cell(row=fila_per, column=4, value=inte.nombre)
+                ws2.cell(row=fila_per, column=5, value=inte.apellido)
+                ws2.cell(row=fila_per, column=6, value=inte.cedula)
+                ws2.cell(row=fila_per, column=7, value=inte.telefono or "—")
+                ws2.cell(row=fila_per, column=8, value=inte.unidad or "—")
+                ws2.cell(row=fila_per, column=9, value=inte.jefe_nombre or "—")
+                ws2.cell(row=fila_per, column=10, value=inte.jefe_telefono or "—")
+                ws2.cell(row=fila_per, column=11, value=placas)
+                ws2.cell(row=fila_per, column=12, value="Sí" if inte.tiene_vehiculo else "No").alignment = centrado
+                ws2.cell(row=fila_per, column=13, value="Sí" if inte.tiene_qr_peatonal else "No").alignment = centrado
+                fila_per += 1
+
+        for col in range(1, len(columnas_per) + 1):
+            ws2.column_dimensions[ws2.cell(row=1, column=col).column_letter].width = 16
+        ws2.column_dimensions["D"].width = 20
+        ws2.column_dimensions["E"].width = 20
+        ws2.column_dimensions["H"].width = 25
+        ws2.column_dimensions["I"].width = 25
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        nombre = dormitorio.nombre.replace(" ", "_")
+        return buf, f"{nombre}_personal.xlsx"
+
+    async def exportar_qr_zip(
+        self, db: AsyncSession, dormitorio_id: UUID, frontend_url: str
+    ) -> tuple[io.BytesIO, str, int]:
+        import zipfile
+
+        import qrcode
+        from PIL import Image, ImageDraw, ImageFont
+
+        dormitorio = await self.obtener_dormitorio(db, dormitorio_id)
+
+        res = await db.execute(
+            select(Habitacion)
+            .where(
+                Habitacion.dormitorio_id == dormitorio_id,
+                Habitacion.activo == True,  # noqa: E712
+            )
+            .order_by(
+                func.coalesce(func.length(Habitacion.piso), 0),
+                Habitacion.piso.asc().nulls_first(),
+                func.length(Habitacion.numero),
+                Habitacion.numero,
+            )
+        )
+        habitaciones = res.scalars().all()
+
+        sin_token = 0
+        buf_zip = io.BytesIO()
+
+        with zipfile.ZipFile(buf_zip, "w", zipfile.ZIP_DEFLATED) as zf:
+            for h in habitaciones:
+                if not h.token:
+                    sin_token += 1
+                    continue
+
+                url = f"{frontend_url.rstrip('/')}/habitacion/{h.token}"
+
+                qr_img = qrcode.make(url, box_size=12, border=2, error_correction=qrcode.constants.ERROR_CORRECT_H)
+                qr_w, qr_h = qr_img.size
+
+                margen = 40
+                alto_etiqueta = 80
+                ancho_total = qr_w + margen * 2
+                alto_total = qr_h + margen * 2 + alto_etiqueta
+
+                canvas = Image.new("RGB", (ancho_total, alto_total), "white")
+                canvas.paste(qr_img, (margen, margen))
+
+                draw = ImageDraw.Draw(canvas)
+                try:
+                    fuente = ImageFont.truetype("arial.ttf", 28)
+                    fuente_peq = ImageFont.truetype("arial.ttf", 18)
+                except OSError:
+                    fuente = ImageFont.load_default()
+                    fuente_peq = fuente
+
+                linea1 = f"Habitación {h.numero}"
+                if h.piso:
+                    linea1 += f"  —  Piso {h.piso}"
+                linea2 = dormitorio.nombre
+
+                bbox1 = draw.textbbox((0, 0), linea1, font=fuente)
+                x1 = (ancho_total - (bbox1[2] - bbox1[0])) // 2
+                y1 = margen + qr_h + 10
+                draw.text((x1, y1), linea1, fill="black", font=fuente)
+
+                bbox2 = draw.textbbox((0, 0), linea2, font=fuente_peq)
+                x2 = (ancho_total - (bbox2[2] - bbox2[0])) // 2
+                y2 = y1 + (bbox1[3] - bbox1[1]) + 6
+                draw.text((x2, y2), linea2, fill="#555555", font=fuente_peq)
+
+                img_buf = io.BytesIO()
+                canvas.save(img_buf, format="JPEG", quality=92)
+                img_buf.seek(0)
+
+                piso_parte = f"_Piso_{h.piso}" if h.piso else ""
+                nombre_archivo = f"Hab_{h.numero}{piso_parte}.jpg"
+                zf.writestr(nombre_archivo, img_buf.getvalue())
+
+        buf_zip.seek(0)
+        nombre = dormitorio.nombre.replace(" ", "_")
+        return buf_zip, f"{nombre}_QR_puertas.zip", sin_token
 
 
 dormitorio_service = DormitorioService()

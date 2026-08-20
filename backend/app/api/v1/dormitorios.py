@@ -13,6 +13,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -223,6 +224,36 @@ async def detalle_dormitorio(
         por_pagina=por_pagina_efectivo,
         total_habitaciones_filtradas=total,
         total_paginas=max(1, -(-total // por_pagina_efectivo)),
+    )
+
+
+@router.get("/{dormitorio_id}/exportar-excel")
+async def exportar_excel(
+    dormitorio_id: UUID,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = DEPENDENCY_ADMIN,
+):
+    buf, nombre = await dormitorio_service.exportar_excel(db, dormitorio_id)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
+
+
+@router.get("/{dormitorio_id}/exportar-qr")
+async def exportar_qr(
+    dormitorio_id: UUID,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = DEPENDENCY_ADMIN,
+):
+    buf, nombre, sin_token = await dormitorio_service.exportar_qr_zip(
+        db, dormitorio_id, config.frontend_url
+    )
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
     )
 
 

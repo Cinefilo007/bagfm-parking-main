@@ -4,6 +4,7 @@ import {
   DoorClosed, Plus, Loader2, ArrowLeft, QrCode, Users, Search,
   UserPlus, Trash2, Download, X, Car, ShieldAlert, Phone, Pencil,
   ChevronDown, ChevronLeft, ChevronRight, RefreshCw, UserCheck,
+  FileSpreadsheet, Archive,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 // Import con nombre y no por defecto: `react-qr-code` es CommonJS y su export por
@@ -51,6 +52,8 @@ const IconoAnterior = ChevronLeft;
 const IconoSiguiente = ChevronRight;
 const IconoRegenerar = RefreshCw;
 const IconoPersonaHallada = UserCheck;
+const IconoExcel = FileSpreadsheet;
+const IconoZip = Archive;
 
 const POR_PAGINA = 8;
 
@@ -549,6 +552,56 @@ const DormitorioDetalle = () => {
     }
   };
 
+  // ─── Exportaciones ────────────────────────────────────────────────────────
+
+  const [exportando, setExportando] = useState(null);
+
+  const descargarBlob = (blob, nombre) => {
+    const url = window.URL.createObjectURL(blob);
+    const enlace = document.createElement('a');
+    enlace.href = url;
+    enlace.download = nombre;
+    enlace.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const exportarExcel = async () => {
+    setExportando('excel');
+    try {
+      const res = await dormitoriosService.exportarExcel(id);
+      const nombre = `${dormitorio.nombre.replace(/\s+/g, '_')}_personal.xlsx`;
+      descargarBlob(new Blob([res.data]), nombre);
+      toast.success('Excel descargado');
+    } catch {
+      toast.error('No se pudo exportar a Excel');
+    } finally {
+      setExportando(null);
+    }
+  };
+
+  const exportarQr = async () => {
+    const sinQr = dormitorio.habitaciones.filter((h) => !h.tiene_token).length;
+    if (sinQr > 0 && dormitorio.habitaciones.length === sinQr) {
+      toast.error('Ninguna habitación tiene QR generado. Genera el QR de cada puerta primero.');
+      return;
+    }
+    setExportando('qr');
+    try {
+      const res = await dormitoriosService.exportarQr(id);
+      const nombre = `${dormitorio.nombre.replace(/\s+/g, '_')}_QR_puertas.zip`;
+      descargarBlob(new Blob([res.data]), nombre);
+      if (sinQr > 0) {
+        toast(`${sinQr} habitación(es) sin QR no se incluyeron. Genera su QR de puerta para que aparezcan.`, { duration: 5000 });
+      } else {
+        toast.success('QR descargados');
+      }
+    } catch {
+      toast.error('No se pudo exportar los QR');
+    } finally {
+      setExportando(null);
+    }
+  };
+
   // ─── Render ────────────────────────────────────────────────────────────────
 
   if (cargando && !dormitorio) {
@@ -570,9 +623,17 @@ const DormitorioDetalle = () => {
         titulo={dormitorio.nombre}
         subtitle={`${dormitorio.ocupacion} de ${dormitorio.camas_totales} camas ocupadas · ${dormitorio.total_habitaciones} habitaciones`}
         actionElement={
-          <Boton onClick={abrirNuevaHabitacion}>
-            <Plus size={16} /> Habitación
-          </Boton>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Boton size="sm" variant="outline" onClick={exportarExcel} isLoading={exportando === 'excel'}>
+              <IconoExcel size={15} /> Excel
+            </Boton>
+            <Boton size="sm" variant="outline" onClick={exportarQr} isLoading={exportando === 'qr'}>
+              <IconoZip size={15} /> QR puertas
+            </Boton>
+            <Boton onClick={abrirNuevaHabitacion}>
+              <Plus size={16} /> Habitación
+            </Boton>
+          </div>
         }
       />
 

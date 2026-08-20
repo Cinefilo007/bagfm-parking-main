@@ -136,6 +136,22 @@ export const dormitoriosService = {
     return res.data;
   },
 
+  // ─── Exportaciones ─────────────────────────────────────────────────────────
+
+  exportarExcel: async (dormitorioId) => {
+    const res = await api.get(`/dormitorios/${dormitorioId}/exportar-excel`, {
+      responseType: 'blob',
+    });
+    return res;
+  },
+
+  exportarQr: async (dormitorioId) => {
+    const res = await api.get(`/dormitorios/${dormitorioId}/exportar-qr`, {
+      responseType: 'blob',
+    });
+    return res;
+  },
+
   // ─── Público (sin sesión) ──────────────────────────────────────────────────
 
   fichaPublica: async (token) => {
