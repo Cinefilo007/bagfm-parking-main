@@ -780,7 +780,7 @@ class DormitorioService:
         self, db: AsyncSession, dormitorio_id: UUID
     ) -> tuple[io.BytesIO, str]:
         from openpyxl import Workbook
-        from openpyxl.styles import Alignment, Font, PatternFill
+        from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
         dormitorio = await self.obtener_dormitorio(db, dormitorio_id)
 
@@ -800,76 +800,66 @@ class DormitorioService:
         habitaciones = res.scalars().all()
 
         wb = Workbook()
-
-        cabecera_font = Font(bold=True, color="FFFFFF", size=11)
-        cabecera_fill = PatternFill(start_color="2E4057", end_color="2E4057", fill_type="solid")
-        centrado = Alignment(horizontal="center", vertical="center")
-
-        # ── Hoja 1: Habitaciones ──
         ws = wb.active
-        ws.title = "Habitaciones"
+        ws.title = "Dormitorio"
 
-        columnas_hab = ["Habitación", "Piso", "Camas", "Ocupadas", "Libres", "QR activo", "Notas"]
-        for col, titulo in enumerate(columnas_hab, 1):
-            celda = ws.cell(row=1, column=col, value=titulo)
-            celda.font = cabecera_font
-            celda.fill = cabecera_fill
-            celda.alignment = centrado
+        titulo_font = Font(bold=True, color="FFFFFF", size=11)
+        titulo_fill = PatternFill(start_color="2E4057", end_color="2E4057", fill_type="solid")
+        hab_font = Font(bold=True, size=11)
+        hab_fill = PatternFill(start_color="D6E4F0", end_color="D6E4F0", fill_type="solid")
+        centrado = Alignment(horizontal="center", vertical="center")
+        borde_fino = Border(bottom=Side(style="thin", color="CCCCCC"))
 
-        for fila, h in enumerate(habitaciones, 2):
-            integrantes = await self.listar_integrantes_habitacion(db, h.id)
-            ocupacion = len(integrantes)
-            ws.cell(row=fila, column=1, value=h.numero).alignment = centrado
-            ws.cell(row=fila, column=2, value=h.piso or "—").alignment = centrado
-            ws.cell(row=fila, column=3, value=h.camas).alignment = centrado
-            ws.cell(row=fila, column=4, value=ocupacion).alignment = centrado
-            ws.cell(row=fila, column=5, value=max(0, h.camas - ocupacion)).alignment = centrado
-            ws.cell(row=fila, column=6, value="Sí" if h.tiene_token else "No").alignment = centrado
-            ws.cell(row=fila, column=7, value=h.notas or "")
-
-        for col in range(1, len(columnas_hab) + 1):
-            ws.column_dimensions[ws.cell(row=1, column=col).column_letter].width = 15
-        ws.column_dimensions["G"].width = 35
-
-        # ── Hoja 2: Personal ──
-        ws2 = wb.create_sheet("Personal")
-        columnas_per = [
-            "Habitación", "Piso", "Grado", "Nombre", "Apellido", "Cédula",
-            "Teléfono", "Unidad", "Jefe directo", "Tel. jefe", "Vehículos",
-            "Declaró vehículo", "Carnet peatonal",
+        columnas = [
+            "Habitación", "Piso", "Camas", "Grado", "Nombre", "Apellido",
+            "Cédula", "Teléfono", "Unidad", "Jefe directo", "Tel. jefe",
+            "Vehículos",
         ]
-        for col, titulo in enumerate(columnas_per, 1):
-            celda = ws2.cell(row=1, column=col, value=titulo)
-            celda.font = cabecera_font
-            celda.fill = cabecera_fill
+        for col, titulo in enumerate(columnas, 1):
+            celda = ws.cell(row=1, column=col, value=titulo)
+            celda.font = titulo_font
+            celda.fill = titulo_fill
             celda.alignment = centrado
 
-        fila_per = 2
+        fila = 2
         for h in habitaciones:
             integrantes = await self.listar_integrantes_habitacion(db, h.id)
-            for inte in integrantes:
-                placas = ", ".join(v.placa for v in inte.vehiculos) if inte.vehiculos else "—"
-                ws2.cell(row=fila_per, column=1, value=h.numero).alignment = centrado
-                ws2.cell(row=fila_per, column=2, value=h.piso or "—").alignment = centrado
-                ws2.cell(row=fila_per, column=3, value=inte.grado or "—")
-                ws2.cell(row=fila_per, column=4, value=inte.nombre)
-                ws2.cell(row=fila_per, column=5, value=inte.apellido)
-                ws2.cell(row=fila_per, column=6, value=inte.cedula)
-                ws2.cell(row=fila_per, column=7, value=inte.telefono or "—")
-                ws2.cell(row=fila_per, column=8, value=inte.unidad or "—")
-                ws2.cell(row=fila_per, column=9, value=inte.jefe_nombre or "—")
-                ws2.cell(row=fila_per, column=10, value=inte.jefe_telefono or "—")
-                ws2.cell(row=fila_per, column=11, value=placas)
-                ws2.cell(row=fila_per, column=12, value="Sí" if inte.tiene_vehiculo else "No").alignment = centrado
-                ws2.cell(row=fila_per, column=13, value="Sí" if inte.tiene_qr_peatonal else "No").alignment = centrado
-                fila_per += 1
+            ocupacion = len(integrantes)
+            piso_txt = f" · Piso {h.piso}" if h.piso else ""
+            resumen = f"Habitación {h.numero}{piso_txt} — {ocupacion}/{h.camas} camas"
 
-        for col in range(1, len(columnas_per) + 1):
-            ws2.column_dimensions[ws2.cell(row=1, column=col).column_letter].width = 16
-        ws2.column_dimensions["D"].width = 20
-        ws2.column_dimensions["E"].width = 20
-        ws2.column_dimensions["H"].width = 25
-        ws2.column_dimensions["I"].width = 25
+            ws.merge_cells(start_row=fila, start_column=1, end_row=fila, end_column=len(columnas))
+            celda_hab = ws.cell(row=fila, column=1, value=resumen)
+            celda_hab.font = hab_font
+            celda_hab.fill = hab_fill
+            fila += 1
+
+            if not integrantes:
+                ws.merge_cells(start_row=fila, start_column=1, end_row=fila, end_column=len(columnas))
+                ws.cell(row=fila, column=1, value="(vacía)").font = Font(italic=True, color="888888")
+                fila += 1
+            else:
+                for inte in integrantes:
+                    placas = ", ".join(v.placa for v in inte.vehiculos) if inte.vehiculos else "—"
+                    ws.cell(row=fila, column=1, value=h.numero).alignment = centrado
+                    ws.cell(row=fila, column=2, value=h.piso or "—").alignment = centrado
+                    ws.cell(row=fila, column=3, value=h.camas).alignment = centrado
+                    ws.cell(row=fila, column=4, value=inte.grado or "—")
+                    ws.cell(row=fila, column=5, value=inte.nombre)
+                    ws.cell(row=fila, column=6, value=inte.apellido)
+                    ws.cell(row=fila, column=7, value=inte.cedula)
+                    ws.cell(row=fila, column=8, value=inte.telefono or "—")
+                    ws.cell(row=fila, column=9, value=inte.unidad or "—")
+                    ws.cell(row=fila, column=10, value=inte.jefe_nombre or "—")
+                    ws.cell(row=fila, column=11, value=inte.jefe_telefono or "—")
+                    ws.cell(row=fila, column=12, value=placas)
+                    for c in range(1, len(columnas) + 1):
+                        ws.cell(row=fila, column=c).border = borde_fino
+                    fila += 1
+
+        anchos = [12, 8, 8, 14, 18, 18, 14, 14, 22, 22, 14, 16]
+        for i, ancho in enumerate(anchos, 1):
+            ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = ancho
 
         buf = io.BytesIO()
         wb.save(buf)
@@ -902,6 +892,26 @@ class DormitorioService:
         )
         habitaciones = res.scalars().all()
 
+        def _cargar_fuente(tam: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+            for nombre_fuente in (
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
+                "arial.ttf",
+                "Arial.ttf",
+            ):
+                try:
+                    return ImageFont.truetype(nombre_fuente, tam)
+                except OSError:
+                    continue
+            try:
+                return ImageFont.load_default(size=tam)
+            except TypeError:
+                return ImageFont.load_default()
+
+        fuente = _cargar_fuente(28)
+        fuente_peq = _cargar_fuente(18)
+
         sin_token = 0
         buf_zip = io.BytesIO()
 
@@ -913,7 +923,13 @@ class DormitorioService:
 
                 url = f"{frontend_url.rstrip('/')}/habitacion/{h.token}"
 
-                qr_img = qrcode.make(url, box_size=12, border=2, error_correction=qrcode.constants.ERROR_CORRECT_H)
+                qr = qrcode.QRCode(
+                    box_size=12, border=2,
+                    error_correction=qrcode.constants.ERROR_CORRECT_H,
+                )
+                qr.add_data(url)
+                qr.make(fit=True)
+                qr_img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
                 qr_w, qr_h = qr_img.size
 
                 margen = 40
@@ -925,16 +941,10 @@ class DormitorioService:
                 canvas.paste(qr_img, (margen, margen))
 
                 draw = ImageDraw.Draw(canvas)
-                try:
-                    fuente = ImageFont.truetype("arial.ttf", 28)
-                    fuente_peq = ImageFont.truetype("arial.ttf", 18)
-                except OSError:
-                    fuente = ImageFont.load_default()
-                    fuente_peq = fuente
 
-                linea1 = f"Habitación {h.numero}"
+                linea1 = f"Habitacion {h.numero}"
                 if h.piso:
-                    linea1 += f"  —  Piso {h.piso}"
+                    linea1 += f"  -  Piso {h.piso}"
                 linea2 = dormitorio.nombre
 
                 bbox1 = draw.textbbox((0, 0), linea1, font=fuente)

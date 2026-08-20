@@ -623,28 +623,28 @@ const DormitorioDetalle = () => {
         titulo={dormitorio.nombre}
         subtitle={`${dormitorio.ocupacion} de ${dormitorio.camas_totales} camas ocupadas · ${dormitorio.total_habitaciones} habitaciones`}
         actionElement={
-          <div className="flex items-center gap-2 flex-wrap">
+          <Boton onClick={abrirNuevaHabitacion}>
+            <Plus size={16} /> Habitación
+          </Boton>
+        }
+      />
+
+      <div className="container mx-auto px-4 md:px-8 flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              onClick={() => navigate('/comando/dormitorios')}
+              className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-text-muted hover:text-primary transition-colors"
+            >
+              <ArrowLeft size={14} /> Volver
+            </button>
             <Boton size="sm" variant="outline" onClick={exportarExcel} isLoading={exportando === 'excel'}>
               <IconoExcel size={15} /> Excel
             </Boton>
             <Boton size="sm" variant="outline" onClick={exportarQr} isLoading={exportando === 'qr'}>
               <IconoZip size={15} /> QR puertas
             </Boton>
-            <Boton onClick={abrirNuevaHabitacion}>
-              <Plus size={16} /> Habitación
-            </Boton>
           </div>
-        }
-      />
-
-      <div className="container mx-auto px-4 md:px-8 flex flex-col gap-4">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
-          <button
-            onClick={() => navigate('/comando/dormitorios')}
-            className="self-start flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-text-muted hover:text-primary transition-colors"
-          >
-            <ArrowLeft size={14} /> Todos los dormitorios
-          </button>
 
           <div className="relative w-full sm:w-80">
             <IconoLupa size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
