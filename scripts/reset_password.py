@@ -5,12 +5,14 @@ Permite a los administradores de sistemas restablecer la contraseña de un usuar
 a su contraseña estándar (su número de cédula) y forzar el cambio en el próximo inicio de sesión.
 
 Uso:
-    python reset_password.py <CEDULA>
+    python reset_password.py V11038824
+    python reset_password.py 11038824
     python reset_password.py
 """
 import os
 import sys
 import asyncio
+import re
 from pathlib import Path
 
 # Asegurar que el directorio raíz de backend esté en sys.path
@@ -22,17 +24,63 @@ elif (BASE_DIR.parent / "backend" / "app").exists():
 elif (BASE_DIR.parent / "app").exists():
     sys.path.insert(0, str(BASE_DIR.parent))
 
-from sqlalchemy import select
+# IMPORTANTE: Registrar todos los modelos en SQLAlchemy antes de operar
+import app.models.base
+
+from sqlalchemy import select, or_
 from app.core.database import FabricaSesion
 from app.models.usuario import Usuario
 from app.models.enums import RolTipo
 from app.core.security import hashear_password
 
 
-async def buscar_usuario_por_cedula(sesion, cedula_limpia: str):
-    query = select(Usuario).where(Usuario.cedula.ilike(cedula_limpia))
+def normalizar_cedula(texto: str) -> str:
+    """Limpia puntos, espacios y guiones."""
+    if not texto:
+        return ""
+    return re.sub(r'[\s\.\-_]', '', texto).strip().upper()
+
+
+async def buscar_usuario_por_cedula(sesion, entrada: str):
+    limpia = normalizar_cedula(entrada)
+    if not limpia:
+        return None
+
+    # Extraer solo dígitos
+    solo_digitos = re.sub(r'\D', '', limpia)
+
+    # Buscar por varias combinaciones comunes
+    condiciones = [
+        Usuario.cedula.ilike(limpia),
+        Usuario.cedula.ilike(f"V{limpia}"),
+        Usuario.cedula.ilike(f"V-{limpia}"),
+        Usuario.cedula.ilike(f"E{limpia}"),
+        Usuario.cedula.ilike(f"E-{limpia}"),
+    ]
+    if solo_digitos:
+        condiciones.extend([
+            Usuario.cedula.ilike(solo_digitos),
+            Usuario.cedula.ilike(f"V{solo_digitos}"),
+            Usuario.cedula.ilike(f"V-{solo_digitos}"),
+            Usuario.cedula.ilike(f"%{solo_digitos}%")
+        ])
+
+    query = select(Usuario).where(
+        Usuario.is_deleted == False,
+        or_(*condiciones)
+    )
     res = await sesion.execute(query)
-    return res.scalar_one_or_none()
+    usuarios = res.scalars().all()
+
+    if len(usuarios) == 1:
+        return usuarios[0]
+    elif len(usuarios) > 1:
+        # Priorizar coincidencia exacta si existe
+        for u in usuarios:
+            if normalizar_cedula(u.cedula) == limpia or normalizar_cedula(u.cedula) == f"V{solo_digitos}":
+                return u
+        return usuarios[0]
+    return None
 
 
 async def listar_comandantes(sesion):
@@ -46,14 +94,7 @@ async def restablecer_password_usuario(cedula: str | None = None, nueva_clave: s
         usuario = None
 
         if cedula:
-            cedula_limpia = cedula.strip().upper()
-            usuario = await buscar_usuario_por_cedula(sesion, cedula_limpia)
-            if not usuario:
-                if cedula_limpia.startswith("V") or cedula_limpia.startswith("E") or cedula_limpia.startswith("J"):
-                    sin_prefijo = cedula_limpia[1:]
-                    usuario = await buscar_usuario_por_cedula(sesion, sin_prefijo)
-                else:
-                    usuario = await buscar_usuario_por_cedula(sesion, f"V{cedula_limpia}")
+            usuario = await buscar_usuario_por_cedula(sesion, cedula)
         else:
             print("\n🔍 Buscando usuarios con rol COMANDANTE en el sistema...")
             comandantes = await listar_comandantes(sesion)
@@ -68,7 +109,7 @@ async def restablecer_password_usuario(cedula: str | None = None, nueva_clave: s
                 print(f"ℹ️ Se encontraron {len(comandantes)} Comandantes:")
                 for idx, c in enumerate(comandantes, 1):
                     print(f"  [{idx}] {c.nombre} {c.apellido} - Cédula: {c.cedula}")
-                opcion = input("\nSeleccione el número del Comandante a restablecer (o presione Ctrl+C para cancelar): ")
+                opcion = input("\nSeleccione el número del Comandante a restablecer (o Ctrl+C para cancelar): ")
                 try:
                     idx_sel = int(opcion.strip()) - 1
                     if 0 <= idx_sel < len(comandantes):
@@ -81,13 +122,13 @@ async def restablecer_password_usuario(cedula: str | None = None, nueva_clave: s
                     return False
 
         if not usuario:
-            print(f"❌ No se encontró ningún usuario con la cédula proporcionada ('{cedula}').")
+            print(f"\n❌ No se encontró ningún usuario con la cédula proporcionada ('{cedula}').")
             return False
 
         password_final = nueva_clave if nueva_clave else usuario.cedula
 
         print("\n==================================================")
-        print("👤 DATOS DEL USUARIO:")
+        print("👤 DATOS DEL USUARIO ENCONTRADO:")
         print(f"   - Nombre:    {usuario.nombre} {usuario.apellido}")
         print(f"   - Cédula:    {usuario.cedula}")
         print(f"   - Rol:       {usuario.rol.value}")
