@@ -18,6 +18,17 @@ class DestinoSalida(BaseModel):
     slug: str
 
 
+class RetencionFotos(BaseModel):
+    """Cuántos días se conservan las fotos de las detecciones antes de borrarse."""
+    dias: int = Field(ge=1, le=365)
+
+
+class RetencionFotosSalida(RetencionFotos):
+    # Cuántas detecciones tienen foto guardada ahora mismo. Es lo que le dice al
+    # Comandante si el ajuste que acaba de mover tiene algún efecto real.
+    detecciones_con_foto: int
+
+
 class EventoAnprSalida(BaseModel):
     id: UUID
     punto_acceso_id: UUID

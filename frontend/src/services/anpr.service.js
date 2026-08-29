@@ -191,6 +191,28 @@ export const anprService = {
     await api.delete(`/anpr/pantallas/${pantallaId}`);
   },
 
+  /** Devuelve { dias, detecciones_con_foto }. */
+  async getRetencionFotos() {
+    const { data } = await api.get('/anpr/retencion-fotos');
+    return data;
+  },
+
+  async setRetencionFotos(dias) {
+    const { data } = await api.put('/anpr/retencion-fotos', { dias });
+    return data;
+  },
+
+  /**
+   * Ejecuta la purga en el momento, sin esperar al ciclo diario.
+   * Sin `dias` usa la retención configurada.
+   */
+  async purgarFotos(dias) {
+    const { data } = await api.post('/anpr/mantenimiento/purgar-fotos', null, {
+      params: dias ? { dias_retencion: dias } : {},
+    });
+    return data;
+  },
+
   /**
    * Descarga una foto de la detección como object URL.
    *

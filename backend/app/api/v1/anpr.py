@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -51,6 +51,8 @@ from app.schemas.anpr import (
     IdentificarConductor,
     PantallaSalida,
     ResolverEvento,
+    RetencionFotos,
+    RetencionFotosSalida,
 )
 from app.services.acceso_service import acceso_service
 from app.services import anpr_diagnostico
@@ -394,6 +396,75 @@ async def eliminar_camara(
     await db.delete(camara)
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+async def _detecciones_con_foto(db: AsyncSession) -> int:
+    return (await db.execute(
+        select(func.count(EventoAnpr.id)).where(
+            (EventoAnpr.foto_placa_path.isnot(None))
+            | (EventoAnpr.foto_escena_path.isnot(None))
+        )
+    )).scalar_one()
+
+
+@router.get("/retencion-fotos", response_model=RetencionFotosSalida)
+async def consultar_retencion_fotos(
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = DEPENDENCY_ADMIN,
+):
+    """Retención vigente de las fotos y cuántas detecciones tienen foto hoy."""
+    return RetencionFotosSalida(
+        dias=await anpr_service.retencion_fotos_dias(db),
+        detecciones_con_foto=await _detecciones_con_foto(db),
+    )
+
+
+@router.put("/retencion-fotos", response_model=RetencionFotosSalida)
+async def fijar_retencion_fotos(
+    datos: RetencionFotos,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = DEPENDENCY_ADMIN,
+):
+    """
+    Cambia cada cuánto se borran las fotos de las detecciones.
+
+    No purga aquí: el cambio lo aplica el ciclo diario. Bajar el número no debe
+    disparar un borrado masivo dentro de la petición del navegador —dejaría al
+    Comandante mirando una pantalla colgada mientras se borran miles de archivos.
+    Para ejecutar la purga en el momento está `/mantenimiento/purgar-fotos`.
+    """
+    try:
+        dias = await anpr_service.fijar_retencion_fotos_dias(db, datos.dias)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return RetencionFotosSalida(
+        dias=dias,
+        detecciones_con_foto=await _detecciones_con_foto(db),
+    )
+
+
+@router.post("/mantenimiento/purgar-fotos")
+async def purgar_fotos_anpr(
+    dias_retencion: int = Query(default=None, ge=1, le=365),
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = DEPENDENCY_ADMIN,
+):
+    """
+    Ejecuta la purga en el momento, sin esperar al ciclo diario.
+
+    Sin `dias_retencion` usa la retención configurada. Se puede pasar un número menor
+    para una limpieza puntual —vaciar un backlog acumulado, por ejemplo— sin tocar el
+    ajuste permanente.
+    """
+    dias = dias_retencion or await anpr_service.retencion_fotos_dias(db)
+    purgadas = await anpr_service.purgar_fotos_antiguas(db, dias)
+    return {
+        "status": "ok",
+        "dias_retencion": dias,
+        "detecciones_purgadas": purgadas,
+        "message": f"Se borraron las fotos de {purgadas} detecciones anteriores a {dias} días.",
+    }
 
 
 @router.get("/diagnostico-ingesta")

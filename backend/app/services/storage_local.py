@@ -138,6 +138,42 @@ def _decodificar(valor: str) -> Optional[tuple[bytes, str]]:
     return (contenido, extension) if contenido else None
 
 
+def optimizar_jpeg(contenido: bytes, lado_maximo: int = 1280, calidad: int = 75) -> bytes:
+    """
+    Reencodea una imagen a JPEG, limitando su lado mayor y comprimiéndola.
+
+    Pensado para las imágenes que entran ya hechas desde un equipo externo —las fotos
+    de las cámaras ANPR—, que llegan en la resolución del sensor y no pasan por el
+    compresor del navegador que sí usan las fotos que sube un operador
+    (frontend/src/utils/imageCompressor.js).
+
+    Ante cualquier fallo devuelve los bytes ORIGINALES. Una foto pesada es un problema
+    de disco y se resuelve con dinero; una foto perdida es un problema de evidencia y
+    no se resuelve. Ante la duda, se guarda lo que llegó.
+    """
+    try:
+        from PIL import Image, ImageOps
+        import io
+
+        img = Image.open(io.BytesIO(contenido))
+        img = ImageOps.exif_transpose(img)
+        if img.mode != "RGB":
+            img = img.convert("RGB")
+        if img.width > lado_maximo or img.height > lado_maximo:
+            img.thumbnail((lado_maximo, lado_maximo), Image.Resampling.LANCZOS)
+
+        buffer = io.BytesIO()
+        img.save(buffer, format="JPEG", quality=calidad, optimize=True)
+        optimizado = buffer.getvalue()
+    except Exception as e:
+        print(f"ALERTA STORAGE: no se pudo optimizar la imagen: {e}")
+        return contenido
+
+    # Si el reencode no achicó nada —imagen ya pequeña, o ya muy comprimida— quedarse
+    # con el original: perder calidad a cambio de cero bytes no es un intercambio.
+    return optimizado if len(optimizado) < len(contenido) else contenido
+
+
 def guardar_imagen_base64(valor: Optional[str], carpeta: str) -> str:
     """
     Convierte una imagen en base64 en un archivo del almacenamiento privado y devuelve

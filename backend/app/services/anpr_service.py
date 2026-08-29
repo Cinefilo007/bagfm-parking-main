@@ -17,7 +17,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 from xml.etree import ElementTree
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import obtener_config
@@ -33,9 +33,22 @@ from app.services import anpr_diagnostico
 from app.services.placa_lookup import (
     verificar_placa, normalizar_placa, semaforo_de, SEMAFORO_ROJO,
 )
-from app.services.storage_local import almacenamiento_privado, PREFIJO_ARCHIVO
+from app.services.configuracion_service import configuracion_service
+from app.services.storage_local import (
+    almacenamiento_privado, borrar_imagenes, optimizar_jpeg, PREFIJO_ARCHIVO,
+)
 
 config = obtener_config()
+
+# Clave en la tabla `configuracion` donde el Comandante guarda su elección desde el
+# panel de cámaras. Manda sobre el valor por defecto del .env.
+CLAVE_RETENCION = "ANPR_RETENCION_FOTOS_DIAS"
+
+# Topes del ajuste. El mínimo de 1 día evita que alguien ponga 0 y borre las fotos de
+# la detección que el guardia tiene en pantalla; el máximo evita volver al caso que
+# originó esto — sin límite, las fotos crecen hasta llenar el disco.
+RETENCION_MINIMA_DIAS = 1
+RETENCION_MAXIMA_DIAS = 365
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -295,10 +308,23 @@ def _clasificar_fotos(imagenes: List[Tuple[str, bytes]]) -> Tuple[Optional[bytes
     return foto_placa, foto_escena
 
 
-def _guardar_foto(contenido: Optional[bytes], subcarpeta: str) -> Optional[str]:
-    """Guarda en el volumen privado y devuelve la referencia 'file:<ruta>'."""
+def _guardar_foto(
+    contenido: Optional[bytes], subcarpeta: str, comprimir: bool = False
+) -> Optional[str]:
+    """
+    Guarda en el volumen privado y devuelve la referencia 'file:<ruta>'.
+
+    `comprimir` se activa solo para la panorámica: la cámara la manda en la resolución
+    del sensor y es lo que ocupa el disco. El recorte de la placa se guarda tal cual
+    llegó — pesa unos pocos KB y es la evidencia de la que depende identificar el
+    vehículo.
+    """
     if not contenido:
         return None
+    if comprimir:
+        contenido = optimizar_jpeg(
+            contenido, config.anpr_escena_lado_maximo, config.anpr_escena_calidad
+        )
     ahora = datetime.now(timezone.utc)
     ruta = f"anpr/{subcarpeta}/{ahora:%Y/%m/%d}/{uuid.uuid4()}.jpg"
     try:
@@ -548,7 +574,7 @@ class AnprService:
         else:
             bytes_placa, bytes_escena = _clasificar_fotos(imagenes)
             foto_placa_path = _guardar_foto(bytes_placa, "placa")
-            foto_escena_path = _guardar_foto(bytes_escena, "escena")
+            foto_escena_path = _guardar_foto(bytes_escena, "escena", comprimir=True)
             veredicto = await verificar_placa(db, placa)
 
         evento = EventoAnpr(
@@ -823,6 +849,94 @@ class AnprService:
             )
         except Exception as e:
             print(f"[ANPR] Fallo al notificar la detección {evento.id}: {e}")
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Retención de fotos
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def retencion_fotos_dias(self, db: AsyncSession) -> int:
+        """
+        Cuántos días se conservan las fotos: lo que eligió el Comandante, o el defecto.
+
+        Un valor corrupto en la tabla —texto, negativo, fuera de rango— se ignora en
+        favor del defecto en vez de reventar. Esto lo consulta el cron, y un cron que
+        falla en silencio es exactamente lo que dejó crecer las fotos hasta los 13 GB.
+        """
+        crudo = await configuracion_service.get_valor(db, CLAVE_RETENCION, None)
+        if crudo is None:
+            return config.anpr_retencion_fotos_dias
+        try:
+            dias = int(str(crudo).strip())
+        except (TypeError, ValueError):
+            print(f"[ANPR] {CLAVE_RETENCION} no es un número ('{crudo}'); uso el defecto.")
+            return config.anpr_retencion_fotos_dias
+
+        if not RETENCION_MINIMA_DIAS <= dias <= RETENCION_MAXIMA_DIAS:
+            print(f"[ANPR] {CLAVE_RETENCION}={dias} fuera de rango; uso el defecto.")
+            return config.anpr_retencion_fotos_dias
+        return dias
+
+    async def fijar_retencion_fotos_dias(self, db: AsyncSession, dias: int) -> int:
+        """Guarda la retención elegida desde el panel. Devuelve el valor aplicado."""
+        if not RETENCION_MINIMA_DIAS <= dias <= RETENCION_MAXIMA_DIAS:
+            raise ValueError(
+                f"La retención debe estar entre {RETENCION_MINIMA_DIAS} y "
+                f"{RETENCION_MAXIMA_DIAS} días."
+            )
+        await configuracion_service.set_valor(
+            db, CLAVE_RETENCION, str(dias),
+            descripcion="Días que se conservan las fotos de las detecciones ANPR.",
+        )
+        return dias
+
+    async def purgar_fotos_antiguas(self, db: AsyncSession, dias_retencion: int) -> int:
+        """
+        Borra las fotos de las detecciones más viejas que `dias_retencion` días.
+
+        Se borra la IMAGEN, nunca la detección. La placa, la hora, el sentido y el
+        veredicto son la bitácora de la alcabala y siguen intactos: lo único que se
+        pierde es el JPEG, que es lo único que ocupaba disco.
+
+        Igual que en la purga de combustible (abastecimiento_service.py), el archivo se
+        borra ANTES de limpiar la columna. Al revés quedaría huérfano: sin la referencia
+        no hay forma de saber qué archivo le correspondía, y ocuparía disco para siempre.
+
+        Devuelve cuántas detecciones se quedaron sin foto.
+        """
+        limite = datetime.now(timezone.utc) - timedelta(days=dias_retencion)
+        total = 0
+
+        while True:
+            filas = (await db.execute(
+                select(
+                    EventoAnpr.id,
+                    EventoAnpr.foto_placa_path,
+                    EventoAnpr.foto_escena_path,
+                )
+                .where(
+                    EventoAnpr.timestamp_recibido < limite,
+                    (EventoAnpr.foto_placa_path.isnot(None))
+                    | (EventoAnpr.foto_escena_path.isnot(None)),
+                )
+                .limit(200)
+            )).all()
+
+            if not filas:
+                break
+
+            borrar_imagenes([valor for fila in filas for valor in (fila[1], fila[2])])
+
+            await db.execute(
+                update(EventoAnpr)
+                .where(EventoAnpr.id.in_([fila[0] for fila in filas]))
+                .values(foto_placa_path=None, foto_escena_path=None)
+            )
+            await db.commit()
+            total += len(filas)
+
+        if total:
+            print(f"[ANPR] Purga de fotos: {total} detecciones anteriores a {dias_retencion} días.")
+        return total
 
 
 anpr_service = AnprService()

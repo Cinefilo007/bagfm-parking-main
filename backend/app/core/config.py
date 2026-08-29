@@ -66,7 +66,19 @@ class Configuracion(BaseSettings):
     # La cámara dispara varias veces por vehículo (LPR multi-frame). Dentro de esta
     # ventana, la misma placa en el mismo punto se marca duplicada.
     anpr_dedupe_segundos: int = 30
-    anpr_retencion_fotos_dias: int = 90
+    # Días que se conservan las FOTOS de las detecciones. Vencido el plazo se borra la
+    # imagen; la detección (placa, hora, sentido, veredicto) no se toca nunca.
+    #
+    # Este es solo el valor por defecto: el Comandante lo cambia desde el panel de
+    # cámaras y ese ajuste, que vive en la tabla `configuracion`, manda sobre este.
+    # Ver anpr_service.retencion_fotos_dias().
+    anpr_retencion_fotos_dias: int = 7
+    # La cámara manda la panorámica del vehículo en la resolución del sensor, y a
+    # varios miles de fotos por día eso llenó 13 GB de disco. Se reencodea al entrar.
+    # El recorte de la placa NO se toca: pesa poco y es la evidencia que identifica al
+    # vehículo, así que no vale la pena arriesgar un carácter ilegible.
+    anpr_escena_lado_maximo: int = 1280
+    anpr_escena_calidad: int = 75
 
     # Control del brazo desde el backend (Fase 2). Requiere alcanzar la cámara dentro
     # de la LAN de la base, cosa que hoy no es posible sin túnel. En Fase 1 el brazo

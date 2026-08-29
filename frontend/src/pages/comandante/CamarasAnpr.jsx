@@ -942,6 +942,139 @@ Su dirección deja de funcionar de inmediato.
   );
 };
 
+/**
+ * Cada cuánto se borran las fotos de las detecciones.
+ *
+ * Se muestra siempre, aunque nadie vaya a tocarlo: durante mucho tiempo la retención
+ * existió como ajuste pero nunca se aplicó, y las fotos llenaron 13 GB sin que nada
+ * lo dijera. Un número a la vista es lo que evita que eso vuelva a pasar en silencio.
+ *
+ * Lo que vence es la FOTO, no la detección: la placa, la hora y el sentido quedan para
+ * siempre en la bitácora de la alcabala.
+ */
+const RetencionFotos = () => {
+  const [dias, setDias] = useState(null);
+  const [conFoto, setConFoto] = useState(0);
+  const [borrador, setBorrador] = useState('');
+  const [editando, setEditando] = useState(false);
+  const [ocupada, setOcupada] = useState(false);
+
+  const cargar = useCallback(async () => {
+    try {
+      const datos = await anprService.getRetencionFotos();
+      setDias(datos.dias);
+      setConFoto(datos.detecciones_con_foto);
+    } catch {
+      // Silencioso a propósito: es un panel informativo dentro de la pantalla de
+      // cámaras. Un toast de error aquí taparía el trabajo real del Comandante.
+    }
+  }, []);
+
+  useEffect(() => { cargar(); }, [cargar]);
+
+  const guardar = async () => {
+    const valor = Number(borrador);
+    if (!Number.isInteger(valor) || valor < 1 || valor > 365) {
+      toast.error('Indique un número entero de días, entre 1 y 365.');
+      return;
+    }
+    setOcupada(true);
+    try {
+      const datos = await anprService.setRetencionFotos(valor);
+      setDias(datos.dias);
+      setConFoto(datos.detecciones_con_foto);
+      setEditando(false);
+      toast.success(`Las fotos se borrarán a los ${datos.dias} días`);
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || 'No se pudo guardar la retención');
+    } finally {
+      setOcupada(false);
+    }
+  };
+
+  const purgarAhora = async () => {
+    if (!window.confirm(
+      `Se borrarán ahora mismo las fotos de las detecciones con más de ${dias} días.\n\n` +
+      'Las detecciones (placa, hora, sentido) NO se borran: solo la imagen.\n\n¿Continuar?'
+    )) return;
+
+    setOcupada(true);
+    try {
+      const resultado = await anprService.purgarFotos();
+      await cargar();
+      toast.success(`Se liberaron las fotos de ${resultado.detecciones_purgadas} detecciones`);
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || 'La purga falló');
+    } finally {
+      setOcupada(false);
+    }
+  };
+
+  if (dias === null) return null;
+
+  return (
+    <Card elevation={2} className="border-bg-high/10">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex gap-3">
+          <Trash2 className="mt-0.5 h-4 w-4 shrink-0 text-text-sec" />
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold text-text-pri">Retención de fotos</h3>
+            {!editando ? (
+              <p className="mt-0.5 text-xs leading-relaxed text-text-sec">
+                Las fotos de las detecciones se eliminan automáticamente a los{' '}
+                <strong className="text-text-pri">{dias} {dias === 1 ? 'día' : 'días'}</strong>.
+                {' '}Hoy hay <strong className="text-text-pri">{conFoto.toLocaleString('es-VE')}</strong>
+                {' '}detecciones con foto guardada.
+              </p>
+            ) : (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={borrador}
+                  onChange={(e) => setBorrador(e.target.value)}
+                  className="w-24"
+                  autoFocus
+                />
+                <span className="text-xs text-text-sec">días</span>
+                <Boton size="sm" onClick={guardar} disabled={ocupada}>
+                  {ocupada ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                  Guardar
+                </Boton>
+                <Boton size="sm" variant="ghost" onClick={() => setEditando(false)} disabled={ocupada}>
+                  <X className="h-4 w-4" /> Cancelar
+                </Boton>
+              </div>
+            )}
+            <p className="mt-1.5 text-[11px] leading-relaxed text-text-sec/80">
+              Solo se borra la imagen. La placa, la hora y el sentido de cada detección
+              quedan en el histórico de forma permanente.
+            </p>
+          </div>
+        </div>
+
+        {!editando && (
+          <div className="flex gap-2">
+            <Boton
+              size="sm"
+              variant="ghost"
+              onClick={() => { setBorrador(String(dias)); setEditando(true); }}
+              disabled={ocupada}
+            >
+              <Pencil className="h-4 w-4" /> Cambiar
+            </Boton>
+            <Boton size="sm" variant="ghost" onClick={purgarAhora} disabled={ocupada}>
+              {ocupada ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              Purgar ahora
+            </Boton>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+};
+
 const CamarasAnpr = () => {
   const [camaras, setCamaras] = useState([]);
   const [puntos, setPuntos] = useState([]);
@@ -1047,6 +1180,7 @@ const CamarasAnpr = () => {
 
       <main className="mt-[-1rem] space-y-4 px-4 pb-24 lg:px-8">
       <GuiaConfiguracion />
+      <RetencionFotos />
       <DiagnosticoIngesta />
 
       {puntos.length === 0 && !cargando && (

@@ -16,19 +16,48 @@ class CronService:
     Encargado de la vigilancia automática de la base y seguridad.
     """
 
+    # Última vez que corrió la purga de fotos ANPR. Vive en memoria a propósito: si el
+    # proceso se reinicia y la purga vuelve a correr, no pasa nada — es idempotente.
+    _ultima_purga_anpr = None
+
     async def ejecutar_ciclo_seguridad(self, db: AsyncSession):
         """Ejecuta todas las tareas de vigilancia."""
         ghosts = await self.procesar_vehiculos_fantasma(db)
         timeouts = await self.procesar_excesos_permanencia(db)
         mass_exits = await self.procesar_salidas_masivas(db)
         saturacion = await self.monitorear_saturacion_estacionamientos(db)
+        fotos_anpr = await self.purgar_fotos_anpr(db)
         return {
             "vehiculos_fantasma_detectados": ghosts,
             "excesos_tiempo_detectados": timeouts,
             "salidas_masivas_procesadas": mass_exits,
             "saturaciones_detectadas": saturacion,
+            "fotos_anpr_purgadas": fotos_anpr,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
+
+    async def purgar_fotos_anpr(self, db: AsyncSession) -> int:
+        """
+        Aplica la retención de fotos de las cámaras ANPR. Corre una vez al día.
+
+        El ciclo entra cada 60 segundos, así que sin la guarda de 24 h esto recorrería
+        la tabla 1440 veces diarias para no borrar nada.
+
+        La marca se pone ANTES de purgar: si la purga falla, se reintenta mañana en vez
+        de cada minuto. Un fallo repetido a razón de uno por minuto llenaría el log y
+        taparía justamente el error que hay que leer.
+        """
+        ahora = datetime.now(timezone.utc)
+        if self._ultima_purga_anpr and (ahora - self._ultima_purga_anpr) < timedelta(hours=24):
+            return 0
+        CronService._ultima_purga_anpr = ahora
+
+        # Import local: anpr_service arrastra medio dominio (modelos, notificaciones,
+        # lookup de placas) y este módulo lo carga el arranque de la app.
+        from app.services.anpr_service import anpr_service
+
+        dias = await anpr_service.retencion_fotos_dias(db)
+        return await anpr_service.purgar_fotos_antiguas(db, dias)
 
     async def procesar_vehiculos_fantasma(self, db: AsyncSession) -> int:
         """

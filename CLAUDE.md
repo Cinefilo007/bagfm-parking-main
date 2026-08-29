@@ -292,11 +292,26 @@ el sistema lo registra como lectura de una sola cámara en vez de tomarlo por un
 
 ```bash
 ANPR_DEDUPE_SEGUNDOS=30        # la cámara dispara varias veces por vehículo
-ANPR_RETENCION_FOTOS_DIAS=90
+ANPR_RETENCION_FOTOS_DIAS=7    # solo el DEFECTO: el Comandante lo cambia desde
+                               # Cámaras ANPR y ese valor (tabla `configuracion`,
+                               # clave ANPR_RETENCION_FOTOS_DIAS) manda sobre este
+ANPR_ESCENA_LADO_MAXIMO=1280   # la panorámica se reencodea al entrar
+ANPR_ESCENA_CALIDAD=75         # el recorte de la placa NO se toca: es la evidencia
 ANPR_IP_ALLOWLIST=             # IP PÚBLICA de la alcabala, no la LAN de la cámara.
                                # Vacía si el ISP da IP dinámica.
 HIKVISION_CONTROL_ACTIVO=false # Fase 2
 ```
+
+### Retención de fotos
+
+Vencido el plazo se borra **la imagen**, nunca la detección: placa, hora, sentido y
+veredicto quedan en `eventos_anpr` de forma permanente. La purga la ejecuta el ciclo
+diario de `cron_service`, y `POST /api/v1/anpr/mantenimiento/purgar-fotos` la dispara
+en el momento.
+
+Las fotos se excluyen del backup a propósito (ver `stack/backup.sh` del repo de
+infraestructura): son efímeras por diseño, y respaldarlas las conservaría 6 meses en
+los snapshots mensuales de restic — justo lo que la retención vino a evitar.
 
 `ANPR_INGEST_TOKEN` quedó **obsoleta**: cada cámara tiene su token en la base.
 
