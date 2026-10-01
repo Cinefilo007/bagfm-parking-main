@@ -23,6 +23,15 @@ class LecturaTanque(Base):
     
     fecha = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
+    # Corrección del administrador. cantidad_original es lo que declaró el bombero y
+    # solo se rellena la primera vez: ver la apertura existe para auditarle, y
+    # sobrescribir sin guardarla borraría justo esa prueba.
+    cantidad_original = Column(Float, nullable=True)
+    corregida_por_id = Column(UUID(as_uuid=True), ForeignKey("usuarios.id", ondelete="RESTRICT"), nullable=True)
+    corregida_at = Column(DateTime(timezone=True), nullable=True)
+    motivo_correccion = Column(String(300), nullable=True)
+
     # Relaciones
     tanque = relationship("TanqueCombustible", foreign_keys=[tanque_id], backref="lecturas")
     bombero = relationship("Usuario", foreign_keys=[bombero_id], backref="lecturas_realizadas")
+    corregida_por = relationship("Usuario", foreign_keys=[corregida_por_id])

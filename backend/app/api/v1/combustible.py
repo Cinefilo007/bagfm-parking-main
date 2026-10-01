@@ -1379,6 +1379,22 @@ async def obtener_dashboard_kpis_supervisor(
         raise HTTPException(status_code=500, detail=f"Error al obtener KPIs del supervisor: {str(e)}")
 
 
+def _lectura_dict(l) -> Optional[Dict[str, Any]]:
+    if l is None:
+        return None
+    return {
+        "id": str(l.id),
+        "fecha": l.fecha.isoformat(),
+        "cantidad_medida": l.cantidad_medida,
+        "cantidad_original": l.cantidad_original,
+        "observaciones": l.observaciones,
+        "responsable_nombre": f"{l.bombero.nombre} {l.bombero.apellido}" if l.bombero else "Sistema",
+        "corregida_por_nombre": f"{l.corregida_por.nombre} {l.corregida_por.apellido}" if l.corregida_por else None,
+        "corregida_at": l.corregida_at.isoformat() if l.corregida_at else None,
+        "motivo_correccion": l.motivo_correccion,
+    }
+
+
 @router.get("/cierres")
 async def listar_cierres_historicos(
     skip: int = Query(0),
@@ -1387,53 +1403,122 @@ async def listar_cierres_historicos(
     usuario: Usuario = Depends(obtener_usuario_actual)
 ):
     """
-    Lista los cierres históricos (tipo_lectura == cierre_dia) con paginación.
+    Lista las jornadas de cada tanque (un día local de Caracas) con su apertura y su cierre.
     Accesible para Supervisor de Bomberos y Comando.
+
+    Se pagina por jornada y no por cierre: una apertura cuyo cierre no llegó a
+    registrarse —el día en curso, o un bombero que se olvidó— tiene que verse igual,
+    porque auditar lo que declara el bombero es justo para lo que existe esta vista.
     """
     if usuario.rol not in [RolTipo.SUPERVISOR_BOMBEROS, RolTipo.COMANDANTE, RolTipo.ADMIN_BASE]:
         raise HTTPException(status_code=403, detail="Permisos insuficientes.")
-        
+
     try:
-        from app.models.lectura_tanque import LecturaTanque
-        from app.models.enums import TipoLecturaTanque
-        from sqlalchemy import func
+        from zoneinfo import ZoneInfo
+        from datetime import time as dt_time
+        from sqlalchemy import literal_column
         from sqlalchemy.orm import selectinload
-        
-        # Consulta para contar el total
-        q_count = select(func.count(LecturaTanque.id)).where(LecturaTanque.tipo_lectura == TipoLecturaTanque.cierre_dia)
-        res_count = await db.execute(q_count)
-        total = res_count.scalar() or 0
-        
-        # Consulta paginada con relaciones tanque y bombero
-        q_cierres = (
-            select(LecturaTanque)
-            .options(selectinload(LecturaTanque.tanque), selectinload(LecturaTanque.bombero))
-            .where(LecturaTanque.tipo_lectura == TipoLecturaTanque.cierre_dia)
-            .order_by(LecturaTanque.fecha.desc())
-            .offset(skip)
-            .limit(limit)
+        from app.models.lectura_tanque import LecturaTanque
+
+        tz = ZoneInfo("America/Caracas")
+        tipos = (TipoLecturaTanque.apertura_dia, TipoLecturaTanque.cierre_dia)
+        # La zona va como literal y no como parámetro: con dos binds distintos Postgres
+        # no reconoce que la expresión del SELECT es la misma del GROUP BY.
+        dia_local = func.date(func.timezone(literal_column("'America/Caracas'"), LecturaTanque.fecha))
+
+        jornadas_q = (
+            select(LecturaTanque.tanque_id, dia_local.label("dia"))
+            .where(LecturaTanque.tipo_lectura.in_(tipos))
+            .group_by(LecturaTanque.tanque_id, dia_local)
         )
-        res_cierres = await db.execute(q_cierres)
-        cierres = res_cierres.scalars().all()
-        
-        return {
-            "status": "success",
-            "total": total,
-            "data": [
-                {
-                    "id": str(c.id),
-                    "fecha": c.fecha.isoformat(),
-                    "tanque_id": str(c.tanque_id),
-                    "tanque_nombre": c.tanque.nombre if c.tanque else "?",
-                    "tanque_tipo": c.tanque.tipo_combustible.value if c.tanque else "?",
-                    "cantidad_medida": c.cantidad_medida,
-                    "observaciones": c.observaciones,
-                    "responsable_nombre": f"{c.bombero.nombre} {c.bombero.apellido}" if c.bombero else "Sistema"
-                } for c in cierres
-            ]
-        }
+        total = (await db.execute(select(func.count()).select_from(jornadas_q.subquery()))).scalar() or 0
+        jornadas = (await db.execute(
+            jornadas_q.order_by(dia_local.desc(), LecturaTanque.tanque_id).offset(skip).limit(limit)
+        )).all()
+
+        lecturas_por_jornada: Dict[tuple, Dict[str, Any]] = {}
+        if jornadas:
+            dias = [j.dia for j in jornadas]
+            q_lecturas = (
+                select(LecturaTanque)
+                .options(
+                    selectinload(LecturaTanque.tanque),
+                    selectinload(LecturaTanque.bombero),
+                    selectinload(LecturaTanque.corregida_por),
+                )
+                .where(
+                    LecturaTanque.tipo_lectura.in_(tipos),
+                    LecturaTanque.tanque_id.in_({j.tanque_id for j in jornadas}),
+                    LecturaTanque.fecha.between(
+                        datetime.combine(min(dias), dt_time.min).replace(tzinfo=tz),
+                        datetime.combine(max(dias), dt_time.max).replace(tzinfo=tz),
+                    ),
+                )
+                .order_by(LecturaTanque.fecha.asc())
+            )
+            for l in (await db.execute(q_lecturas)).scalars().all():
+                slot = lecturas_por_jornada.setdefault((l.tanque_id, l.fecha.astimezone(tz).date()), {})
+                # Si hubiera dos (datos viejos, antes de la validación): manda la primera
+                # apertura y el último cierre del día.
+                if l.tipo_lectura == TipoLecturaTanque.apertura_dia:
+                    slot.setdefault("apertura", l)
+                else:
+                    slot["cierre"] = l
+                slot["tanque"] = l.tanque
+
+        data = []
+        for j in jornadas:
+            slot = lecturas_por_jornada.get((j.tanque_id, j.dia), {})
+            apertura, cierre, tanque = slot.get("apertura"), slot.get("cierre"), slot.get("tanque")
+            referencia = cierre or apertura
+            data.append({
+                # id y fecha siguen siendo los del cierre: los usan el PDF y la carga excepcional
+                "id": str(cierre.id) if cierre else None,
+                "dia": j.dia.isoformat(),
+                "fecha": referencia.fecha.isoformat() if referencia else None,
+                "tanque_id": str(j.tanque_id),
+                "tanque_nombre": tanque.nombre if tanque else "?",
+                "tanque_tipo": tanque.tipo_combustible.value if tanque else "?",
+                "apertura": _lectura_dict(apertura),
+                "cierre": _lectura_dict(cierre),
+            })
+
+        return {"status": "success", "total": total, "data": data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al listar cierres: {str(e)}")
+
+
+class CorregirLecturaRequest(BaseModel):
+    cantidad_medida: float
+    motivo: str = Field(..., min_length=3, max_length=300)
+
+
+@router.patch("/lecturas/{lectura_id}")
+async def corregir_lectura_tanque(
+    lectura_id: UUID,
+    request: CorregirLecturaRequest,
+    db: AsyncSession = Depends(obtener_db),
+    usuario: Usuario = Depends(obtener_usuario_actual)
+):
+    """
+    Corrige la cifra de una apertura o un cierre. Solo administración: el supervisor de
+    bomberos es parte de lo que se audita.
+    """
+    if usuario.rol not in [RolTipo.ADMIN_BASE, RolTipo.COMANDANTE]:
+        raise HTTPException(status_code=403, detail="Solo el administrador puede corregir lecturas.")
+
+    try:
+        await abastecimiento_service.corregir_lectura(
+            db, lectura_id, usuario.id, request.cantidad_medida, request.motivo.strip()
+        )
+        await db.commit()
+        return {"status": "success", "message": "Lectura corregida."}
+    except ValueError as ve:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/cierres/{lectura_id}/reporte-data")

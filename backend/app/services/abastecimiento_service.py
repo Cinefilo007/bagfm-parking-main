@@ -505,6 +505,55 @@ class AbastecimientoService:
         await db.flush()
         return lectura
 
+    async def corregir_lectura(
+        self,
+        db: AsyncSession,
+        lectura_id: uuid.UUID,
+        admin_id: uuid.UUID,
+        cantidad_medida: float,
+        motivo: str
+    ) -> LecturaTanque:
+        """
+        Corrige la cifra de una apertura o un cierre conservando la que declaró el bombero.
+        """
+        res = await db.execute(select(LecturaTanque).where(LecturaTanque.id == lectura_id))
+        lectura = res.scalar_one_or_none()
+        if not lectura:
+            raise ValueError("Lectura no encontrada.")
+        if lectura.tipo_lectura not in (TipoLecturaTanque.apertura_dia, TipoLecturaTanque.cierre_dia):
+            raise ValueError("Solo se pueden corregir aperturas y cierres del día.")
+
+        res_t = await db.execute(select(TanqueCombustible).where(TanqueCombustible.id == lectura.tanque_id))
+        tanque = res_t.scalar_one()
+        if cantidad_medida < 0:
+            raise ValueError("La cantidad no puede ser negativa.")
+        if cantidad_medida > tanque.capacidad_maxima:
+            raise ValueError(f"La cantidad ingresada ({cantidad_medida} L) supera la capacidad máxima del tanque ({tanque.capacidad_maxima} L).")
+
+        diferencia = cantidad_medida - lectura.cantidad_medida
+
+        # El inventario del tanque es la última lectura menos lo despachado desde entonces.
+        # Si esta lectura sigue siendo la última, el error se arrastra hasta hoy y hay que
+        # moverlo con la misma diferencia (no igualarlo: borraría los abastecimientos
+        # posteriores). Si ya hubo otra lectura después, esa fijó el inventario y la
+        # corrección no lo toca.
+        q_posterior = select(func.count(LecturaTanque.id)).where(
+            LecturaTanque.tanque_id == lectura.tanque_id,
+            LecturaTanque.fecha > lectura.fecha
+        )
+        if not (await db.execute(q_posterior)).scalar():
+            tanque.cantidad_actual = max(0.0, tanque.cantidad_actual + diferencia)
+
+        if lectura.cantidad_original is None:
+            lectura.cantidad_original = lectura.cantidad_medida
+        lectura.cantidad_medida = cantidad_medida
+        lectura.corregida_por_id = admin_id
+        lectura.corregida_at = datetime.now(ZoneInfo("America/Caracas"))
+        lectura.motivo_correccion = motivo
+
+        await db.flush()
+        return lectura
+
     async def verificar_apertura_dia(self, db: AsyncSession, tanque_id: Optional[uuid.UUID] = None, fecha_str: Optional[str] = None) -> bool:
         """
         Verifica si hay una lectura de apertura registrada hoy.

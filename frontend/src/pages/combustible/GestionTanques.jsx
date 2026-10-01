@@ -3,7 +3,7 @@ import {
   Flame, RefreshCw, PlusCircle, Edit3, Trash2, 
   CheckCircle, AlertTriangle, XCircle, Database, Droplet,
   ClipboardList, ChevronLeft, ChevronRight, FileDown,
-  X, Camera, User, Plus
+  X, Camera, User, Plus, Sunrise, Sunset
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { toast } from 'react-hot-toast';
@@ -20,6 +20,66 @@ function formatTimeAgo(dateString) {
   if (m < 60) return `Hace ${m}m`;
   const h = Math.floor(m / 60);
   return h < 24 ? `Hace ${h}h` : `Hace ${Math.floor(h / 24)}d`;
+}
+
+// `dia` llega como "AAAA-MM-DD" (el día local de Caracas). Pasarlo por new Date() lo
+// leería como medianoche UTC y en Venezuela mostraría el día anterior.
+function formatDia(dia) {
+  if (!dia) return '--';
+  const [a, m, d] = dia.split('-');
+  return `${d}/${m}/${a.slice(2)}`;
+}
+
+function formatHora(fecha) {
+  return new Date(fecha).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+}
+
+/**
+ * Una apertura o un cierre dentro de la tabla de jornadas. Si el administrador lo
+ * corrigió, se ve tachado lo que declaró el bombero: esconderlo dejaría la cifra
+ * corregida como si la hubiera puesto él.
+ */
+function CeldaLectura({ lectura, color, puedeCorregir, onCorregir }) {
+  if (!lectura) {
+    return <span className="text-[10px] font-black uppercase tracking-widest text-text-muted/60">Sin registrar</span>;
+  }
+  const corregida = lectura.cantidad_original !== null && lectura.cantidad_original !== undefined;
+  return (
+    <div className="flex items-start justify-end gap-2">
+      <div className="text-right">
+        <div className="flex items-baseline justify-end gap-1.5">
+          {corregida && (
+            <span className="text-[10px] font-mono text-text-muted line-through" title="Lo que declaró el bombero">
+              {Number(lectura.cantidad_original).toFixed(1)}
+            </span>
+          )}
+          <span className={cn('text-sm font-black font-mono', color)}>
+            {Number(lectura.cantidad_medida).toFixed(1)} L
+          </span>
+        </div>
+        <p className="text-[9px] text-text-muted uppercase truncate max-w-[170px]">
+          {formatHora(lectura.fecha)} · {lectura.responsable_nombre}
+        </p>
+        {corregida && (
+          <p
+            className="text-[9px] text-primary uppercase font-bold truncate max-w-[170px]"
+            title={`${lectura.motivo_correccion || ''}${lectura.corregida_at ? ` — ${new Date(lectura.corregida_at).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}` : ''}`}
+          >
+            Corregida por {lectura.corregida_por_nombre}
+          </p>
+        )}
+      </div>
+      {puedeCorregir && (
+        <button
+          onClick={onCorregir}
+          className="w-7 h-7 shrink-0 rounded-lg bg-white/5 border border-bg-high/30 flex items-center justify-center text-text-muted hover:text-primary hover:border-primary/30 transition-all cursor-pointer"
+          title="Corregir lectura"
+        >
+          <Edit3 size={12} />
+        </button>
+      )}
+    </div>
+  );
 }
 
 export default function GestionTanques() {
@@ -61,6 +121,11 @@ export default function GestionTanques() {
     conductor: ''
   });
   const [guardandoEdicion, setGuardandoEdicion] = useState(false);
+
+  // Corrección de una apertura o un cierre: { lectura, tipo, jornada }
+  const [corrigiendo, setCorrigiendo] = useState(null);
+  const [formCorreccion, setFormCorreccion] = useState({ cantidad_medida: '', motivo: '' });
+  const [guardandoCorreccion, setGuardandoCorreccion] = useState(false);
 
   // Modal Editar Tanque
   const [modalEditar, setModalEditar] = useState(null);
@@ -358,6 +423,41 @@ export default function GestionTanques() {
     }
   };
 
+  const abrirCorreccion = (jornada, tipo) => {
+    const lectura = jornada[tipo];
+    setCorrigiendo({ lectura, tipo, jornada });
+    setFormCorreccion({ cantidad_medida: lectura.cantidad_medida, motivo: '' });
+  };
+
+  const handleGuardarCorreccion = async (e) => {
+    e.preventDefault();
+    const cantidad = parseFloat(formCorreccion.cantidad_medida);
+    if (Number.isNaN(cantidad) || cantidad < 0) {
+      toast.error("Indique una cantidad válida.");
+      return;
+    }
+    if (formCorreccion.motivo.trim().length < 3) {
+      toast.error("Explique el motivo de la corrección.");
+      return;
+    }
+    setGuardandoCorreccion(true);
+    try {
+      await combustibleService.corregirLectura(corrigiendo.lectura.id, {
+        cantidad_medida: cantidad,
+        motivo: formCorreccion.motivo.trim()
+      });
+      toast.success(corrigiendo.tipo === 'apertura' ? 'Apertura corregida.' : 'Cierre corregido.');
+      setCorrigiendo(null);
+      cargarCierres();
+      // El inventario del tanque cambia si la lectura corregida era la última
+      cargarTanques();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "No se pudo corregir la lectura.");
+    } finally {
+      setGuardandoCorreccion(false);
+    }
+  };
+
   const getNivelColor = (porcentaje) => {
     if (porcentaje > 50) return { bar: 'bg-emerald-500', text: 'text-emerald-400', glow: 'shadow-[0_0_12px_rgba(16,185,129,0.3)]' };
     if (porcentaje > 20) return { bar: 'bg-amber-500', text: 'text-amber-400', glow: 'shadow-[0_0_12px_rgba(245,158,11,0.3)]' };
@@ -499,12 +599,12 @@ export default function GestionTanques() {
             </div>
             <div>
               <h3 className="font-black text-text-main tracking-wide">
-                {tabActivo === 'general' ? 'Historial General' : 'Historial de Cierres Diarios'}
+                {tabActivo === 'general' ? 'Historial General' : 'Aperturas y Cierres'}
               </h3>
               <p className="text-[10px] text-text-muted mt-0.5">
                 {tabActivo === 'general' 
                   ? 'Registro de todos los abastecimientos realizados en la base' 
-                  : 'Historial de lecturas de cierres diarios por tanque'}
+                  : 'Lo que declaró el bombero al abrir y al cerrar cada tanque, día por día'}
               </p>
             </div>
           </div>
@@ -527,7 +627,7 @@ export default function GestionTanques() {
                 tabActivo === 'cierres' ? 'bg-bg-card text-success border border-success/10' : 'text-text-muted hover:text-text-main'
               )}
             >
-              Cierres Diarios
+              Aperturas y Cierres
             </button>
           </div>
           
@@ -629,8 +729,8 @@ export default function GestionTanques() {
                 <tr className="border-b border-white/5 bg-bg-low/30">
                   <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted">Fecha</th>
                   <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted">Tanque</th>
-                  <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted text-right">Litros Cierre</th>
-                  <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted">Responsable</th>
+                  <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted text-right">Apertura</th>
+                  <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted text-right">Cierre</th>
                   <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-text-muted text-center">Acciones</th>
                 </tr>
               </thead>
@@ -639,37 +739,41 @@ export default function GestionTanques() {
                   <tr>
                     <td colSpan="5" className="px-4 py-8 text-center text-text-muted">
                       <RefreshCw size={24} className="animate-spin mx-auto mb-2 opacity-50" />
-                      <p className="text-xs uppercase tracking-widest font-black">Cargando Cierres...</p>
+                      <p className="text-xs uppercase tracking-widest font-black">Cargando jornadas...</p>
                     </td>
                   </tr>
                 ) : cierres.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="px-4 py-8 text-center text-text-muted text-xs uppercase tracking-widest font-black">
-                      No hay registros de cierres diarios.
+                      No hay aperturas ni cierres registrados.
                     </td>
                   </tr>
                 ) : (
                   cierres.map(c => (
-                    <tr key={c.id} className="hover:bg-white/5 transition-colors">
+                    <tr key={`${c.tanque_id}-${c.dia}`} className="hover:bg-white/5 transition-colors">
                       <td className="px-4 py-3">
-                        <span className="text-xs font-mono text-text-sec">
-                          {new Date(c.fecha).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}
-                        </span>
+                        <span className="text-xs font-mono text-text-sec">{formatDia(c.dia)}</span>
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-xs font-black text-text-main tracking-wide uppercase">
                           {c.tanque_nombre}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="text-sm font-black text-amber-400 font-mono">
-                          {Number(c.cantidad_medida).toFixed(1)} L
-                        </span>
+                      <td className="px-4 py-3">
+                        <CeldaLectura
+                          lectura={c.apertura}
+                          color="text-sky-400"
+                          puedeCorregir={esAdmin}
+                          onCorregir={() => abrirCorreccion(c, 'apertura')}
+                        />
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-[10px] font-bold text-text-muted uppercase truncate max-w-[150px] block">
-                          {c.bombero_nombre}
-                        </span>
+                        <CeldaLectura
+                          lectura={c.cierre}
+                          color="text-amber-400"
+                          puedeCorregir={esAdmin}
+                          onCorregir={() => abrirCorreccion(c, 'cierre')}
+                        />
                       </td>
                       <td className="px-4 py-3 text-center">
                         <div className="flex items-center justify-center gap-2">
@@ -683,6 +787,8 @@ export default function GestionTanques() {
                               Carga
                             </button>
                           )}
+                          {/* Los reportes son del cierre: sin cierre todavía no hay nada que reportar */}
+                          {c.id && (<>
                           <button
                             disabled={descargandoCierreId !== null || descargandoConFotosId !== null}
                             onClick={() => handleDescargarCierre(c.id)}
@@ -709,6 +815,7 @@ export default function GestionTanques() {
                             )}
                             PDF + Fotos
                           </button>
+                          </>)}
                         </div>
                       </td>
                     </tr>
@@ -1056,6 +1163,102 @@ export default function GestionTanques() {
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL CORREGIR APERTURA / CIERRE --- */}
+      {corrigiendo && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-bg-card border border-bg-high/50 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
+            <div className="p-4 border-b border-bg-high/20 flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                {corrigiendo.tipo === 'apertura'
+                  ? <Sunrise size={16} className="text-sky-400" />
+                  : <Sunset size={16} className="text-amber-400" />}
+                <div>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-text-main font-mono">
+                    Corregir {corrigiendo.tipo === 'apertura' ? 'Apertura' : 'Cierre'}
+                  </h3>
+                  <p className="text-[9px] text-text-muted uppercase tracking-wider">
+                    {corrigiendo.jornada.tanque_nombre} · {formatDia(corrigiendo.jornada.dia)}
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setCorrigiendo(null)} className="text-text-muted hover:text-text-main cursor-pointer">
+                <XCircle size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleGuardarCorreccion} className="p-5 space-y-4">
+              <div className="bg-bg-low border border-bg-high/30 rounded-xl p-3 space-y-1">
+                <p className="text-[8px] font-black uppercase text-text-muted tracking-widest">Declarado por el bombero</p>
+                <p className="text-sm font-black font-mono text-text-main">
+                  {Number(corrigiendo.lectura.cantidad_original ?? corrigiendo.lectura.cantidad_medida).toFixed(1)} L
+                </p>
+                <p className="text-[9px] text-text-muted uppercase">
+                  {corrigiendo.lectura.responsable_nombre} · {formatHora(corrigiendo.lectura.fecha)}
+                </p>
+                {corrigiendo.lectura.cantidad_original !== null && corrigiendo.lectura.cantidad_original !== undefined && (
+                  <p className="text-[9px] text-primary uppercase font-bold pt-1">
+                    Ya corregida a {Number(corrigiendo.lectura.cantidad_medida).toFixed(1)} L por {corrigiendo.lectura.corregida_por_nombre}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[8px] font-black uppercase text-text-muted tracking-widest flex items-center gap-1">
+                  <Droplet size={10} /> Cantidad correcta (L) *
+                </label>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={formCorreccion.cantidad_medida}
+                  onChange={(e) => setFormCorreccion(p => ({ ...p, cantidad_medida: e.target.value }))}
+                  className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 h-11 text-xs text-text-main focus:outline-none focus:border-primary transition-all font-display font-bold"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[8px] font-black uppercase text-text-muted tracking-widest">Motivo de la corrección *</label>
+                <textarea
+                  value={formCorreccion.motivo}
+                  onChange={(e) => setFormCorreccion(p => ({ ...p, motivo: e.target.value }))}
+                  maxLength={300}
+                  rows={2}
+                  placeholder="Ej: tecleó 1600 en vez de 1160"
+                  className="w-full bg-bg-low border border-bg-high/30 rounded-xl px-3 py-2 text-xs text-text-main focus:outline-none focus:border-primary transition-all resize-none"
+                  required
+                />
+              </div>
+
+              <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 flex items-start gap-2">
+                <AlertTriangle size={14} className="text-amber-400 shrink-0 mt-0.5" />
+                <p className="text-[9px] text-text-muted leading-relaxed">
+                  La cifra del bombero queda registrada junto a la corrección. Si es la última lectura del tanque, el inventario actual se ajusta con la diferencia.
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setCorrigiendo(null)}
+                  className="flex-1 h-11 rounded-xl bg-white/5 border border-bg-high/30 text-text-muted font-black text-[10px] uppercase tracking-widest hover:bg-white/10 transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={guardandoCorreccion}
+                  className="flex-1 h-11 rounded-xl bg-primary text-on-primary font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5 hover:brightness-110 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                >
+                  {guardandoCorreccion ? <RefreshCw size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+                  Guardar
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

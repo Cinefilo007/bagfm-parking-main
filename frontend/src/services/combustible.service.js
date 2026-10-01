@@ -255,4 +255,13 @@ export const combustibleService = {
     const { data } = await api.patch(`/combustible/abastecimientos/${id}/editar-litraje`, datos);
     return data;
   },
+
+  /**
+   * Corrige la cifra de una apertura o un cierre (solo administración).
+   * El backend conserva lo que declaró el bombero en `cantidad_original`.
+   */
+  async corregirLectura(id, datos) {
+    const { data } = await api.patch(`/combustible/lecturas/${id}`, datos);
+    return data;
+  },
 };

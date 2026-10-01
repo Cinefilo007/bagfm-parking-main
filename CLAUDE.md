@@ -246,6 +246,14 @@ lista blanca) necesita WireGuard en el VPS + un router saliente en cada alcabala
   es como aparecieron las fichas duplicadas que hubo que sanear. La placa nueva se crea
   en `vehiculos`, la tabla madre, para que la cámara la reconozca desde la lectura
   siguiente.
+- **Corregir una apertura o un cierre de tanque NO sobrescribe lo que declaró el bombero.**
+  Ver la apertura existe para auditarle, así que la primera corrección guarda su cifra en
+  `lecturas_tanque.cantidad_original` (migración `c3d4cor5e6f7`) con quién, cuándo y por
+  qué; la tabla la enseña tachada. El inventario del tanque solo se mueve —con la
+  diferencia, no igualándolo— si la lectura corregida es la última del tanque: si hubo
+  otra después, esa ya fijó el stock. Corrige solo ADMIN_BASE/COMANDANTE: el supervisor
+  de bomberos es parte de lo auditado. El historial se pagina **por jornada** (tanque +
+  día de Caracas), no por cierre, para que una apertura sin cierre también se vea.
 - **`validar_qr` comprueba el perfil militar ANTES del camino de socio permanente.** Ese
   camino corta con "Socio sin registro de membresía vigente" y un militar alojado nunca va
   a tener membresía: no es socio de ningún club. Puesta después, la rama sería inalcanzable
