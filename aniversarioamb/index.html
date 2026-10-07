@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consulta de inscripción · Carrera 106º Aniversario AMB</title>
+<meta name="description" content="Consulta con tu cédula si quedaste inscrito en la Carrera 10K y Caminata 5K del 106º Aniversario de la Aviación Militar Bolivariana.">
+<!-- El enlace va a circular por WhatsApp: esto es lo que se ve en la vista previa. -->
+<meta property="og:title" content="¿Quedaste inscrito? Carrera 10K y Caminata 5K">
+<meta property="og:description" content="106º Aniversario de la Aviación Militar Bolivariana · 17 de octubre de 2026 · Base Aérea La Carlota. Consulta con tu cédula.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#0b2447">
+<meta name="color-scheme" content="only light">
+<link rel="icon" href="/logo-106.png" type="image/png">
+<style>
+  :root {
+    --fondo: #f3f6fb;
+    --tarjeta: #ffffff;
+    --texto: #0f1d33;
+    --suave: #5a6a82;
+    --borde: #d8e0ec;
+    --marca: #0b2447;
+    --acento: #1f6feb;
+    --dorado: #c9a227;
+    --ok-fondo: #e7f6ec; --ok-borde: #7cc79a; --ok-texto: #0f5a2c;
+    --no-fondo: #fdecec; --no-borde: #eaa0a0; --no-texto: #8a1c1c;
+    --nada-fondo: #eef1f6; --nada-borde: #c5cedb; --nada-texto: #34445c;
+  }
+  /* Siempre claro, aunque el teléfono esté en modo oscuro: el diseño se
+     decidió así, y el logo (aviones negros) solo se lee sobre fondo claro.
+     color-scheme evita que el navegador oscurezca los campos por su cuenta. */
+  :root { color-scheme: only light; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--fondo);
+    color: var(--texto);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    /* La foto es casi toda cielo y nubes blancas: sin el velo azul el texto
+       blanco no se lee. El velo se aclara hacia arriba para que se vean los
+       aviones y se cierra abajo, donde están las fechas y entra la tarjeta. */
+    background:
+      linear-gradient(180deg, rgba(11, 36, 71, .45) 0%, rgba(11, 36, 71, .7) 55%, rgba(11, 36, 71, .92) 100%),
+      #0b2447 url("/fondo.jpg") 62% 45% / cover no-repeat;
+    color: #fff;
+    /* Más alta en pantallas anchas: con la altura del teléfono la foto quedaba
+       recortada a una franja y no se veían los aviones. */
+    padding: clamp(56px, 9vw, 130px) 16px clamp(96px, 12vw, 170px);
+    text-align: center;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, .45);
+  }
+  .aniversario {
+    display: inline-block;
+    font-size: 13px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--dorado);
+    background: rgba(11, 36, 71, .55);
+    border: 1px solid rgba(201, 162, 39, .6);
+    border-radius: 999px;
+    padding: 4px 14px;
+    margin-bottom: 16px;
+  }
+  h1 { margin: 0 0 6px; font-size: clamp(26px, 6vw, 36px); line-height: 1.15; }
+  .institucion { margin: 0; color: #c7d5ec; font-size: 15px; }
+  .datos-evento {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+    margin: 20px 0 0; padding: 0; list-style: none;
+  }
+  .datos-evento li {
+    background: rgba(11, 36, 71, .55);
+    border: 1px solid rgba(255, 255, 255, .15);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 14px;
+  }
+  main { max-width: 520px; margin: -48px auto 40px; padding: 0 16px; }
+  .tarjeta {
+    background: var(--tarjeta);
+    border: 1px solid var(--borde);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 10px 30px rgba(11, 36, 71, .12);
+  }
+  label { display: block; font-weight: 600; margin-bottom: 8px; }
+  .fila { display: flex; gap: 8px; }
+  input {
+    flex: 1; min-width: 0;
+    font: inherit; font-size: 20px; letter-spacing: .04em;
+    padding: 12px 14px;
+    color: var(--texto);
+    background: var(--fondo);
+    border: 1px solid var(--borde);
+    border-radius: 10px;
+  }
+  input:focus { outline: 2px solid var(--acento); outline-offset: 1px; }
+  button {
+    font: inherit; font-weight: 600;
+    padding: 0 20px;
+    color: #fff;
+    background: var(--acento);
+    border: 0; border-radius: 10px;
+    cursor: pointer;
+  }
+  button:disabled { opacity: .6; cursor: progress; }
+  .ayuda { margin: 8px 0 0; font-size: 14px; color: var(--suave); }
+  .resultado {
+    margin-top: 20px;
+    border: 1px solid; border-radius: 12px;
+    padding: 18px;
+  }
+  .resultado[hidden], .resultado .modalidad[hidden] { display: none; }
+  .resultado h2 { margin: 0 0 6px; font-size: 20px; }
+  .resultado p { margin: 0; }
+  .resultado .cedula { font-size: 14px; opacity: .8; margin-bottom: 8px; }
+  .resultado .modalidad {
+    display: inline-block; margin-top: 12px;
+    font-weight: 700; font-size: 15px;
+    padding: 4px 12px; border-radius: 999px;
+    background: var(--ok-texto); color: var(--ok-fondo);
+  }
+  .inscrito { background: var(--ok-fondo); border-color: var(--ok-borde); color: var(--ok-texto); }
+  .excluido { background: var(--no-fondo); border-color: var(--no-borde); color: var(--no-texto); }
+  .neutro { background: var(--nada-fondo); border-color: var(--nada-borde); color: var(--nada-texto); }
+  footer { text-align: center; font-size: 13px; color: var(--suave); padding: 0 16px 32px; }
+</style>
+</head>
+<body>
+<header>
+  <span class="aniversario">106º Aniversario</span>
+  <h1>Carrera 10K y Caminata 5K</h1>
+  <p class="institucion">Aviación Militar Bolivariana</p>
+  <ul class="datos-evento">
+    <li>17 de octubre de 2026</li>
+    <li>07:00</li>
+    <li>Base Aérea La Carlota</li>
+  </ul>
+</header>
+
+<main>
+  <form class="tarjeta" id="formulario" novalidate>
+    <label for="cedula">Consulta tu inscripción</label>
+    <div class="fila">
+      <input id="cedula" name="cedula" inputmode="numeric" autocomplete="off"
+             placeholder="Ej. 12345678" maxlength="16" required>
+      <button type="submit" id="boton">Consultar</button>
+    </div>
+    <p class="ayuda">Escribe tu número de cédula, sin puntos ni letra.</p>
+
+    <div class="resultado" id="resultado" hidden role="status" aria-live="polite">
+      <p class="cedula" id="res-cedula"></p>
+      <h2 id="res-titulo"></h2>
+      <p id="res-mensaje"></p>
+      <span class="modalidad" id="res-modalidad" hidden></span>
+    </div>
+  </form>
+</main>
+
+<footer>Base Aérea Generalísimo Francisco de Miranda · La Carlota</footer>
+
+<script src="/app.js"></script>
+</body>
+</html>

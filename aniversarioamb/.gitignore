@@ -1,0 +1,7 @@
+# El repo es PÚBLICO. Los Excel traen cédula, teléfono, correo y fecha de
+# nacimiento de casi 1.900 personas: no salen de esta máquina. Lo único que se
+# sube es datos.json, que solo guarda HMAC de cédulas.
+*.xlsx
+*.xls
+*.docx
+.pimienta
