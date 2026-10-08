@@ -54,12 +54,16 @@ def sin_acentos(texto):
 
 
 def leer_planilla(patron, columna_modalidad):
-    """Busca las columnas por su título, no por posición: las dos planillas
-    tienen el orden distinto y una versión corregida podría moverlo otra vez."""
     archivos = glob.glob(os.path.join(AQUI, patron))
     if len(archivos) != 1:
         sys.exit(f"Esperaba un archivo para {patron!r} y hay {len(archivos)}")
-    hoja = openpyxl.load_workbook(archivos[0], read_only=True, data_only=True).worksheets[0]
+    return leer_archivo(archivos[0], columna_modalidad)
+
+
+def leer_archivo(ruta, columna_modalidad):
+    """Busca las columnas por su título, no por posición: las dos planillas
+    tienen el orden distinto y una versión corregida podría moverlo otra vez."""
+    hoja = openpyxl.load_workbook(ruta, read_only=True, data_only=True).worksheets[0]
     filas = hoja.iter_rows(values_only=True)
 
     for fila in filas:
@@ -69,7 +73,7 @@ def leer_planilla(patron, columna_modalidad):
             col_modalidad = next(i for i, t in enumerate(titulos) if t.startswith(columna_modalidad))
             break
     else:
-        sys.exit(f"No encontré la fila de títulos en {archivos[0]}")
+        sys.exit(f"No encontré la fila de títulos en {ruta}")
 
     registros = {}
     for fila in filas:
@@ -95,6 +99,11 @@ def clave(pimienta, cedula):
 
 def main():
     inscritos = leer_planilla("*DEFINITIVO*.xlsx", "PARTICIPACI")
+    # Las altas sueltas que se sumaron después con agregar_inscritos.py: sin
+    # esto, regenerar desde la lista definitiva las borraría sin avisar.
+    for ruta in sorted(glob.glob(os.path.join(AQUI, "adicionales", "*.xlsx"))):
+        for cedula, modalidades in leer_archivo(ruta, "PARTICIPACI").items():
+            inscritos.setdefault(cedula, set()).update(modalidades)
     excluidos = leer_planilla("*EXCLUIDOS*.xlsx", "MODALIDAD")
     pimienta = cargar_pimienta()
 
