@@ -17,7 +17,7 @@ import os
 import shutil
 import sys
 
-from generar_datos import AQUI, cargar_pimienta, clave, leer_archivo
+from generar_datos import AQUI, HOJA_INSCRITOS, cargar_pimienta, clave, leer_archivo
 
 RUTA_DATOS = os.path.join(AQUI, "datos.json")
 
@@ -26,7 +26,7 @@ def main():
     if len(sys.argv) != 2:
         sys.exit(__doc__)
     origen = sys.argv[1]
-    nuevos = leer_archivo(origen, "PARTICIPACI")
+    nuevos = leer_archivo(origen, "PARTICIPACI", HOJA_INSCRITOS)
     if not nuevos:
         sys.exit("El archivo no trae ninguna cédula válida: no se cambió nada.")
 

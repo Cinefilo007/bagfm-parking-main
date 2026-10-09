@@ -53,17 +53,30 @@ def sin_acentos(texto):
     return "".join(c for c in unicodedata.normalize("NFD", texto) if unicodedata.category(c) != "Mn")
 
 
-def leer_planilla(patron, columna_modalidad):
+# La lista definitiva del 09-10-2026 llegó con tres hojas y la primera era
+# "BDD A EXCLUIR": leer la primera a ciegas habría publicado 15 cédulas como
+# si fueran todo el listado.
+HOJA_INSCRITOS = "BDD TOTAL DEF"
+
+
+def leer_planilla(patron, columna_modalidad, hoja=None):
     archivos = glob.glob(os.path.join(AQUI, patron))
     if len(archivos) != 1:
         sys.exit(f"Esperaba un archivo para {patron!r} y hay {len(archivos)}")
-    return leer_archivo(archivos[0], columna_modalidad)
+    return leer_archivo(archivos[0], columna_modalidad, hoja)
 
 
-def leer_archivo(ruta, columna_modalidad):
+def leer_archivo(ruta, columna_modalidad, hoja=None):
     """Busca las columnas por su título, no por posición: las dos planillas
     tienen el orden distinto y una versión corregida podría moverlo otra vez."""
-    hoja = openpyxl.load_workbook(ruta, read_only=True, data_only=True).worksheets[0]
+    libro = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
+    if hoja and hoja in libro.sheetnames:
+        hoja = libro[hoja]
+    elif len(libro.worksheets) == 1:
+        hoja = libro.worksheets[0]
+    else:
+        sys.exit(f"{os.path.basename(ruta)} tiene varias hojas {libro.sheetnames} "
+                 f"y ninguna se llama {hoja!r}: no sé cuál es la lista.")
     filas = hoja.iter_rows(values_only=True)
 
     for fila in filas:
@@ -98,7 +111,7 @@ def clave(pimienta, cedula):
 
 
 def main():
-    inscritos = leer_planilla("*DEFINITIVO*.xlsx", "PARTICIPACI")
+    inscritos = leer_planilla("*DEFINITIVO*.xlsx", "PARTICIPACI", HOJA_INSCRITOS)
     # Las altas sueltas que se sumaron después con agregar_inscritos.py: sin
     # esto, regenerar desde la lista definitiva las borraría sin avisar.
     for ruta in sorted(glob.glob(os.path.join(AQUI, "adicionales", "*.xlsx"))):
